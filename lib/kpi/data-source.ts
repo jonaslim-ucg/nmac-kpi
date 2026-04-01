@@ -21,7 +21,7 @@ export const MOCK_DOCTORS = [
 
 /** Shown to everyone — avoid product/vendor jargon */
 export const MSG_DATA_NOT_CONFIGURED =
-  "The data connection isn’t set up yet. Ask whoever manages this app or your IT contact to finish the environment configuration.";
+  "The data connection isn’t set up yet. If this site is hosted online, add the Supabase URL and anon key in your hosting project’s environment variables (for Vercel: Project → Settings → Environment Variables), then redeploy. Otherwise ask whoever manages this app or your IT contact to finish local configuration.";
 
 export const MSG_KPIS_NOT_INITIALIZED =
   "No KPIs are available yet. Your technical contact needs to run the one-time database setup (schema and seed scripts from the project).";

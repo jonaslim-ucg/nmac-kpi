@@ -16,16 +16,18 @@ npm install
 cp .env.example .env.local
 ```
 
-3. Fill `.env.local`:
+3. Fill `.env.local` (see [`.env.example`](.env.example) for all keys):
 
-```bash
-NEXT_PUBLIC_SUPABASE_URL=your-project-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-```
+   - **Supabase:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (Settings → API → service role — server-only, never expose to the browser).
+   - **Auth:** `AUTH_SECRET` — at least 32 characters (e.g. `openssl rand -base64 32`).
+   - **Optional:** `AUTH_ALLOWED_EMAIL_DOMAINS` (comma-separated, e.g. `ucg.bm`) to restrict sign-in; `AUTH_BOOTSTRAP_ADMIN_EMAILS` for extra admin grants on first signup (after the first user).
+   - **Microsoft Graph (email codes):** `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `GRAPH_SENDER_EMAIL` (mailbox that sends mail), `GRAPH_SENDER_NAME` (e.g. `NMAC KPI`). In Azure Entra ID, the app registration needs **Application** permission **Mail.Send** on Microsoft Graph, with **admin consent**.
+
+   **If Outlook still shows the wrong sender name (e.g. “NMAC CRM”):** Microsoft 365 often uses the **mailbox / user display name** from the directory, not only the Graph API. In [Microsoft 365 admin](https://admin.microsoft.com) go to **Users** → open the account for `GRAPH_SENDER_EMAIL` → set **Display name** to **NMAC KPI** (or **Exchange admin center** → **Recipients** → **Mailboxes** → same mailbox → edit display name). Redeploy is not required for that change.
 
 4. In Supabase **SQL Editor**, run in order:
 
-   - [`supabase/schema.sql`](supabase/schema.sql) — tables + RLS  
+   - [`supabase/schema.sql`](supabase/schema.sql) — KPI tables + `app_users` / `auth_otp_codes` + RLS  
    - [`supabase/seed.sql`](supabase/seed.sql) — KPI definitions + 2026 weekly sample data (weeks 1–8)
 
 5. Start locally:
@@ -38,9 +40,20 @@ npm run dev
 
 - **`kpi_definitions`** — KPI metadata and targets (`slug`, `label`, `unit`, `suffix`, `target`, `sort_order`).
 - **`kpi_weekly_values`** — Weekly `this_year` / `last_year` by `kpi_slug`, `year`, `week_index`.
+- **`app_users`** — `email`, optional `first_name` / `last_name` (shown in the UI instead of email when set), and role (`viewer`, `editor`, `admin`). First successful sign-up becomes **admin** when the table was empty; after that, new users default to **viewer** unless listed in `AUTH_BOOTSTRAP_ADMIN_EMAILS` or an admin changes their role under **Users**. If the table already exists without name columns, run [`supabase/add-user-names.sql`](supabase/add-user-names.sql) in the SQL Editor.
+- **`auth_otp_codes`** — Short-lived hashed OTP for email sign-in (service role only).
 
 Admin **Save** uses `upsert` on `(kpi_slug, year, week_index)`.
 
+## Sign-in and roles
+
+- **Viewer** — Dashboard and doctors (read-only).
+- **Editor** — Can use **Data entry** to save weekly values.
+- **Admin** — Editor capabilities plus **Users** to add users and change roles.
+
 ## Vercel
 
-Add the same `NEXT_PUBLIC_SUPABASE_*` variables to the project environment, then deploy.
+1. In [Supabase](https://supabase.com/dashboard) → your project → **Settings → API**, copy **Project URL**, **anon public**, and **service_role** (secret).
+2. In [Vercel](https://vercel.com) → your project → **Settings → Environment Variables**, add every variable from `.env.local` that the app needs, including `AUTH_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, and the Azure / Graph keys for sending login codes.
+3. Enable **Production** (and **Preview** if you use preview URLs) for each variable as appropriate.
+4. **Redeploy** after changing variables. `NEXT_PUBLIC_*` values are baked in at build time; server secrets apply at runtime but still require a new deployment when first added.

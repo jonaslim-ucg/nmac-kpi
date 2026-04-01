@@ -1,9 +1,16 @@
 "use client";
 
 import { ThemeProvider } from "next-themes";
-import { MockRoleProvider } from "@/components/dashboard/mock-role-provider";
+import { SessionProvider } from "@/components/auth/session-provider";
+import type { SessionUser } from "@/lib/auth/session-user";
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({
+  children,
+  initialSessionUser,
+}: {
+  children: React.ReactNode;
+  initialSessionUser: SessionUser | null;
+}) {
   return (
     <ThemeProvider
       attribute="class"
@@ -12,9 +19,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       storageKey="nmac-kpi-theme"
       disableTransitionOnChange
     >
-      <MockRoleProvider>
+      <SessionProvider initialUser={initialSessionUser}>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
-      </MockRoleProvider>
+      </SessionProvider>
     </ThemeProvider>
   );
 }

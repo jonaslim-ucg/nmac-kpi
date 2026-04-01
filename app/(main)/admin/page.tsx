@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSession } from "@/components/auth/session-provider";
 import { MainShell } from "@/components/dashboard/main-shell";
-import { useAppRole } from "@/components/dashboard/mock-role-provider";
+import { canEditKpiData } from "@/lib/auth/types";
 import {
   formatKpiValue,
   loadKpiDefinitions,
@@ -22,12 +22,12 @@ function nextWeekIndex(rows: WeeklyRow[]): number {
 }
 
 export default function AdminPage() {
-  const { role } = useAppRole();
+  const { user, loading: sessionLoading } = useSession();
   const [kpis, setKpis] = useState<KpiDefinition[]>([]);
   const [slug, setSlug] = useState("");
   const [year, setYear] = useState(2026);
   const [rows, setRows] = useState<WeeklyRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [kpiLoading, setKpiLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   /** Shown only on the empty setup screen (no KPIs) */
   const [setupError, setSetupError] = useState<string | null>(null);
@@ -40,7 +40,7 @@ export default function AdminPage() {
   useEffect(() => {
     let active = true;
     async function init() {
-      setLoading(true);
+      setKpiLoading(true);
       const defs = await loadKpiDefinitions();
       if (!active) return;
       setKpis(defs.data);
@@ -51,7 +51,7 @@ export default function AdminPage() {
       } else {
         setSetupError(null);
       }
-      setLoading(false);
+      setKpiLoading(false);
     }
     init();
     return () => {
@@ -87,23 +87,28 @@ export default function AdminPage() {
     setSnackbar(null);
   }
 
-  if (role !== "admin") {
+  if (sessionLoading) {
+    return (
+      <MainShell title="Data entry" subtitle="Loading">
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      </MainShell>
+    );
+  }
+
+  if (!canEditKpiData(user?.role)) {
     return (
       <MainShell title="Data entry" subtitle="Restricted">
         <div className="mx-auto max-w-md rounded-xl border border-border bg-card p-8 text-center">
           <p className="text-muted-foreground">
-            You don’t have permission to edit data. Switch to <strong>Admin</strong> under{" "}
-            <Link href="/settings" className="font-medium text-accent underline">
-              Settings
-            </Link>{" "}
-            for testing, or sign in with an admin account when sign-in is enabled.
+            You don’t have permission to edit data. Ask an administrator to assign you the <strong>Editor</strong> or{" "}
+            <strong>Admin</strong> role.
           </p>
         </div>
       </MainShell>
     );
   }
 
-  if (loading) {
+  if (kpiLoading) {
     return (
       <MainShell title="Data entry" subtitle="Loading KPI setup">
         <p className="text-sm text-muted-foreground">Loading…</p>

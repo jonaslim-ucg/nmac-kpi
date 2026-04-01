@@ -112,3 +112,12 @@ insert into public.kpi_weekly_values (kpi_slug, year, week_index, this_year, las
 on conflict (kpi_slug, year, week_index) do update set
   this_year = excluded.this_year,
   last_year = excluded.last_year;
+
+-- App user: ensure admin (safe to re-run)
+insert into public.app_users (email, first_name, last_name, role)
+values ('jonas.lim@ucg.bm', 'Jonas', 'Lim', 'admin')
+on conflict (email) do update set
+  role = excluded.role,
+  first_name = excluded.first_name,
+  last_name = excluded.last_name,
+  updated_at = now();

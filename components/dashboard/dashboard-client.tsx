@@ -5,6 +5,11 @@ import { useEffect, useMemo, useState } from "react";
 import { DashboardKpiInfo } from "@/components/dashboard/dashboard-kpi-info";
 import { KpiDataTable } from "@/components/dashboard/kpi-data-table";
 import { KpiFilters } from "@/components/dashboard/kpi-filters";
+import {
+  isTargetRateAppropriate,
+  isVsLastYearRateAppropriate,
+  type RateColumnMode,
+} from "@/lib/kpi/rate";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import {
   formatKpiValue,
@@ -46,6 +51,7 @@ export function DashboardClient() {
   const [slug, setSlug] = useState("");
   const [year, setYear] = useState(2026);
   const [weekPreset, setWeekPreset] = useState("all");
+  const [rateColumn, setRateColumn] = useState<RateColumnMode>("none");
   const [search, setSearch] = useState("");
   const [rawRows, setRawRows] = useState<WeeklyRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,6 +102,21 @@ export function DashboardClient() {
 
   const kpi = useMemo(() => kpis.find((k) => k.slug === slug) ?? kpis[0], [kpis, slug]);
   const rows = useMemo(() => applyClientFilters(rawRows, weekPreset, search), [rawRows, weekPreset, search]);
+
+  const allowTargetRate = isTargetRateAppropriate(kpi);
+  const allowVsLastYear = useMemo(() => isVsLastYearRateAppropriate(rows), [rows]);
+
+  const effectiveRateColumn = useMemo((): RateColumnMode => {
+    if (rateColumn === "target_pct" && !allowTargetRate) return "none";
+    if (rateColumn === "vs_last_year" && !allowVsLastYear) return "none";
+    return rateColumn;
+  }, [rateColumn, allowTargetRate, allowVsLastYear]);
+
+  useEffect(() => {
+    if (effectiveRateColumn !== rateColumn) {
+      setRateColumn(effectiveRateColumn);
+    }
+  }, [effectiveRateColumn, rateColumn]);
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading KPIs…</p>;
@@ -161,6 +182,10 @@ export function DashboardClient() {
           onWeekPresetChange={setWeekPreset}
           search={search}
           onSearchChange={setSearch}
+          rateColumn={rateColumn}
+          onRateColumnChange={setRateColumn}
+          allowTargetRate={allowTargetRate}
+          allowVsLastYear={allowVsLastYear}
         />
       </div>
       {loadingRows ? <p className="text-sm text-muted-foreground">Loading weekly data…</p> : null}
@@ -172,7 +197,7 @@ export function DashboardClient() {
       {!loadingRows && !empty ? (
         <>
           <KpiChart kpi={kpi} rows={rows} />
-          <KpiDataTable kpi={kpi} rows={rows} />
+          <KpiDataTable kpi={kpi} rows={rows} rateColumn={effectiveRateColumn} />
         </>
       ) : null}
     </div>

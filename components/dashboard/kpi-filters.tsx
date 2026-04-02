@@ -3,6 +3,8 @@
 import { Search } from "lucide-react";
 import type { KpiDefinition } from "@/lib/kpi/types";
 
+import type { RateColumnMode } from "@/lib/kpi/rate";
+
 type Props = {
   kpis: KpiDefinition[];
   selectedSlug: string;
@@ -13,6 +15,10 @@ type Props = {
   onWeekPresetChange: (p: string) => void;
   search: string;
   onSearchChange: (s: string) => void;
+  rateColumn: RateColumnMode;
+  onRateColumnChange: (mode: RateColumnMode) => void;
+  allowTargetRate: boolean;
+  allowVsLastYear: boolean;
 };
 
 export function KpiFilters({
@@ -25,6 +31,10 @@ export function KpiFilters({
   onWeekPresetChange,
   search,
   onSearchChange,
+  rateColumn,
+  onRateColumnChange,
+  allowTargetRate,
+  allowVsLastYear,
 }: Props) {
   const field =
     "rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground shadow-sm";
@@ -69,6 +79,23 @@ export function KpiFilters({
           <option value="all">All loaded weeks</option>
           <option value="4">Last 4 weeks</option>
           <option value="8">Last 8 weeks</option>
+        </select>
+      </label>
+      <label className="flex min-w-[180px] flex-col gap-1">
+        <span className="text-xs font-medium text-muted-foreground">Rate column</span>
+        <select
+          className={field}
+          value={rateColumn}
+          onChange={(e) => onRateColumnChange(e.target.value as RateColumnMode)}
+          title="Options depend on the KPI target and whether last-year data exists for the weeks you filtered."
+        >
+          <option value="none">Hidden</option>
+          <option value="target_pct" disabled={!allowTargetRate}>
+            Target %
+          </option>
+          <option value="vs_last_year" disabled={!allowVsLastYear}>
+            vs last year
+          </option>
         </select>
       </label>
       <label className="flex min-w-[200px] flex-1 flex-col gap-1">

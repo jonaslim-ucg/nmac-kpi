@@ -20,10 +20,16 @@ export function rateVsTargetPct(thisYear: number | null, target: number): string
   return pct % 1 === 0 ? `${Math.round(pct)}%` : `${pct.toFixed(1)}%`;
 }
 
+/** Percent change vs the same period last year (numeric); null if not computable. */
+export function yoyDeltaNumeric(thisYear: number | null, lastYear: number | null): number | null {
+  if (thisYear === null || lastYear === null || lastYear === 0) return null;
+  return ((thisYear - lastYear) / lastYear) * 100;
+}
+
 /** Percent change vs the same week last year. */
 export function rateVsLastYearPct(thisYear: number | null, lastYear: number | null): string {
-  if (thisYear === null || lastYear === null || lastYear === 0) return "—";
-  const pct = ((thisYear - lastYear) / lastYear) * 100;
+  const pct = yoyDeltaNumeric(thisYear, lastYear);
+  if (pct === null) return "—";
   const s = pct % 1 === 0 ? String(Math.round(pct)) : pct.toFixed(1);
   return `${pct > 0 ? "+" : ""}${s}%`;
 }

@@ -22,7 +22,9 @@ const KpiChart = dynamic(
   () => import("@/components/dashboard/kpi-chart").then((m) => m.KpiChart),
   {
     ssr: false,
-    loading: () => <div className="h-[340px] rounded-xl border border-border bg-card" />,
+    loading: () => (
+      <div className="dashboard-card h-[340px] animate-pulse bg-surface-muted/30" aria-hidden />
+    ),
   },
 );
 
@@ -119,14 +121,23 @@ export function DashboardClient() {
   }, [effectiveRateColumn, rateColumn]);
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading KPIs…</p>;
+    return (
+      <div className="space-y-4" aria-busy="true">
+        <div className="dashboard-card h-36 animate-pulse bg-surface-muted/40" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="dashboard-card h-28 animate-pulse bg-surface-muted/40" />
+          <div className="dashboard-card h-28 animate-pulse bg-surface-muted/40" />
+        </div>
+        <p className="text-sm text-muted-foreground">Loading KPIs…</p>
+      </div>
+    );
   }
 
   if (!kpi) {
     return (
       <div className="space-y-2">
         {notice ? (
-          <p className="rounded-lg border border-amber-400/40 bg-amber-100/70 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+          <p className="rounded-lg border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
             {notice}
           </p>
         ) : null}
@@ -158,9 +169,9 @@ export function DashboardClient() {
   const empty = rows.length === 0;
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6">
+    <div className="mx-auto flex max-w-6xl flex-col gap-7">
       {notice ? (
-        <p className="rounded-lg border border-amber-400/40 bg-amber-100/70 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+        <p className="rounded-lg border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
           {notice}
         </p>
       ) : null}
@@ -171,26 +182,24 @@ export function DashboardClient() {
         filteredCount={rows.length}
       />
       <SummaryCards cards={cards} />
-      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-        <KpiFilters
-          kpis={kpis}
-          selectedSlug={slug}
-          onKpiChange={setSlug}
-          year={year}
-          onYearChange={setYear}
-          weekPreset={weekPreset}
-          onWeekPresetChange={setWeekPreset}
-          search={search}
-          onSearchChange={setSearch}
-          rateColumn={rateColumn}
-          onRateColumnChange={setRateColumn}
-          allowTargetRate={allowTargetRate}
-          allowVsLastYear={allowVsLastYear}
-        />
-      </div>
+      <KpiFilters
+        kpis={kpis}
+        selectedSlug={slug}
+        onKpiChange={setSlug}
+        year={year}
+        onYearChange={setYear}
+        weekPreset={weekPreset}
+        onWeekPresetChange={setWeekPreset}
+        search={search}
+        onSearchChange={setSearch}
+        rateColumn={rateColumn}
+        onRateColumnChange={setRateColumn}
+        allowTargetRate={allowTargetRate}
+        allowVsLastYear={allowVsLastYear}
+      />
       {loadingRows ? <p className="text-sm text-muted-foreground">Loading weekly data…</p> : null}
       {!loadingRows && empty ? (
-        <p className="rounded-xl border border-dashed border-border bg-card py-16 text-center text-muted-foreground">
+        <p className="rounded-xl border border-dashed border-border bg-card/80 py-16 text-center text-muted-foreground">
           No rows match your filters.
         </p>
       ) : null}

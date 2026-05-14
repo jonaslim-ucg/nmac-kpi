@@ -37,12 +37,13 @@ export function KpiFilters({
   allowVsLastYear,
 }: Props) {
   const field =
-    "rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground shadow-sm";
+    "rounded-lg border border-border bg-surface-muted/60 px-3 py-2 text-sm text-foreground shadow-inner outline-none transition focus:border-accent focus:ring-1 focus:ring-accent/30 dark:bg-surface-muted/40";
 
   return (
-    <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
-      <label className="flex min-w-[180px] flex-1 flex-col gap-1">
-        <span className="text-xs font-medium text-muted-foreground">KPI</span>
+    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
+        <label className="flex min-w-[180px] flex-1 flex-col gap-1">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">KPI</span>
         <select
           className={field}
           value={selectedSlug}
@@ -56,7 +57,7 @@ export function KpiFilters({
         </select>
       </label>
       <label className="flex w-28 flex-col gap-1">
-        <span className="text-xs font-medium text-muted-foreground">Year</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Year</span>
         <select
           className={field}
           value={String(year)}
@@ -70,7 +71,7 @@ export function KpiFilters({
         </select>
       </label>
       <label className="flex min-w-[140px] flex-col gap-1">
-        <span className="text-xs font-medium text-muted-foreground">Week range</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Week range</span>
         <select
           className={field}
           value={weekPreset}
@@ -82,7 +83,7 @@ export function KpiFilters({
         </select>
       </label>
       <label className="flex min-w-[180px] flex-col gap-1">
-        <span className="text-xs font-medium text-muted-foreground">Rate column</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Rate column</span>
         <select
           className={field}
           value={rateColumn}
@@ -99,18 +100,19 @@ export function KpiFilters({
         </select>
       </label>
       <label className="flex min-w-[200px] flex-1 flex-col gap-1">
-        <span className="text-xs font-medium text-muted-foreground">Search</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Search</span>
         <span className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             type="search"
             placeholder="Search by week (e.g. Week 3)…"
-            className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm text-foreground shadow-sm placeholder:text-muted-foreground"
+            className="w-full rounded-lg border border-border bg-surface-muted/60 py-2 pl-9 pr-3 text-sm text-foreground shadow-inner outline-none transition placeholder:text-muted-foreground focus:border-accent focus:ring-1 focus:ring-accent/30 dark:bg-surface-muted/40"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
           />
         </span>
       </label>
+      </div>
     </div>
   );
 }

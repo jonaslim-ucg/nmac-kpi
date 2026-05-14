@@ -6,16 +6,14 @@ export function SummaryCards({ cards }: { cards: Card[] }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {cards.map((c) => (
-        <div
-          key={c.label}
-          className="rounded-xl border border-border bg-card p-5 shadow-sm"
-        >
-          <p className="text-sm font-medium text-muted-foreground">{c.label}</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-card-foreground">
+        <div key={c.label} className="dashboard-card p-5">
+          <span className="dashboard-card-accent" aria-hidden />
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{c.label}</p>
+          <p className="mt-2 font-mono text-[1.65rem] font-bold leading-none tracking-tight text-card-foreground">
             {c.value}
           </p>
           {c.hint ? (
-            <p className="mt-1 text-xs text-muted-foreground">{c.hint}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{c.hint}</p>
           ) : null}
         </div>
       ))}

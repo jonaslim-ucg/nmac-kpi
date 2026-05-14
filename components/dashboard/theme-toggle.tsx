@@ -1,11 +1,11 @@
 "use client";
 
 import { Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
+import { useAppTheme } from "@/components/app-theme-provider";
 import { useEffect, useState } from "react";
 
 export function ThemeToggle() {
-  const { resolvedTheme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useAppTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -15,19 +15,19 @@ export function ThemeToggle() {
   if (!mounted) {
     return (
       <span
-        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card"
+        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-muted/50"
         aria-hidden
       />
     );
   }
 
-  const isDark = resolvedTheme === "dark";
+  const isDark = resolvedTheme !== "light";
 
   return (
     <button
       type="button"
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground shadow-sm transition hover:border-accent hover:bg-accent-muted hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-muted/50 text-foreground shadow-sm transition hover:border-accent hover:bg-accent-muted/50 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       aria-pressed={isDark}
     >

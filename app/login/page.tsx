@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { AppBrand } from "@/components/dashboard/app-logo";
 
 type Step = "email" | "code";
 
@@ -69,7 +70,12 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm">
-        <h1 className="text-xl font-semibold text-foreground">NMAC KPI</h1>
+        <div className="mb-6">
+          <AppBrand layout="login" />
+        </div>
+        <h1 className="text-lg font-semibold tracking-tight text-foreground">
+          {step === "email" ? "Sign in" : "Check your email"}
+        </h1>
         {step === "email" ? (
           <>
             <p className="mt-2 text-sm text-muted-foreground">

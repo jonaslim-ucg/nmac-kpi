@@ -18,7 +18,7 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NMAC 2026 – KPI Dashboard",
+  title: "NMAC KPI",
   description: "Weekly practice KPI dashboard",
 };
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { establishSessionForEmail } from "@/lib/auth/establish-session";
+import { establishSessionForEmails } from "@/lib/auth/establish-session";
 import { applySessionCookie } from "@/lib/auth/session-cookie";
 import { fetchBitrixUserCurrent } from "@/lib/bitrix/integration-rest";
 import { isPortalAllowedByEnv, isValidBitrixPortalDomain, normalizePortalDomain } from "@/lib/bitrix/portal";
@@ -67,19 +67,18 @@ export async function POST(req: Request) {
     );
   }
 
-  const emailRaw = bx.user.email?.trim() ?? "";
-  if (!emailRaw) {
+  if (bx.user.emails.length === 0) {
     return NextResponse.json(
       {
         ok: false,
         message:
-          "Your Bitrix profile has no work email. Add an email in Bitrix24 profile settings, then reload this app.",
+          "Your Bitrix profile has no email. Add a work or personal email in Bitrix24 profile settings, then reload this app.",
       },
       { status: 401 },
     );
   }
 
-  const session = await establishSessionForEmail(emailRaw);
+  const session = await establishSessionForEmails(bx.user.emails);
   if (!session.ok) {
     return NextResponse.json({ ok: false, message: session.message }, { status: session.status });
   }

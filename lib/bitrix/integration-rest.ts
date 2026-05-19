@@ -1,7 +1,11 @@
+import { isValidEmailFormat } from "@/lib/auth/email-policy";
 import { normalizePortalDomain } from "@/lib/bitrix/portal";
 
 export interface BitrixUserCurrentResult {
+  /** Primary email from Bitrix (usually work). */
   email: string | null;
+  /** Work + personal addresses from the profile, in priority order. */
+  emails: string[];
   id: string | null;
   displayName: string | null;
 }
@@ -84,14 +88,36 @@ export async function fetchBitrixUserCurrent(
     };
   }
 
-  const email =
-    (typeof result.EMAIL === "string" && result.EMAIL.trim()) ||
-    (typeof result.email === "string" && result.email.trim()) ||
-    null;
+  const emails = emailsFromBitrixResult(result);
+  const email = emails[0] ?? null;
   const id =
     (typeof result.ID === "string" && result.ID) ||
     (typeof result.id === "string" && result.id) ||
     null;
 
-  return { ok: true, user: { email, id, displayName: displayNameFromBitrixResult(result) } };
+  return {
+    ok: true,
+    user: { email, emails, id, displayName: displayNameFromBitrixResult(result) },
+  };
+}
+
+const BITRIX_EMAIL_KEYS: [string, string][] = [
+  ["EMAIL", "email"],
+  ["PERSONAL_MAILBOX", "personal_mailbox"],
+  ["WORK_MAILBOX", "work_mailbox"],
+];
+
+/** Collect valid emails from Bitrix `user.current` (work email is not always in `EMAIL`). */
+export function emailsFromBitrixResult(result: Record<string, unknown>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const [upper, lower] of BITRIX_EMAIL_KEYS) {
+    const raw = bitrixResultString(result, upper, lower);
+    if (!raw || !isValidEmailFormat(raw)) continue;
+    const normalized = raw.toLowerCase();
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
 }

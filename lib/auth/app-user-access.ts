@@ -30,3 +30,16 @@ export async function lookupAppUserByEmail(emailRaw: string): Promise<AppUserRec
     role: data.role as AppRole,
   };
 }
+
+/** First directory match among candidate emails (e.g. Bitrix work + personal mailboxes). */
+export async function lookupAppUserByEmails(candidates: string[]): Promise<AppUserRecord | null> {
+  const seen = new Set<string>();
+  for (const raw of candidates) {
+    const email = raw.trim().toLowerCase();
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    const user = await lookupAppUserByEmail(email);
+    if (user) return user;
+  }
+  return null;
+}

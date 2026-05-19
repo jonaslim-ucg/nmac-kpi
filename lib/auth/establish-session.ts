@@ -1,4 +1,8 @@
-import { lookupAppUserByEmail, NO_APP_ACCESS_MESSAGE } from "@/lib/auth/app-user-access";
+import {
+  lookupAppUserByEmail,
+  lookupAppUserByEmails,
+  NO_APP_ACCESS_MESSAGE,
+} from "@/lib/auth/app-user-access";
 import { isEmailDomainAllowed, isValidEmailFormat } from "@/lib/auth/email-policy";
 import { signSessionToken } from "@/lib/auth/session";
 import type { AppRole } from "@/lib/auth/types";
@@ -25,7 +29,26 @@ export async function establishSessionForEmail(emailRaw: string): Promise<Establ
     };
   }
 
-  const user = await lookupAppUserByEmail(email);
+  return establishSessionForAppUser(await lookupAppUserByEmail(email));
+}
+
+/** Try several emails (Bitrix may expose work and personal addresses separately). */
+export async function establishSessionForEmails(
+  emailCandidates: string[],
+): Promise<EstablishSessionResult> {
+  const allowed = emailCandidates
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e && isValidEmailFormat(e) && isEmailDomainAllowed(e));
+  if (allowed.length === 0) {
+    return { ok: false, message: "Invalid email.", status: 400 };
+  }
+  const user = await lookupAppUserByEmails(allowed);
+  return establishSessionForAppUser(user);
+}
+
+async function establishSessionForAppUser(
+  user: Awaited<ReturnType<typeof lookupAppUserByEmail>>,
+): Promise<EstablishSessionResult> {
   if (!user) {
     return { ok: false, message: NO_APP_ACCESS_MESSAGE, status: 403 };
   }

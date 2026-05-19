@@ -1,18 +1,20 @@
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
-export type UserDashboardPreferences = {
+export const APP_SETTINGS_ID = "default";
+
+export type AppDashboardSettings = {
   hideLegacyNav: boolean;
   useNmacTestData: boolean;
   nmacMonthCacheRevision: number;
 };
 
-type PrefsRow = {
+type SettingsRow = {
   hide_legacy_nav: boolean;
   use_nmac_test_data: boolean;
   nmac_month_cache_revision: number | string;
 };
 
-function rowToPrefs(row: PrefsRow): UserDashboardPreferences {
+function rowToSettings(row: SettingsRow): AppDashboardSettings {
   return {
     hideLegacyNav: Boolean(row.hide_legacy_nav),
     useNmacTestData: row.use_nmac_test_data !== false,
@@ -20,30 +22,29 @@ function rowToPrefs(row: PrefsRow): UserDashboardPreferences {
   };
 }
 
-export async function getUserDashboardPreferences(userId: string): Promise<UserDashboardPreferences | null> {
+export async function getAppDashboardSettings(): Promise<AppDashboardSettings | null> {
   const supabase = createServiceRoleClient();
   const { data, error } = await supabase
-    .from("app_users")
+    .from("app_settings")
     .select("hide_legacy_nav,use_nmac_test_data,nmac_month_cache_revision")
-    .eq("id", userId)
+    .eq("id", APP_SETTINGS_ID)
     .maybeSingle();
 
   if (error || !data) return null;
-  return rowToPrefs(data as PrefsRow);
+  return rowToSettings(data as SettingsRow);
 }
 
-export type UpdateUserDashboardPreferencesInput = {
+export type UpdateAppDashboardSettingsInput = {
   hideLegacyNav?: boolean;
   useNmacTestData?: boolean;
   bumpNmacMonthCacheRevision?: boolean;
 };
 
-export async function updateUserDashboardPreferences(
-  userId: string,
-  input: UpdateUserDashboardPreferencesInput,
-): Promise<UserDashboardPreferences | null> {
+export async function updateAppDashboardSettings(
+  input: UpdateAppDashboardSettingsInput,
+): Promise<AppDashboardSettings | null> {
   const supabase = createServiceRoleClient();
-  const current = await getUserDashboardPreferences(userId);
+  const current = await getAppDashboardSettings();
   if (!current) return null;
 
   const patch: Record<string, unknown> = {
@@ -56,12 +57,12 @@ export async function updateUserDashboardPreferences(
   }
 
   const { data, error } = await supabase
-    .from("app_users")
+    .from("app_settings")
     .update(patch)
-    .eq("id", userId)
+    .eq("id", APP_SETTINGS_ID)
     .select("hide_legacy_nav,use_nmac_test_data,nmac_month_cache_revision")
     .single();
 
   if (error || !data) return null;
-  return rowToPrefs(data as PrefsRow);
+  return rowToSettings(data as SettingsRow);
 }

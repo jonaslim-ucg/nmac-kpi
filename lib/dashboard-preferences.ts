@@ -1,7 +1,10 @@
 import { STORAGE_KEY } from "@/lib/kpi-nmac-2026/model";
-import type { UserDashboardPreferences } from "@/lib/auth/user-preferences";
+import type { AppDashboardSettings } from "@/lib/auth/app-settings";
 
 export const DASHBOARD_PREFS_EVENT = "kpi-dashboard-prefs";
+
+/** Shared across all signed-in users (not per account). */
+export const GLOBAL_CACHE_REVISION_KEY = "global";
 
 export type DashboardPrefsDetail = {
   /** Re-run NMAC monthly + targets fetch (e.g. after clearing browser month cache). */
@@ -12,9 +15,9 @@ const HIDE_LEGACY_NAV_KEY = "kpi_hide_legacy_nav";
 const USE_NMAC_TEST_DATA_KEY = "kpi_nmac_use_test_data";
 const CACHE_REVISION_KEY_PREFIX = "kpi_nmac_cache_rev:";
 
-let syncedPrefs: UserDashboardPreferences | null = null;
+let syncedPrefs: AppDashboardSettings | null = null;
 
-export function applySyncedDashboardPrefs(prefs: UserDashboardPreferences | null) {
+export function applySyncedDashboardPrefs(prefs: AppDashboardSettings | null) {
   syncedPrefs = prefs;
 }
 
@@ -75,10 +78,10 @@ function writeLocalUseNmacTestData(use: boolean) {
   }
 }
 
-export function readLocalCacheRevision(userKey: string): number {
+export function readLocalCacheRevision(scopeKey: string): number {
   if (typeof window === "undefined") return 0;
   try {
-    const raw = window.localStorage.getItem(`${CACHE_REVISION_KEY_PREFIX}${userKey}`);
+    const raw = window.localStorage.getItem(`${CACHE_REVISION_KEY_PREFIX}${scopeKey}`);
     const n = Number(raw);
     return Number.isFinite(n) ? n : 0;
   } catch {
@@ -86,44 +89,24 @@ export function readLocalCacheRevision(userKey: string): number {
   }
 }
 
-export function writeLocalCacheRevision(userKey: string, revision: number) {
+export function writeLocalCacheRevision(scopeKey: string, revision: number) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(`${CACHE_REVISION_KEY_PREFIX}${userKey}`, String(revision));
+    window.localStorage.setItem(`${CACHE_REVISION_KEY_PREFIX}${scopeKey}`, String(revision));
   } catch {
     /* ignore */
   }
 }
 
-/** Account-synced when signed in; falls back to this browser when signed out. */
+/** Organization-wide when loaded from server; falls back to this browser when signed out. */
 export function loadHideLegacyNav(): boolean {
   if (syncedPrefs) return syncedPrefs.hideLegacyNav;
   return readLocalHideLegacyNav();
 }
 
-export function saveHideLegacyNav(hide: boolean) {
-  writeLocalHideLegacyNav(hide);
-  if (syncedPrefs) syncedPrefs = { ...syncedPrefs, hideLegacyNav: hide };
-  dispatchPrefs();
-}
-
-/** Default true so existing installs keep sample fill until turned off. */
 export function loadUseNmacTestData(): boolean {
   if (syncedPrefs) return syncedPrefs.useNmacTestData;
   return readLocalUseNmacTestData();
-}
-
-export function saveUseNmacTestData(use: boolean) {
-  writeLocalUseNmacTestData(use);
-  if (!use) clearNmacMonthlyLocalCacheOnly();
-  if (syncedPrefs) syncedPrefs = { ...syncedPrefs, useNmacTestData: use };
-  dispatchPrefs(use ? undefined : { reloadNmacFromServer: true });
-}
-
-/** Removes cached FY month actuals for NMAC charts in this browser (not Supabase). */
-export function clearNmacMonthlyLocalCache() {
-  clearNmacMonthlyLocalCacheOnly();
-  dispatchPrefs({ reloadNmacFromServer: true });
 }
 
 export function clearNmacMonthlyLocalCacheOnly() {
@@ -133,4 +116,10 @@ export function clearNmacMonthlyLocalCacheOnly() {
   } catch {
     /* ignore */
   }
+}
+
+/** @deprecated Use provider clearNmacMonthCache */
+export function clearNmacMonthlyLocalCache() {
+  clearNmacMonthlyLocalCacheOnly();
+  dispatchPrefs({ reloadNmacFromServer: true });
 }

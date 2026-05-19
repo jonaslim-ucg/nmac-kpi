@@ -31,11 +31,12 @@ type SwitchRowProps = {
   title: string;
   description: string;
   checked: boolean;
+  disabled?: boolean;
   onCheckedChange: (next: boolean) => void;
   icon: ReactNode;
 };
 
-function SwitchRow({ title, description, checked, onCheckedChange, icon }: SwitchRowProps) {
+function SwitchRow({ title, description, checked, disabled, onCheckedChange, icon }: SwitchRowProps) {
   return (
     <div className="flex gap-3 py-4 sm:gap-4">
       <div
@@ -53,10 +54,12 @@ function SwitchRow({ title, description, checked, onCheckedChange, icon }: Switc
           type="button"
           role="switch"
           aria-checked={checked}
+          aria-disabled={disabled}
+          disabled={disabled}
           aria-label={`${title}: ${checked ? "on" : "off"}`}
           onClick={() => onCheckedChange(!checked)}
           className={
-            "relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent " +
+            "relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 " +
             (checked ? "bg-accent" : "bg-muted-foreground/30")
           }
         >
@@ -79,6 +82,7 @@ export default function SettingsPage() {
   const { user, loading, logout, refresh } = useSession();
   const {
     ready: prefsReady,
+    canEdit: canEditOrgPrefs,
     hideLegacyNav,
     useNmacTestData,
     setHideLegacyNav,
@@ -149,9 +153,9 @@ export default function SettingsPage() {
               <Cloud className="h-5 w-5" strokeWidth={1.75} aria-hidden />
             </span>
             <div className="min-w-0 pt-0.5">
-              <h2 className="text-base font-semibold tracking-tight text-foreground">Your account</h2>
+              <h2 className="text-base font-semibold tracking-tight text-foreground">Organization</h2>
               <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                Saved to your account and sync on any device where you sign in.
+                Applies to every signed-in user. Changing a switch updates the dashboard for all accounts.
               </p>
             </div>
           </div>
@@ -161,13 +165,15 @@ export default function SettingsPage() {
               title="Hide legacy navigation"
               description="Hides Practice (weekly KPIs, doctors) and Data entry in the sidebar. You can still open those pages by URL."
               checked={hideLegacyNav}
+              disabled={!canEditOrgPrefs}
               onCheckedChange={(next) => void setHideLegacyNav(next)}
             />
             <SwitchRow
               icon={<Sparkles className="h-4 w-4" strokeWidth={2} />}
               title="Sample data for NMAC charts"
-              description="When on and months are empty, fills them with sample values for preview. Turning off clears cached month values on your devices and reloads saved data from your organization when available."
+              description="When on and months are empty, fills them with sample values for preview. Turning off clears cached month values for everyone and reloads saved data from your organization when available."
               checked={useNmacTestData}
+              disabled={!canEditOrgPrefs}
               onCheckedChange={(next) => void setUseNmacTestData(next)}
             />
           </div>
@@ -177,9 +183,8 @@ export default function SettingsPage() {
               Reset chart month cache
             </div>
             <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-              Clears cached FY month values for NMAC charts on all devices signed in as you. Data loads again after
-              refresh when your organization data is available. If sample data is on and nothing is saved, samples may
-              reappear.
+              Clears cached FY month values for NMAC charts for all users. Data loads again after refresh when your
+              organization data is available. If sample data is on and nothing is saved, samples may reappear.
             </p>
             {!cacheClearOpen ? (
               <button
@@ -192,7 +197,7 @@ export default function SettingsPage() {
               </button>
             ) : (
               <div className="mt-3 flex flex-col gap-2 rounded-lg border border-destructive/25 bg-destructive/[0.06] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-xs text-muted-foreground">Clears cache on all your signed-in devices. Continue?</p>
+                <p className="text-xs text-muted-foreground">Clears cache for every user. Continue?</p>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -209,7 +214,7 @@ export default function SettingsPage() {
                         setCacheClearing(true);
                         try {
                           await clearNmacMonthCache();
-                          setPrefsNote("Month cache cleared on your account.");
+                          setPrefsNote("Chart month cache cleared for everyone.");
                           setCacheClearOpen(false);
                           window.setTimeout(() => setPrefsNote(null), 5000);
                         } finally {

@@ -6,16 +6,15 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import { useSession } from "@/components/auth/session-provider";
-import type { UserDashboardPreferences } from "@/lib/auth/user-preferences";
+import type { AppDashboardSettings } from "@/lib/auth/app-settings";
 import {
   applySyncedDashboardPrefs,
   clearNmacMonthlyLocalCacheOnly,
-  DASHBOARD_PREFS_EVENT,
   dispatchPrefs,
+  GLOBAL_CACHE_REVISION_KEY,
   readLegacyLocalPrefs,
   readLocalCacheRevision,
   writeLocalCacheRevision,
@@ -25,25 +24,29 @@ import {
 
 type Ctx = {
   ready: boolean;
+  canEdit: boolean;
   hideLegacyNav: boolean;
   useNmacTestData: boolean;
   setHideLegacyNav: (next: boolean) => Promise<void>;
   setUseNmacTestData: (next: boolean) => Promise<void>;
   clearNmacMonthCache: () => Promise<void>;
+  refresh: () => Promise<void>;
 };
 
 const DashboardPreferencesContext = createContext<Ctx | null>(null);
 
-const LOCAL_SYNC_KEY = "kpi_prefs_account_synced";
+type PrefsResponse = {
+  preferences?: AppDashboardSettings;
+  canEdit?: boolean;
+};
 
-async function fetchPreferences(): Promise<UserDashboardPreferences | null> {
+async function fetchPreferences(): Promise<PrefsResponse | null> {
   const r = await fetch("/api/auth/preferences", { credentials: "include", cache: "no-store" });
   if (!r.ok) return null;
-  const j = (await r.json()) as { preferences?: UserDashboardPreferences };
-  return j.preferences ?? null;
+  return (await r.json()) as PrefsResponse;
 }
 
-async function patchPreferences(body: Record<string, unknown>): Promise<UserDashboardPreferences | null> {
+async function patchPreferences(body: Record<string, unknown>): Promise<PrefsResponse | null> {
   const r = await fetch("/api/auth/preferences", {
     method: "PATCH",
     credentials: "include",
@@ -51,15 +54,14 @@ async function patchPreferences(body: Record<string, unknown>): Promise<UserDash
     body: JSON.stringify(body),
   });
   if (!r.ok) return null;
-  const j = (await r.json()) as { preferences?: UserDashboardPreferences };
-  return j.preferences ?? null;
+  return (await r.json()) as PrefsResponse;
 }
 
-function applyCacheRevisionFromServer(userKey: string, serverRevision: number) {
-  const localRevision = readLocalCacheRevision(userKey);
+function applyCacheRevisionFromServer(serverRevision: number) {
+  const localRevision = readLocalCacheRevision(GLOBAL_CACHE_REVISION_KEY);
   if (serverRevision > localRevision) {
     clearNmacMonthlyLocalCacheOnly();
-    writeLocalCacheRevision(userKey, serverRevision);
+    writeLocalCacheRevision(GLOBAL_CACHE_REVISION_KEY, serverRevision);
     dispatchPrefs({ reloadNmacFromServer: true });
   }
 }
@@ -67,151 +69,135 @@ function applyCacheRevisionFromServer(userKey: string, serverRevision: number) {
 export function DashboardPreferencesProvider({ children }: { children: React.ReactNode }) {
   const { user, loading: sessionLoading } = useSession();
   const [ready, setReady] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
   const [hideLegacyNav, setHideLegacyNavState] = useState(false);
   const [useNmacTestData, setUseNmacTestDataState] = useState(true);
-  const userKeyRef = useRef<string | null>(null);
 
-  const applyServerPrefs = useCallback((prefs: UserDashboardPreferences, userKey: string) => {
+  const applyServerPrefs = useCallback((prefs: AppDashboardSettings) => {
     applySyncedDashboardPrefs(prefs);
-    applyCacheRevisionFromServer(userKey, prefs.nmacMonthCacheRevision);
+    applyCacheRevisionFromServer(prefs.nmacMonthCacheRevision);
+    writeLegacyLocalPrefs(prefs.hideLegacyNav, prefs.useNmacTestData);
     setHideLegacyNavState(prefs.hideLegacyNav);
     setUseNmacTestDataState(prefs.useNmacTestData);
     dispatchPrefs();
   }, []);
 
+  const loadFromServer = useCallback(async () => {
+    const res = await fetchPreferences();
+    if (!res?.preferences) return false;
+    setCanEdit(res.canEdit ?? Boolean(user));
+    applyServerPrefs(res.preferences);
+    return true;
+  }, [applyServerPrefs, user]);
+
   useEffect(() => {
     if (sessionLoading) return;
 
     if (!user) {
-      userKeyRef.current = null;
       applySyncedDashboardPrefs(null);
       const legacy = readLegacyLocalPrefs();
       setHideLegacyNavState(legacy.hideLegacyNav);
       setUseNmacTestDataState(legacy.useNmacTestData);
+      setCanEdit(false);
       setReady(true);
       return;
     }
 
-    const userKey = user.email.trim().toLowerCase();
-    userKeyRef.current = userKey;
     let cancelled = false;
+    setReady(false);
 
     void (async () => {
-      setReady(false);
-      let prefs = await fetchPreferences();
+      const ok = await loadFromServer();
       if (cancelled) return;
-
-      if (!prefs) {
+      if (!ok) {
         const legacy = readLegacyLocalPrefs();
         setHideLegacyNavState(legacy.hideLegacyNav);
         setUseNmacTestDataState(legacy.useNmacTestData);
+        setCanEdit(true);
         applySyncedDashboardPrefs(null);
-        setReady(true);
-        return;
       }
-
-      try {
-        const synced = window.localStorage.getItem(`${LOCAL_SYNC_KEY}:${userKey}`) === "1";
-        if (!synced) {
-          const legacy = readLegacyLocalPrefs();
-          const needsMigrate =
-            legacy.hideLegacyNav !== prefs.hideLegacyNav || legacy.useNmacTestData !== prefs.useNmacTestData;
-          if (needsMigrate) {
-            const migrated = await patchPreferences({
-              hide_legacy_nav: legacy.hideLegacyNav,
-              use_nmac_test_data: legacy.useNmacTestData,
-            });
-            if (migrated) prefs = migrated;
-          }
-          window.localStorage.setItem(`${LOCAL_SYNC_KEY}:${userKey}`, "1");
-          writeLegacyLocalPrefs(prefs.hideLegacyNav, prefs.useNmacTestData);
-        }
-      } catch {
-        /* ignore migration errors */
-      }
-
-      if (cancelled) return;
-      applyServerPrefs(prefs, userKey);
-      setReady(true);
+      if (!cancelled) setReady(true);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [user, sessionLoading, applyServerPrefs]);
+  }, [user, sessionLoading, loadFromServer]);
+
+  useEffect(() => {
+    if (!user) return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void loadFromServer();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [user, loadFromServer]);
 
   const persist = useCallback(
-    async (
-      patch: Record<string, unknown>,
-      detail?: DashboardPrefsDetail,
-      localAfter?: { hideLegacyNav: boolean; useNmacTestData: boolean },
-    ) => {
-      if (!user) return;
-      const userKey = userKeyRef.current ?? user.email.trim().toLowerCase();
-      const prefs = await patchPreferences(patch);
-      if (!prefs) return;
-      if (localAfter) writeLegacyLocalPrefs(localAfter.hideLegacyNav, localAfter.useNmacTestData);
-      applyServerPrefs(prefs, userKey);
+    async (patch: Record<string, unknown>, detail?: DashboardPrefsDetail) => {
+      if (!canEdit) return;
+      const res = await patchPreferences(patch);
+      if (!res?.preferences) return;
+      setCanEdit(res.canEdit ?? true);
+      applyServerPrefs(res.preferences);
       if (patch.clear_nmac_month_cache === true) {
         clearNmacMonthlyLocalCacheOnly();
-        writeLocalCacheRevision(userKey, prefs.nmacMonthCacheRevision);
+        writeLocalCacheRevision(GLOBAL_CACHE_REVISION_KEY, res.preferences.nmacMonthCacheRevision);
       }
       dispatchPrefs(detail);
     },
-    [user, applyServerPrefs],
+    [canEdit, applyServerPrefs],
   );
 
   const setHideLegacyNav = useCallback(
     async (next: boolean) => {
+      if (!canEdit) return;
       setHideLegacyNavState(next);
-      if (!user) {
-        writeLegacyLocalPrefs(next, useNmacTestData);
-        dispatchPrefs();
-        return;
-      }
-      await persist({ hide_legacy_nav: next }, undefined, { hideLegacyNav: next, useNmacTestData });
+      await persist({ hide_legacy_nav: next });
     },
-    [user, useNmacTestData, persist],
+    [canEdit, persist],
   );
 
   const setUseNmacTestData = useCallback(
     async (next: boolean) => {
+      if (!canEdit) return;
       setUseNmacTestDataState(next);
-      if (!user) {
-        writeLegacyLocalPrefs(hideLegacyNav, next);
-        if (!next) clearNmacMonthlyLocalCacheOnly();
-        dispatchPrefs(next ? undefined : { reloadNmacFromServer: true });
-        return;
-      }
       if (!next) clearNmacMonthlyLocalCacheOnly();
-      await persist(
-        { use_nmac_test_data: next },
-        next ? undefined : { reloadNmacFromServer: true },
-        { hideLegacyNav, useNmacTestData: next },
-      );
+      await persist({ use_nmac_test_data: next }, next ? undefined : { reloadNmacFromServer: true });
     },
-    [user, hideLegacyNav, persist],
+    [canEdit, persist],
   );
 
   const clearNmacMonthCache = useCallback(async () => {
-    if (!user) {
-      clearNmacMonthlyLocalCacheOnly();
-      dispatchPrefs({ reloadNmacFromServer: true });
-      return;
-    }
+    if (!canEdit) return;
     await persist({ clear_nmac_month_cache: true }, { reloadNmacFromServer: true });
-  }, [user, persist]);
+  }, [canEdit, persist]);
+
+  const refresh = useCallback(async () => {
+    await loadFromServer();
+  }, [loadFromServer]);
 
   const value = useMemo(
     () => ({
       ready,
+      canEdit,
       hideLegacyNav,
       useNmacTestData,
       setHideLegacyNav,
       setUseNmacTestData,
       clearNmacMonthCache,
+      refresh,
     }),
-    [ready, hideLegacyNav, useNmacTestData, setHideLegacyNav, setUseNmacTestData, clearNmacMonthCache],
+    [
+      ready,
+      canEdit,
+      hideLegacyNav,
+      useNmacTestData,
+      setHideLegacyNav,
+      setUseNmacTestData,
+      clearNmacMonthCache,
+      refresh,
+    ],
   );
 
   return <DashboardPreferencesContext.Provider value={value}>{children}</DashboardPreferencesContext.Provider>;

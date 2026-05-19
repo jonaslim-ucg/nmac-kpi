@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  getUserDashboardPreferences,
-  updateUserDashboardPreferences,
-} from "@/lib/auth/user-preferences";
+import { getAppDashboardSettings, updateAppDashboardSettings } from "@/lib/auth/app-settings";
 import { getSessionFromCookies } from "@/lib/auth/session";
-
 export const dynamic = "force-dynamic";
 
 export async function GET() {
@@ -13,13 +9,16 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const prefs = await getUserDashboardPreferences(session.sub);
-  if (!prefs) {
-    return NextResponse.json({ error: "Could not load preferences." }, { status: 500 });
+  const settings = await getAppDashboardSettings();
+  if (!settings) {
+    return NextResponse.json({ error: "Could not load settings." }, { status: 500 });
   }
 
   return NextResponse.json(
-    { preferences: prefs },
+    {
+      preferences: settings,
+      canEdit: true,
+    },
     { headers: { "Cache-Control": "private, no-store, max-age=0" } },
   );
 }
@@ -54,10 +53,10 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "No valid fields to update." }, { status: 400 });
   }
 
-  const prefs = await updateUserDashboardPreferences(session.sub, input);
-  if (!prefs) {
-    return NextResponse.json({ error: "Could not save preferences." }, { status: 500 });
+  const settings = await updateAppDashboardSettings(input);
+  if (!settings) {
+    return NextResponse.json({ error: "Could not save settings." }, { status: 500 });
   }
 
-  return NextResponse.json({ preferences: prefs });
+  return NextResponse.json({ preferences: settings, canEdit: true });
 }

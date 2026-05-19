@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { resolveSessionWithDatabase } from "@/lib/auth/sync-session";
+import { buildSessionCookieOptions } from "@/lib/auth/session-cookie";
 import { SESSION_COOKIE_NAME, verifySessionTokenEdge } from "@/lib/auth/session";
 
 export async function middleware(request: NextRequest) {
@@ -35,11 +37,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (pathname.startsWith("/admin/users") && session.role !== "admin") {
-    return NextResponse.redirect(new URL("/", request.url));
+  const { session: synced, refreshedToken } = await resolveSessionWithDatabase(session);
+  session = synced;
+
+  const denyUsers = pathname.startsWith("/admin/users") && session.role !== "admin";
+  const res = denyUsers
+    ? NextResponse.redirect(new URL("/", request.url))
+    : NextResponse.next();
+
+  if (refreshedToken) {
+    res.cookies.set(SESSION_COOKIE_NAME, refreshedToken, buildSessionCookieOptions());
   }
 
-  return NextResponse.next();
+  return res;
 }
 
 export const config = {

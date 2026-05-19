@@ -1,9 +1,9 @@
 import { cookies } from "next/headers";
 import type { SessionPayload } from "@/lib/auth/session";
 import { SESSION_COOKIE_NAME, signSessionToken } from "@/lib/auth/session";
+import { fetchAppUserById } from "@/lib/auth/app-user-access";
 import { buildSessionCookieOptions } from "@/lib/auth/session-cookie";
 import type { AppRole } from "@/lib/auth/types";
-import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export type SessionSyncResult =
   | { ok: true; session: SessionPayload; refreshedToken?: string }
@@ -13,24 +13,18 @@ export type SessionSyncResult =
 export async function resolveSessionWithDatabase(
   session: SessionPayload,
 ): Promise<SessionSyncResult> {
+  const row = await fetchAppUserById(session.sub);
+  if (!row) {
+    return { ok: false, revoked: true };
+  }
+
+  const email = row.email;
+  const role = row.role as AppRole;
+  if (email === session.email && role === session.role) {
+    return { ok: true, session };
+  }
+
   try {
-    const supabase = createServiceRoleClient();
-    const { data } = await supabase
-      .from("app_users")
-      .select("email, role")
-      .eq("id", session.sub)
-      .maybeSingle();
-
-    if (!data) {
-      return { ok: false, revoked: true };
-    }
-
-    const email = data.email as string;
-    const role = data.role as AppRole;
-    if (email === session.email && role === session.role) {
-      return { ok: true, session };
-    }
-
     const refreshedToken = await signSessionToken({ sub: session.sub, email, role });
     return {
       ok: true,
@@ -38,13 +32,13 @@ export async function resolveSessionWithDatabase(
       refreshedToken,
     };
   } catch {
-    return { ok: true, session };
+    return { ok: false, revoked: true };
   }
 }
 
-export async function persistRefreshedSessionToken(token: string): Promise<void> {
+export async function persistRefreshedSessionToken(token: string, embedded?: boolean): Promise<void> {
   const store = await cookies();
-  store.set(SESSION_COOKIE_NAME, token, buildSessionCookieOptions());
+  store.set(SESSION_COOKIE_NAME, token, buildSessionCookieOptions(embedded));
 }
 
 /** Clear session cookie in Route Handlers / Server Components. */

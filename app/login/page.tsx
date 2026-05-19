@@ -4,13 +4,15 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { BitrixAutoSignIn } from "@/components/auth/bitrix-auto-sign-in";
 import { AppBrand } from "@/components/dashboard/app-logo";
+import { NO_APP_ACCESS_MESSAGE } from "@/lib/auth/app-user-access";
 import { isLikelyBitrixEmbed } from "@/lib/bitrix/embedded-client";
 
 type Step = "email" | "code";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [showOtpForm, setShowOtpForm] = useState(() => !isLikelyBitrixEmbed());
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [showOtpForm, setShowOtpForm] = useState(false);
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -20,6 +22,16 @@ export default function LoginPage() {
 
   const onBitrixFallback = useCallback(() => {
     setShowOtpForm(true);
+  }, []);
+
+  useEffect(() => {
+    const denied = new URLSearchParams(window.location.search).get("access") === "denied";
+    setAccessDenied(denied);
+    if (denied) {
+      setShowOtpForm(false);
+      return;
+    }
+    setShowOtpForm(!isLikelyBitrixEmbed());
   }, []);
 
   useEffect(() => {
@@ -82,7 +94,14 @@ export default function LoginPage() {
         </div>
 
         {!showOtpForm ? (
-          <BitrixAutoSignIn onFallback={onBitrixFallback} />
+          <BitrixAutoSignIn onFallback={onBitrixFallback} allowOtpFallback={!accessDenied} />
+        ) : accessDenied ? (
+          <div className="py-2">
+            <p className="text-lg font-semibold tracking-tight text-foreground">Access not available</p>
+            <p className="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">
+              {NO_APP_ACCESS_MESSAGE}
+            </p>
+          </div>
         ) : (
           <>
             <h1 className="text-lg font-semibold tracking-tight text-foreground">

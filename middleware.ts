@@ -4,6 +4,11 @@ import { resolveSessionWithDatabase } from "@/lib/auth/sync-session";
 import { buildSessionCookieOptions, clearSessionCookieOnResponse } from "@/lib/auth/session-cookie";
 import { SESSION_COOKIE_NAME, verifySessionTokenEdge } from "@/lib/auth/session";
 
+function isBitrixEmbeddedRequest(request: NextRequest): boolean {
+  const referer = request.headers.get("referer") ?? "";
+  return /bitrix24\.com/i.test(referer);
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -33,16 +38,18 @@ export async function middleware(request: NextRequest) {
       const res =
         pathname === "/login"
           ? NextResponse.next()
-          : NextResponse.redirect(new URL("/login", request.url));
+          : NextResponse.redirect(new URL("/login?access=denied", request.url));
       clearSessionCookieOnResponse(res);
       return res;
     }
     session = sync.session;
 
+    const embedded = isBitrixEmbeddedRequest(request);
+
     if (pathname === "/login") {
       const res = NextResponse.redirect(new URL("/", request.url));
       if (sync.refreshedToken) {
-        res.cookies.set(SESSION_COOKIE_NAME, sync.refreshedToken, buildSessionCookieOptions());
+        res.cookies.set(SESSION_COOKIE_NAME, sync.refreshedToken, buildSessionCookieOptions(embedded));
       }
       return res;
     }
@@ -53,7 +60,7 @@ export async function middleware(request: NextRequest) {
       : NextResponse.next();
 
     if (sync.refreshedToken) {
-      res.cookies.set(SESSION_COOKIE_NAME, sync.refreshedToken, buildSessionCookieOptions());
+      res.cookies.set(SESSION_COOKIE_NAME, sync.refreshedToken, buildSessionCookieOptions(embedded));
     }
     return res;
   }
@@ -62,7 +69,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  return NextResponse.redirect(new URL("/login", request.url));
+  return NextResponse.redirect(new URL("/login?access=denied", request.url));
 }
 
 export const config = {

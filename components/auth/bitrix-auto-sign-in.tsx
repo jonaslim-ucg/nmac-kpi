@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { NO_APP_ACCESS_MESSAGE } from "@/lib/auth/app-user-access";
 import { getBitrixClientAuth, isLikelyBitrixEmbed } from "@/lib/bitrix/embedded-client";
 
 type Phase = "idle" | "trying" | "failed" | "denied";
@@ -10,7 +11,14 @@ type Phase = "idle" | "trying" | "failed" | "denied";
  * When opened inside Bitrix24 (iframe), loads BX24 and signs in via `/api/auth/bitrix`.
  * On failure, calls `onFallback` so the email OTP form can be shown.
  */
-export function BitrixAutoSignIn({ onFallback }: { onFallback: () => void }) {
+export function BitrixAutoSignIn({
+  onFallback,
+  allowOtpFallback = true,
+}: {
+  onFallback: () => void;
+  /** When false, never show the email OTP form (used after access was revoked). */
+  allowOtpFallback?: boolean;
+}) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>(() => (isLikelyBitrixEmbed() ? "trying" : "idle"));
   const [deniedMessage, setDeniedMessage] = useState<string | null>(null);
@@ -25,6 +33,11 @@ export function BitrixAutoSignIn({ onFallback }: { onFallback: () => void }) {
       if (cancelled) return;
 
       if (!auth) {
+        if (!allowOtpFallback) {
+          setDeniedMessage(NO_APP_ACCESS_MESSAGE);
+          setPhase("denied");
+          return;
+        }
         setPhase("failed");
         onFallback();
         return;
@@ -50,6 +63,11 @@ export function BitrixAutoSignIn({ onFallback }: { onFallback: () => void }) {
             setPhase("denied");
             return;
           }
+          if (!allowOtpFallback) {
+            setDeniedMessage(j.message ?? NO_APP_ACCESS_MESSAGE);
+            setPhase("denied");
+            return;
+          }
           setPhase("failed");
           onFallback();
           return;
@@ -59,6 +77,11 @@ export function BitrixAutoSignIn({ onFallback }: { onFallback: () => void }) {
         router.refresh();
       } catch {
         if (!cancelled) {
+          if (!allowOtpFallback) {
+            setDeniedMessage(NO_APP_ACCESS_MESSAGE);
+            setPhase("denied");
+            return;
+          }
           setPhase("failed");
           onFallback();
         }

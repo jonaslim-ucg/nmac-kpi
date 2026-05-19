@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
 import { AppBrand } from "@/components/dashboard/app-logo";
 import { SIDEBAR_SECTIONS } from "@/components/dashboard/nmac-2026-nav";
 import { useSession } from "@/components/auth/session-provider";
 import { formatDisplayName } from "@/lib/auth/display-name";
 import { canEditKpiData, canManageUsers } from "@/lib/auth/types";
-import { DASHBOARD_PREFS_EVENT, loadHideLegacyNav } from "@/lib/dashboard-preferences";
+import { useDashboardPreferences } from "@/components/auth/dashboard-preferences-provider";
 
 function linkActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
@@ -24,14 +23,7 @@ function linkActive(pathname: string, href: string): boolean {
 export function AppSidebar() {
   const pathname = usePathname();
   const { user, loading, logout } = useSession();
-  const [hideLegacyNav, setHideLegacyNav] = useState(false);
-
-  useEffect(() => {
-    setHideLegacyNav(loadHideLegacyNav());
-    const on = () => setHideLegacyNav(loadHideLegacyNav());
-    window.addEventListener(DASHBOARD_PREFS_EVENT, on);
-    return () => window.removeEventListener(DASHBOARD_PREFS_EVENT, on);
-  }, []);
+  const { hideLegacyNav } = useDashboardPreferences();
 
   const sections = SIDEBAR_SECTIONS.map((section) => {
     if (hideLegacyNav && section.legacySection) {

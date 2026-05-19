@@ -24,3 +24,7 @@ alter table public.auth_otp_codes enable row level security;
 -- If this file was run on an older DB without name columns, run add-user-names.sql too.
 alter table public.app_users add column if not exists first_name text;
 alter table public.app_users add column if not exists last_name text;
+
+alter table public.app_users add column if not exists hide_legacy_nav boolean not null default false;
+alter table public.app_users add column if not exists use_nmac_test_data boolean not null default true;
+alter table public.app_users add column if not exists nmac_month_cache_revision bigint not null default 0;

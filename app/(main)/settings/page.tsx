@@ -7,7 +7,7 @@ import {
   ChevronDown,
   Loader2,
   PanelLeftClose,
-  Smartphone,
+  Cloud,
   Sparkles,
   Trash2,
   UserRound,
@@ -15,16 +15,9 @@ import {
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MainShell } from "@/components/dashboard/main-shell";
+import { useDashboardPreferences } from "@/components/auth/dashboard-preferences-provider";
 import { useSession } from "@/components/auth/session-provider";
 import { formatDisplayName } from "@/lib/auth/display-name";
-import {
-  clearNmacMonthlyLocalCache,
-  DASHBOARD_PREFS_EVENT,
-  loadHideLegacyNav,
-  loadUseNmacTestData,
-  saveHideLegacyNav,
-  saveUseNmacTestData,
-} from "@/lib/dashboard-preferences";
 
 function initialsFromDisplayName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -84,14 +77,21 @@ type Feedback = { tone: "ok" | "err"; text: string } | null;
 
 export default function SettingsPage() {
   const { user, loading, logout, refresh } = useSession();
+  const {
+    ready: prefsReady,
+    hideLegacyNav,
+    useNmacTestData,
+    setHideLegacyNav,
+    setUseNmacTestData,
+    clearNmacMonthCache,
+  } = useDashboardPreferences();
   const [first, setFirst] = useState("");
   const [last, setLast] = useState("");
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
-  const [hideLegacyNav, setHideLegacyNav] = useState(false);
-  const [useNmacTestData, setUseNmacTestData] = useState(true);
   const [prefsNote, setPrefsNote] = useState<string | null>(null);
   const [cacheClearOpen, setCacheClearOpen] = useState(false);
+  const [cacheClearing, setCacheClearing] = useState(false);
 
   const displayName = formatDisplayName(user);
   const avatarLetter = initialsFromDisplayName(displayName);
@@ -109,17 +109,6 @@ export default function SettingsPage() {
       setLast(user.lastName ?? "");
     }
   }, [user]);
-
-  useEffect(() => {
-    setHideLegacyNav(loadHideLegacyNav());
-    setUseNmacTestData(loadUseNmacTestData());
-    const sync = () => {
-      setHideLegacyNav(loadHideLegacyNav());
-      setUseNmacTestData(loadUseNmacTestData());
-    };
-    window.addEventListener(DASHBOARD_PREFS_EVENT, sync);
-    return () => window.removeEventListener(DASHBOARD_PREFS_EVENT, sync);
-  }, []);
 
   const saveProfile = useCallback(async () => {
     setFeedback(null);
@@ -148,15 +137,21 @@ export default function SettingsPage() {
   return (
     <MainShell title="Settings" subtitle="Preferences and account">
       <div className="mx-auto grid max-w-3xl gap-6 lg:grid-cols-2 lg:items-start lg:gap-8">
-        <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
+        <section
+          className={
+            "overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04] " +
+            (!prefsReady ? "pointer-events-none opacity-60" : "")
+          }
+          aria-busy={!prefsReady}
+        >
           <div className="flex items-start gap-3 border-b border-border bg-surface-muted/40 px-5 py-4">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-accent">
-              <Smartphone className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+              <Cloud className="h-5 w-5" strokeWidth={1.75} aria-hidden />
             </span>
             <div className="min-w-0 pt-0.5">
-              <h2 className="text-base font-semibold tracking-tight text-foreground">This device</h2>
+              <h2 className="text-base font-semibold tracking-tight text-foreground">Your account</h2>
               <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                Preferences stay in this browser. They do not sync to other devices or users.
+                Saved to your account and sync on any device where you sign in.
               </p>
             </div>
           </div>
@@ -166,20 +161,14 @@ export default function SettingsPage() {
               title="Hide legacy navigation"
               description="Hides Practice (weekly KPIs, doctors) and Data entry in the sidebar. You can still open those pages by URL."
               checked={hideLegacyNav}
-              onCheckedChange={(next) => {
-                setHideLegacyNav(next);
-                saveHideLegacyNav(next);
-              }}
+              onCheckedChange={(next) => void setHideLegacyNav(next)}
             />
             <SwitchRow
               icon={<Sparkles className="h-4 w-4" strokeWidth={2} />}
               title="Sample data for NMAC charts"
-              description="When on and months are empty, fills them with sample values for preview. Turning off removes those stored month values from this browser and reloads saved data from your organization when available."
+              description="When on and months are empty, fills them with sample values for preview. Turning off clears cached month values on your devices and reloads saved data from your organization when available."
               checked={useNmacTestData}
-              onCheckedChange={(next) => {
-                setUseNmacTestData(next);
-                saveUseNmacTestData(next);
-              }}
+              onCheckedChange={(next) => void setUseNmacTestData(next)}
             />
           </div>
           <div className="border-t border-border bg-surface-muted/25 px-5 py-4">
@@ -188,8 +177,9 @@ export default function SettingsPage() {
               Reset chart month cache
             </div>
             <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-              Removes the FY month values stored in this browser for NMAC charts. They load again after refresh when
-              your data is available. If sample data is on and nothing is saved, samples may reappear.
+              Clears cached FY month values for NMAC charts on all devices signed in as you. Data loads again after
+              refresh when your organization data is available. If sample data is on and nothing is saved, samples may
+              reappear.
             </p>
             {!cacheClearOpen ? (
               <button
@@ -202,7 +192,7 @@ export default function SettingsPage() {
               </button>
             ) : (
               <div className="mt-3 flex flex-col gap-2 rounded-lg border border-destructive/25 bg-destructive/[0.06] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-xs text-muted-foreground">Only affects this browser. Continue?</p>
+                <p className="text-xs text-muted-foreground">Clears cache on all your signed-in devices. Continue?</p>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -213,15 +203,23 @@ export default function SettingsPage() {
                   </button>
                   <button
                     type="button"
+                    disabled={cacheClearing}
                     onClick={() => {
-                      clearNmacMonthlyLocalCache();
-                      setPrefsNote("Local month cache cleared.");
-                      setCacheClearOpen(false);
-                      window.setTimeout(() => setPrefsNote(null), 5000);
+                      void (async () => {
+                        setCacheClearing(true);
+                        try {
+                          await clearNmacMonthCache();
+                          setPrefsNote("Month cache cleared on your account.");
+                          setCacheClearOpen(false);
+                          window.setTimeout(() => setPrefsNote(null), 5000);
+                        } finally {
+                          setCacheClearing(false);
+                        }
+                      })();
                     }}
-                    className="rounded-lg bg-destructive px-3 py-2 text-xs font-medium text-white shadow-sm transition hover:opacity-95"
+                    className="rounded-lg bg-destructive px-3 py-2 text-xs font-medium text-white shadow-sm transition hover:opacity-95 disabled:opacity-50"
                   >
-                    Clear now
+                    {cacheClearing ? "Clearing…" : "Clear now"}
                   </button>
                 </div>
               </div>

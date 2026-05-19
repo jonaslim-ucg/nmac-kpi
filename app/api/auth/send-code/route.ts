@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { lookupAppUserByEmail, NO_APP_ACCESS_MESSAGE } from "@/lib/auth/app-user-access";
 import { isEmailDomainAllowed, isValidEmailFormat } from "@/lib/auth/email-policy";
 import { generateOtpCode, hashOtpForStorage } from "@/lib/auth/otp";
 import { sendMailViaGraph } from "@/lib/graph/send-mail";
@@ -13,6 +14,12 @@ export async function POST(req: Request) {
     }
     if (!isEmailDomainAllowed(emailRaw)) {
       return NextResponse.json({ ok: false, message: "That email domain is not allowed." }, { status: 403 });
+    }
+
+    const email = emailRaw.toLowerCase();
+    const registered = await lookupAppUserByEmail(email);
+    if (!registered) {
+      return NextResponse.json({ ok: false, message: NO_APP_ACCESS_MESSAGE }, { status: 403 });
     }
 
     const secret = process.env.AUTH_SECRET;
@@ -38,7 +45,6 @@ export async function POST(req: Request) {
       );
     }
 
-    const email = emailRaw.toLowerCase();
     const code = generateOtpCode();
     const codeHash = hashOtpForStorage(secret, email, code);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();

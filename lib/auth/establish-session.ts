@@ -1,7 +1,7 @@
-import { isBootstrapAdmin, isEmailDomainAllowed, isValidEmailFormat } from "@/lib/auth/email-policy";
+import { lookupAppUserByEmail, NO_APP_ACCESS_MESSAGE } from "@/lib/auth/app-user-access";
+import { isEmailDomainAllowed, isValidEmailFormat } from "@/lib/auth/email-policy";
 import { signSessionToken } from "@/lib/auth/session";
 import type { AppRole } from "@/lib/auth/types";
-import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export type EstablishSessionResult =
   | {
@@ -11,7 +11,7 @@ export type EstablishSessionResult =
     }
   | { ok: false; message: string; status: number };
 
-/** Find or create `app_users` and issue a JWT (same rules as email OTP verify). */
+/** Issue a JWT only for emails already listed in `app_users` (admin directory). */
 export async function establishSessionForEmail(emailRaw: string): Promise<EstablishSessionResult> {
   const email = emailRaw.trim().toLowerCase();
   if (!email || !isValidEmailFormat(email)) {
@@ -25,35 +25,21 @@ export async function establishSessionForEmail(emailRaw: string): Promise<Establ
     };
   }
 
-  const supabase = createServiceRoleClient();
-  const { data: existing } = await supabase.from("app_users").select("*").eq("email", email).maybeSingle();
-
-  if (!existing) {
-    const { count } = await supabase.from("app_users").select("*", { count: "exact", head: true });
-    const isFirstUser = (count ?? 0) === 0;
-    const role: AppRole = isFirstUser || isBootstrapAdmin(email) ? "admin" : "viewer";
-    const { error: insertErr } = await supabase.from("app_users").insert({ email, role });
-    if (insertErr) {
-      console.error(insertErr);
-      return { ok: false, message: "Could not create account.", status: 500 };
-    }
+  const user = await lookupAppUserByEmail(email);
+  if (!user) {
+    return { ok: false, message: NO_APP_ACCESS_MESSAGE, status: 403 };
   }
 
-  const { data: user, error: userErr } = await supabase.from("app_users").select("*").eq("email", email).single();
-  if (userErr || !user) {
-    return { ok: false, message: "Account error.", status: 500 };
-  }
-
-  const role = user.role as AppRole;
+  const role = user.role;
   const token = await signSessionToken({
-    sub: user.id as string,
-    email: user.email as string,
+    sub: user.id,
+    email: user.email,
     role,
   });
 
   return {
     ok: true,
     token,
-    user: { id: user.id as string, email: user.email as string, role },
+    user: { id: user.id, email: user.email, role },
   };
 }

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getBitrixClientAuth, isLikelyBitrixEmbed } from "@/lib/bitrix/embedded-client";
 
-type Phase = "idle" | "trying" | "failed";
+type Phase = "idle" | "trying" | "failed" | "denied";
 
 /**
  * When opened inside Bitrix24 (iframe), loads BX24 and signs in via `/api/auth/bitrix`.
@@ -13,6 +13,7 @@ type Phase = "idle" | "trying" | "failed";
 export function BitrixAutoSignIn({ onFallback }: { onFallback: () => void }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>(() => (isLikelyBitrixEmbed() ? "trying" : "idle"));
+  const [deniedMessage, setDeniedMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (phase !== "trying") return;
@@ -44,6 +45,11 @@ export function BitrixAutoSignIn({ onFallback }: { onFallback: () => void }) {
         if (cancelled) return;
 
         if (!res.ok || !j.ok) {
+          if (res.status === 403 && j.message) {
+            setDeniedMessage(j.message);
+            setPhase("denied");
+            return;
+          }
           setPhase("failed");
           onFallback();
           return;
@@ -64,6 +70,17 @@ export function BitrixAutoSignIn({ onFallback }: { onFallback: () => void }) {
     };
   }, [phase, onFallback, router]);
 
+  if (phase === "denied") {
+    return (
+      <div className="py-4">
+        <p className="text-sm font-medium text-foreground">Access not available</p>
+        <p className="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">
+          {deniedMessage}
+        </p>
+      </div>
+    );
+  }
+
   if (phase !== "trying") return null;
 
   return (
@@ -73,5 +90,3 @@ export function BitrixAutoSignIn({ onFallback }: { onFallback: () => void }) {
     </div>
   );
 }
-
-

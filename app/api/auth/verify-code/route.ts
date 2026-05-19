@@ -1,12 +1,7 @@
 import { NextResponse } from "next/server";
-import { isBootstrapAdmin } from "@/lib/auth/email-policy";
-import type { AppRole } from "@/lib/auth/types";
+import { establishSessionForEmail } from "@/lib/auth/establish-session";
 import { verifyOtp } from "@/lib/auth/otp";
-import {
-  SESSION_COOKIE_NAME,
-  sessionCookieMaxAgeSec,
-  signSessionToken,
-} from "@/lib/auth/session";
+import { applySessionCookie } from "@/lib/auth/session-cookie";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export async function POST(req: Request) {
@@ -67,42 +62,15 @@ export async function POST(req: Request) {
 
   await supabase.from("auth_otp_codes").delete().eq("email", email);
 
-  const { data: existing } = await supabase.from("app_users").select("*").eq("email", email).maybeSingle();
-
-  if (!existing) {
-    const { count } = await supabase.from("app_users").select("*", { count: "exact", head: true });
-    const isFirstUser = (count ?? 0) === 0;
-    const role: AppRole =
-      isFirstUser || isBootstrapAdmin(email) ? "admin" : "viewer";
-    const { error: insertErr } = await supabase.from("app_users").insert({ email, role });
-    if (insertErr) {
-      console.error(insertErr);
-      return NextResponse.json({ ok: false, message: "Could not create account." }, { status: 500 });
-    }
+  const session = await establishSessionForEmail(email);
+  if (!session.ok) {
+    return NextResponse.json({ ok: false, message: session.message }, { status: session.status });
   }
-
-  const { data: user, error: userErr } = await supabase.from("app_users").select("*").eq("email", email).single();
-  if (userErr || !user) {
-    return NextResponse.json({ ok: false, message: "Account error." }, { status: 500 });
-  }
-
-  const role = user.role as AppRole;
-  const token = await signSessionToken({
-    sub: user.id as string,
-    email: user.email as string,
-    role,
-  });
 
   const res = NextResponse.json({
     ok: true,
-    user: { email: user.email, role: user.role },
+    user: { email: session.user.email, role: session.user.role },
   });
-  res.cookies.set(SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: sessionCookieMaxAgeSec,
-  });
+  applySessionCookie(res, session.token);
   return res;
 }

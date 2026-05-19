@@ -20,7 +20,7 @@ cp .env.example .env.local
 
    - **Supabase:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (Settings → API → service role — server-only, never expose to the browser).
    - **Auth:** `AUTH_SECRET` — at least 32 characters (e.g. `openssl rand -base64 32`).
-   - **Optional:** `AUTH_ALLOWED_EMAIL_DOMAINS` (comma-separated, e.g. `ucg.bm`) to restrict sign-in; `AUTH_BOOTSTRAP_ADMIN_EMAILS` for extra admin grants on first signup (after the first user).
+   - **Optional:** `AUTH_ALLOWED_EMAIL_DOMAINS` (comma-separated, e.g. `ucg.bm`) to restrict sign-in; `AUTH_BOOTSTRAP_ADMIN_EMAILS` for extra admin grants on first signup (after the first user); `BITRIX_ALLOWED_PORTALS` to restrict Bitrix auto sign-in to specific portal hostnames.
    - **Microsoft Graph (email codes):** `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `GRAPH_SENDER_EMAIL` (mailbox that sends mail), `GRAPH_SENDER_NAME` (e.g. `NMAC KPI`). In Azure Entra ID, the app registration needs **Application** permission **Mail.Send** on Microsoft Graph, with **admin consent**.
 
    **If Outlook still shows the wrong sender name (e.g. “NMAC CRM”):** Microsoft 365 often uses the **mailbox / user display name** from the directory, not only the Graph API. In [Microsoft 365 admin](https://admin.microsoft.com) go to **Users** → open the account for `GRAPH_SENDER_EMAIL` → set **Display name** to **NMAC KPI** (or **Exchange admin center** → **Recipients** → **Mailboxes** → same mailbox → edit display name). Redeploy is not required for that change.
@@ -50,6 +50,25 @@ npm run dev
 Admin **Save** uses `upsert` on `(kpi_slug, year, week_index)`.
 
 ## Sign-in and roles
+
+### Bitrix24 (embedded app)
+
+When NMAC KPI is installed as a **local Bitrix24 application** (iframe), users are signed in automatically:
+
+1. The login page loads the Bitrix JS SDK (`BX24.init` / `getAuth`).
+2. `POST /api/auth/bitrix` validates the token with your portal’s `user.current` REST API.
+3. The user’s Bitrix **work email** is matched to `app_users` (created on first sign-in with the same rules as email OTP).
+4. Session cookie `nmac_session` is set with `SameSite=None; Secure` for iframe use.
+
+**Bitrix app setup**
+
+- **Handler URL:** your deployed app root or `/login` (e.g. `https://your-app.vercel.app/login`).
+- The app must be served over **HTTPS** (required for embedded cookies).
+- Optional env: `BITRIX_ALLOWED_PORTALS` — comma-separated portal hostnames (e.g. `northshoremedicalcenter.bitrix24.com`). If unset, any valid Bitrix domain is accepted.
+
+Email OTP sign-in still works when Bitrix auth is unavailable (standalone browser) or as a fallback.
+
+### Roles
 
 - **Viewer** — Dashboard and doctors (read-only).
 - **Editor** — Can use **Data entry** to save weekly values and **NMAC master (Supabase)** for NMAC targets plus monthly this year / last year actuals.

@@ -27,3 +27,11 @@ export function applySessionCookie(
 ): void {
   res.cookies.set(SESSION_COOKIE_NAME, token, buildSessionCookieOptions(embedded));
 }
+
+/** Clears session for standalone and Bitrix iframe cookies (attributes must match when set). */
+export function clearSessionCookieOnResponse(res: {
+  cookies: { set: (name: string, value: string, options: SessionCookieOptions) => void };
+}): void {
+  res.cookies.set(SESSION_COOKIE_NAME, "", { ...buildSessionCookieOptions(), maxAge: 0 });
+  res.cookies.set(SESSION_COOKIE_NAME, "", { ...buildSessionCookieOptions(true), maxAge: 0 });
+}

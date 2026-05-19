@@ -72,14 +72,17 @@ export async function getSessionFromCookies(): Promise<SessionPayload | null> {
     const session = await verifySessionToken(token);
     if (!session) return null;
 
-    const { resolveSessionWithDatabase, persistRefreshedSessionToken } = await import(
-      "@/lib/auth/sync-session"
-    );
-    const { session: synced, refreshedToken } = await resolveSessionWithDatabase(session);
-    if (refreshedToken) {
-      await persistRefreshedSessionToken(refreshedToken);
+    const { resolveSessionWithDatabase, persistRefreshedSessionToken, clearSessionCookie } =
+      await import("@/lib/auth/sync-session");
+    const sync = await resolveSessionWithDatabase(session);
+    if (!sync.ok) {
+      await clearSessionCookie();
+      return null;
     }
-    return synced;
+    if (sync.refreshedToken) {
+      await persistRefreshedSessionToken(sync.refreshedToken);
+    }
+    return sync.session;
   } catch {
     return null;
   }

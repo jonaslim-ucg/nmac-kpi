@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { resolveSessionWithDatabase } from "@/lib/auth/sync-session";
-import { buildSessionCookieOptions } from "@/lib/auth/session-cookie";
+import { buildSessionCookieOptions, clearSessionCookieOnResponse } from "@/lib/auth/session-cookie";
 import { SESSION_COOKIE_NAME, verifySessionTokenEdge } from "@/lib/auth/session";
 
 export async function middleware(request: NextRequest) {
@@ -26,30 +26,43 @@ export async function middleware(request: NextRequest) {
     session = await verifySessionTokenEdge(token, secret);
   }
 
-  if (pathname === "/login") {
-    if (session) {
-      return NextResponse.redirect(new URL("/", request.url));
+  if (session) {
+    const sync = await resolveSessionWithDatabase(session);
+    if (!sync.ok) {
+      session = null;
+      const res =
+        pathname === "/login"
+          ? NextResponse.next()
+          : NextResponse.redirect(new URL("/login", request.url));
+      clearSessionCookieOnResponse(res);
+      return res;
     }
+    session = sync.session;
+
+    if (pathname === "/login") {
+      const res = NextResponse.redirect(new URL("/", request.url));
+      if (sync.refreshedToken) {
+        res.cookies.set(SESSION_COOKIE_NAME, sync.refreshedToken, buildSessionCookieOptions());
+      }
+      return res;
+    }
+
+    const denyUsers = pathname.startsWith("/admin/users") && session.role !== "admin";
+    const res = denyUsers
+      ? NextResponse.redirect(new URL("/", request.url))
+      : NextResponse.next();
+
+    if (sync.refreshedToken) {
+      res.cookies.set(SESSION_COOKIE_NAME, sync.refreshedToken, buildSessionCookieOptions());
+    }
+    return res;
+  }
+
+  if (pathname === "/login") {
     return NextResponse.next();
   }
 
-  if (!session) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  const { session: synced, refreshedToken } = await resolveSessionWithDatabase(session);
-  session = synced;
-
-  const denyUsers = pathname.startsWith("/admin/users") && session.role !== "admin";
-  const res = denyUsers
-    ? NextResponse.redirect(new URL("/", request.url))
-    : NextResponse.next();
-
-  if (refreshedToken) {
-    res.cookies.set(SESSION_COOKIE_NAME, refreshedToken, buildSessionCookieOptions());
-  }
-
-  return res;
+  return NextResponse.redirect(new URL("/login", request.url));
 }
 
 export const config = {

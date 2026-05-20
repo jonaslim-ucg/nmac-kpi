@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAppDashboardSettings, updateAppDashboardSettings } from "@/lib/auth/app-settings";
 import { getSessionFromCookies } from "@/lib/auth/session";
+import { canManageUsers } from "@/lib/auth/types";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
@@ -14,10 +15,12 @@ export async function GET() {
     return NextResponse.json({ error: "Could not load settings." }, { status: 500 });
   }
 
+  const canEdit = canManageUsers(session.role);
+
   return NextResponse.json(
     {
       preferences: settings,
-      canEdit: true,
+      canEdit,
     },
     { headers: { "Cache-Control": "private, no-store, max-age=0" } },
   );
@@ -27,6 +30,10 @@ export async function PATCH(req: Request) {
   const session = await getSessionFromCookies();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!canManageUsers(session.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = (await req.json()) as {

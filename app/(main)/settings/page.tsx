@@ -18,6 +18,7 @@ import { MainShell } from "@/components/dashboard/main-shell";
 import { useDashboardPreferences } from "@/components/auth/dashboard-preferences-provider";
 import { useSession } from "@/components/auth/session-provider";
 import { formatDisplayName } from "@/lib/auth/display-name";
+import { canManageUsers } from "@/lib/auth/types";
 
 function initialsFromDisplayName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -99,6 +100,7 @@ export default function SettingsPage() {
 
   const displayName = formatDisplayName(user);
   const avatarLetter = initialsFromDisplayName(displayName);
+  const isAdmin = canManageUsers(user?.role);
 
   const nameDirty = useMemo(() => {
     if (!user) return false;
@@ -140,7 +142,13 @@ export default function SettingsPage() {
 
   return (
     <MainShell title="Settings" subtitle="Preferences and account">
-      <div className="mx-auto grid max-w-3xl gap-6 lg:grid-cols-2 lg:items-start lg:gap-8">
+      <div
+        className={
+          "mx-auto grid max-w-3xl gap-6 " +
+          (isAdmin ? "lg:grid-cols-2 lg:items-start lg:gap-8" : "max-w-xl")
+        }
+      >
+        {isAdmin ? (
         <section
           className={
             "overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04] " +
@@ -240,6 +248,7 @@ export default function SettingsPage() {
             ) : null}
           </div>
         </section>
+        ) : null}
 
         <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
           <div className="flex items-start gap-3 border-b border-border bg-surface-muted/40 px-5 py-4">

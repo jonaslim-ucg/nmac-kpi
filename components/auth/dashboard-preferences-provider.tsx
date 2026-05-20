@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { useSession } from "@/components/auth/session-provider";
+import { canManageUsers } from "@/lib/auth/types";
 import type { AppDashboardSettings } from "@/lib/auth/app-settings";
 import {
   applySyncedDashboardPrefs,
@@ -85,7 +86,7 @@ export function DashboardPreferencesProvider({ children }: { children: React.Rea
   const loadFromServer = useCallback(async () => {
     const res = await fetchPreferences();
     if (!res?.preferences) return false;
-    setCanEdit(res.canEdit ?? Boolean(user));
+    setCanEdit(res.canEdit ?? canManageUsers(user?.role));
     applyServerPrefs(res.preferences);
     return true;
   }, [applyServerPrefs, user]);
@@ -113,7 +114,7 @@ export function DashboardPreferencesProvider({ children }: { children: React.Rea
         const legacy = readLegacyLocalPrefs();
         setHideLegacyNavState(legacy.hideLegacyNav);
         setUseNmacTestDataState(legacy.useNmacTestData);
-        setCanEdit(true);
+        setCanEdit(canManageUsers(user?.role));
         applySyncedDashboardPrefs(null);
       }
       if (!cancelled) setReady(true);

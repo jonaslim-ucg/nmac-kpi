@@ -143,8 +143,7 @@ export default function SettingsPage() {
 
   return (
     <MainShell title="Settings" subtitle="Preferences and account">
-      <div className="mx-auto grid max-w-3xl gap-6 lg:grid-cols-2 lg:items-start lg:gap-8">
-        <div className="flex flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
           {isAdmin ? (
             <section
               className={
@@ -192,14 +191,21 @@ export default function SettingsPage() {
             }
             aria-busy={!prefsReady}
           >
-            <div className="border-b border-border bg-surface-muted/25 px-5 py-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                <Trash2 className="h-4 w-4 text-muted-foreground" strokeWidth={2} aria-hidden />
-                Reset chart month cache
+            <div className="flex items-start gap-3 border-b border-border bg-surface-muted/40 px-5 py-4">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground">
+                <Trash2 className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+              </span>
+              <div className="min-w-0 pt-0.5">
+                <h2 className="text-base font-semibold tracking-tight text-foreground">NMAC charts</h2>
+                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                  Refresh chart data for everyone when numbers look stale.
+                </p>
               </div>
-              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-                Clears cached FY month values for NMAC charts for all users. Data loads again after refresh when your
-                organization data is available. If sample data is on and nothing is saved, samples may reappear.
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Clears cached FY month values for all users. Data reloads after refresh when your organization data is
+                available. If sample data is on and nothing is saved, samples may reappear.
               </p>
               {!cacheClearOpen ? (
                 <button
@@ -256,7 +262,6 @@ export default function SettingsPage() {
               ) : null}
             </div>
           </section>
-        </div>
 
         <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
           <div className="flex items-start gap-3 border-b border-border bg-surface-muted/40 px-5 py-4">

@@ -21,6 +21,7 @@ export async function GET() {
     {
       preferences: settings,
       canEdit,
+      canClearCache: true,
     },
     { headers: { "Cache-Control": "private, no-store, max-age=0" } },
   );
@@ -32,9 +33,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!canManageUsers(session.role)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const isAdmin = canManageUsers(session.role);
 
   const body = (await req.json()) as {
     hide_legacy_nav?: unknown;
@@ -48,9 +47,17 @@ export async function PATCH(req: Request) {
     bumpNmacMonthCacheRevision?: boolean;
   } = {};
 
+  const wantsOrgToggle =
+    typeof body.hide_legacy_nav === "boolean" || typeof body.use_nmac_test_data === "boolean";
+  const wantsCacheClear = body.clear_nmac_month_cache === true;
+
+  if (wantsOrgToggle && !isAdmin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   if (typeof body.hide_legacy_nav === "boolean") input.hideLegacyNav = body.hide_legacy_nav;
   if (typeof body.use_nmac_test_data === "boolean") input.useNmacTestData = body.use_nmac_test_data;
-  if (body.clear_nmac_month_cache === true) input.bumpNmacMonthCacheRevision = true;
+  if (wantsCacheClear) input.bumpNmacMonthCacheRevision = true;
 
   if (
     input.hideLegacyNav === undefined &&
@@ -65,5 +72,9 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Could not save settings." }, { status: 500 });
   }
 
-  return NextResponse.json({ preferences: settings, canEdit: true });
+  return NextResponse.json({
+    preferences: settings,
+    canEdit: isAdmin,
+    canClearCache: true,
+  });
 }

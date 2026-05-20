@@ -84,6 +84,7 @@ export default function SettingsPage() {
   const {
     ready: prefsReady,
     canEdit: canEditOrgPrefs,
+    canClearCache,
     hideLegacyNav,
     useNmacTestData,
     setHideLegacyNav,
@@ -142,113 +143,120 @@ export default function SettingsPage() {
 
   return (
     <MainShell title="Settings" subtitle="Preferences and account">
-      <div
-        className={
-          "mx-auto grid max-w-3xl gap-6 " +
-          (isAdmin ? "lg:grid-cols-2 lg:items-start lg:gap-8" : "max-w-xl")
-        }
-      >
-        {isAdmin ? (
-        <section
-          className={
-            "overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04] " +
-            (!prefsReady ? "pointer-events-none opacity-60" : "")
-          }
-          aria-busy={!prefsReady}
-        >
-          <div className="flex items-start gap-3 border-b border-border bg-surface-muted/40 px-5 py-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-accent">
-              <Cloud className="h-5 w-5" strokeWidth={1.75} aria-hidden />
-            </span>
-            <div className="min-w-0 pt-0.5">
-              <h2 className="text-base font-semibold tracking-tight text-foreground">Organization</h2>
-              <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                Applies to every signed-in user. Changing a switch updates the dashboard for all accounts.
-              </p>
-            </div>
-          </div>
-          <div className="divide-y divide-border px-5">
-            <SwitchRow
-              icon={<PanelLeftClose className="h-4 w-4" strokeWidth={2} />}
-              title="Hide legacy navigation"
-              description="Hides Practice (weekly KPIs, doctors) and Data entry in the sidebar. You can still open those pages by URL."
-              checked={hideLegacyNav}
-              disabled={!canEditOrgPrefs}
-              onCheckedChange={(next) => void setHideLegacyNav(next)}
-            />
-            <SwitchRow
-              icon={<Sparkles className="h-4 w-4" strokeWidth={2} />}
-              title="Sample data for NMAC charts"
-              description="When on and months are empty, fills them with sample values for preview. Turning off clears cached month values for everyone and reloads saved data from your organization when available."
-              checked={useNmacTestData}
-              disabled={!canEditOrgPrefs}
-              onCheckedChange={(next) => void setUseNmacTestData(next)}
-            />
-          </div>
-          <div className="border-t border-border bg-surface-muted/25 px-5 py-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-              <Trash2 className="h-4 w-4 text-muted-foreground" strokeWidth={2} aria-hidden />
-              Reset chart month cache
-            </div>
-            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-              Clears cached FY month values for NMAC charts for all users. Data loads again after refresh when your
-              organization data is available. If sample data is on and nothing is saved, samples may reappear.
-            </p>
-            {!cacheClearOpen ? (
-              <button
-                type="button"
-                onClick={() => setCacheClearOpen(true)}
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-medium text-foreground transition hover:border-destructive/45 hover:bg-destructive/[0.07] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:w-auto"
-              >
-                <Trash2 className="h-4 w-4 opacity-80" aria-hidden />
-                Clear cache…
-              </button>
-            ) : (
-              <div className="mt-3 flex flex-col gap-2 rounded-lg border border-destructive/25 bg-destructive/[0.06] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-xs text-muted-foreground">Clears cache for every user. Continue?</p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCacheClearOpen(false)}
-                    className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-surface-muted"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={cacheClearing}
-                    onClick={() => {
-                      void (async () => {
-                        setCacheClearing(true);
-                        try {
-                          await clearNmacMonthCache();
-                          setPrefsNote("Chart month cache cleared for everyone.");
-                          setCacheClearOpen(false);
-                          window.setTimeout(() => setPrefsNote(null), 5000);
-                        } finally {
-                          setCacheClearing(false);
-                        }
-                      })();
-                    }}
-                    className="rounded-lg bg-destructive px-3 py-2 text-xs font-medium text-white shadow-sm transition hover:opacity-95 disabled:opacity-50"
-                  >
-                    {cacheClearing ? "Clearing…" : "Clear now"}
-                  </button>
+      <div className="mx-auto grid max-w-3xl gap-6 lg:grid-cols-2 lg:items-start lg:gap-8">
+        <div className="flex flex-col gap-6">
+          {isAdmin ? (
+            <section
+              className={
+                "overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04] " +
+                (!prefsReady ? "pointer-events-none opacity-60" : "")
+              }
+              aria-busy={!prefsReady}
+            >
+              <div className="flex items-start gap-3 border-b border-border bg-surface-muted/40 px-5 py-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-accent">
+                  <Cloud className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+                </span>
+                <div className="min-w-0 pt-0.5">
+                  <h2 className="text-base font-semibold tracking-tight text-foreground">Organization</h2>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                    Admin only. Changing a switch updates the dashboard for all accounts.
+                  </p>
                 </div>
               </div>
-            )}
-            {prefsNote ? (
-              <p
-                className="mt-3 flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400"
-                role="status"
-              >
-                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                {prefsNote}
+              <div className="divide-y divide-border px-5">
+                <SwitchRow
+                  icon={<PanelLeftClose className="h-4 w-4" strokeWidth={2} />}
+                  title="Hide legacy navigation"
+                  description="Hides Practice (weekly KPIs, doctors) and Data entry in the sidebar. You can still open those pages by URL."
+                  checked={hideLegacyNav}
+                  disabled={!canEditOrgPrefs}
+                  onCheckedChange={(next) => void setHideLegacyNav(next)}
+                />
+                <SwitchRow
+                  icon={<Sparkles className="h-4 w-4" strokeWidth={2} />}
+                  title="Sample data for NMAC charts"
+                  description="When on and months are empty, fills them with sample values for preview. Turning off clears cached month values for everyone and reloads saved data from your organization when available."
+                  checked={useNmacTestData}
+                  disabled={!canEditOrgPrefs}
+                  onCheckedChange={(next) => void setUseNmacTestData(next)}
+                />
+              </div>
+            </section>
+          ) : null}
+
+          <section
+            className={
+              "overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04] " +
+              (!prefsReady ? "pointer-events-none opacity-60" : "")
+            }
+            aria-busy={!prefsReady}
+          >
+            <div className="border-b border-border bg-surface-muted/25 px-5 py-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <Trash2 className="h-4 w-4 text-muted-foreground" strokeWidth={2} aria-hidden />
+                Reset chart month cache
+              </div>
+              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                Clears cached FY month values for NMAC charts for all users. Data loads again after refresh when your
+                organization data is available. If sample data is on and nothing is saved, samples may reappear.
               </p>
-            ) : null}
-          </div>
-        </section>
-        ) : null}
+              {!cacheClearOpen ? (
+                <button
+                  type="button"
+                  disabled={!canClearCache}
+                  onClick={() => setCacheClearOpen(true)}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-medium text-foreground transition hover:border-destructive/45 hover:bg-destructive/[0.07] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                >
+                  <Trash2 className="h-4 w-4 opacity-80" aria-hidden />
+                  Clear cache…
+                </button>
+              ) : (
+                <div className="mt-3 flex flex-col gap-2 rounded-lg border border-destructive/25 bg-destructive/[0.06] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs text-muted-foreground">Clears cache for every user. Continue?</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCacheClearOpen(false)}
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-surface-muted"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={cacheClearing || !canClearCache}
+                      onClick={() => {
+                        void (async () => {
+                          setCacheClearing(true);
+                          try {
+                            await clearNmacMonthCache();
+                            setPrefsNote("Chart month cache cleared for everyone.");
+                            setCacheClearOpen(false);
+                            window.setTimeout(() => setPrefsNote(null), 5000);
+                          } finally {
+                            setCacheClearing(false);
+                          }
+                        })();
+                      }}
+                      className="rounded-lg bg-destructive px-3 py-2 text-xs font-medium text-white shadow-sm transition hover:opacity-95 disabled:opacity-50"
+                    >
+                      {cacheClearing ? "Clearing…" : "Clear now"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {prefsNote ? (
+                <p
+                  className="mt-3 flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400"
+                  role="status"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  {prefsNote}
+                </p>
+              ) : null}
+            </div>
+          </section>
+        </div>
 
         <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
           <div className="flex items-start gap-3 border-b border-border bg-surface-muted/40 px-5 py-4">

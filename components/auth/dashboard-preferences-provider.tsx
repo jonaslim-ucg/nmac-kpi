@@ -26,6 +26,7 @@ import {
 type Ctx = {
   ready: boolean;
   canEdit: boolean;
+  canClearCache: boolean;
   hideLegacyNav: boolean;
   useNmacTestData: boolean;
   setHideLegacyNav: (next: boolean) => Promise<void>;
@@ -39,6 +40,7 @@ const DashboardPreferencesContext = createContext<Ctx | null>(null);
 type PrefsResponse = {
   preferences?: AppDashboardSettings;
   canEdit?: boolean;
+  canClearCache?: boolean;
 };
 
 async function fetchPreferences(): Promise<PrefsResponse | null> {
@@ -71,6 +73,7 @@ export function DashboardPreferencesProvider({ children }: { children: React.Rea
   const { user, loading: sessionLoading } = useSession();
   const [ready, setReady] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
+  const [canClearCache, setCanClearCache] = useState(false);
   const [hideLegacyNav, setHideLegacyNavState] = useState(false);
   const [useNmacTestData, setUseNmacTestDataState] = useState(true);
 
@@ -87,6 +90,7 @@ export function DashboardPreferencesProvider({ children }: { children: React.Rea
     const res = await fetchPreferences();
     if (!res?.preferences) return false;
     setCanEdit(res.canEdit ?? canManageUsers(user?.role));
+    setCanClearCache(res.canClearCache ?? Boolean(user));
     applyServerPrefs(res.preferences);
     return true;
   }, [applyServerPrefs, user]);
@@ -100,6 +104,7 @@ export function DashboardPreferencesProvider({ children }: { children: React.Rea
       setHideLegacyNavState(legacy.hideLegacyNav);
       setUseNmacTestDataState(legacy.useNmacTestData);
       setCanEdit(false);
+      setCanClearCache(false);
       setReady(true);
       return;
     }
@@ -115,6 +120,7 @@ export function DashboardPreferencesProvider({ children }: { children: React.Rea
         setHideLegacyNavState(legacy.hideLegacyNav);
         setUseNmacTestDataState(legacy.useNmacTestData);
         setCanEdit(canManageUsers(user?.role));
+        setCanClearCache(Boolean(user));
         applySyncedDashboardPrefs(null);
       }
       if (!cancelled) setReady(true);
@@ -170,9 +176,14 @@ export function DashboardPreferencesProvider({ children }: { children: React.Rea
   );
 
   const clearNmacMonthCache = useCallback(async () => {
-    if (!canEdit) return;
-    await persist({ clear_nmac_month_cache: true }, { reloadNmacFromServer: true });
-  }, [canEdit, persist]);
+    if (!canClearCache) return;
+    const res = await patchPreferences({ clear_nmac_month_cache: true });
+    if (!res?.preferences) return;
+    applyServerPrefs(res.preferences);
+    clearNmacMonthlyLocalCacheOnly();
+    writeLocalCacheRevision(GLOBAL_CACHE_REVISION_KEY, res.preferences.nmacMonthCacheRevision);
+    dispatchPrefs({ reloadNmacFromServer: true });
+  }, [canClearCache, applyServerPrefs]);
 
   const refresh = useCallback(async () => {
     await loadFromServer();
@@ -182,6 +193,7 @@ export function DashboardPreferencesProvider({ children }: { children: React.Rea
     () => ({
       ready,
       canEdit,
+      canClearCache,
       hideLegacyNav,
       useNmacTestData,
       setHideLegacyNav,
@@ -192,6 +204,7 @@ export function DashboardPreferencesProvider({ children }: { children: React.Rea
     [
       ready,
       canEdit,
+      canClearCache,
       hideLegacyNav,
       useNmacTestData,
       setHideLegacyNav,

@@ -70,7 +70,7 @@ export function AppBrand({ layout = "sidebar" }: AppBrandProps) {
   }
 
   return (
-    <Link href="/" className={className} aria-label="NMAC KPI home">
+    <Link href="/nmac-2026" className={className} aria-label="NMAC KPI home">
       {inner}
     </Link>
   );

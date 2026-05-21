@@ -77,7 +77,7 @@ export default function LoginPage() {
         setError(j.message ?? "Could not sign in.");
         return;
       }
-      router.replace("/");
+      router.replace("/nmac-2026");
       router.refresh();
     } catch {
       setError("Could not sign in.");

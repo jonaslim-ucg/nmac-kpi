@@ -1,0 +1,102 @@
+PURPOSE OF THE APP
+
+NMAC KPI is North Shore Medical Center's performance dashboard. It brings key numbers into one place so the team can see how the practice is doing this year compared to last year and compared to goals. Most people use it to review charts in Bitrix. Editors also enter and update the numbers behind those charts so everyone is looking at the same, up-to-date information.
+
+
+GETTING IN
+
+1. Open NMAC KPI from Bitrix24 (same way you open other workplace apps).
+2. You should be signed in automatically with your Bitrix email.
+3. If you see "Access not available," your email is not on the user list yet — ask an administrator to add you with the Editor role.
+4. At the bottom of the sidebar, confirm your name, email, and role (Editor).
+
+
+WHERE TO GO IN THE APP
+
+NMAC master KPI (review charts):
+• Performance overview
+• Visit volume
+• Scheduling
+• Finance
+• Calls
+• Nursing
+• Specialty
+• Compliance
+
+Use the year and filters at the top to change what you see.
+
+Administration (enter data):
+• Data entry — weekly numbers
+• NMAC master — yearly targets and monthly this year / last year numbers (these feed the main charts)
+• Settings — your name and reset chart cache
+
+If you don't see Data entry or NMAC master, ask an admin to confirm your role is Editor.
+
+
+DATA ENTRY (WEEKLY KPIs)
+
+Use when you need numbers by week (Week 1, Week 2, and so on).
+
+1. Go to Administration, then Data entry.
+2. Choose the KPI and Year at the top.
+3. For each week, enter "this year" and "last year."
+4. If you need another week, click Add week.
+5. Click Save.
+6. Wait for the confirmation message.
+7. If save fails, try again or contact your admin.
+
+
+NMAC MASTER (TARGETS AND MONTHLY DATA)
+
+Main place for NMAC dashboard numbers. Go to Administration, then NMAC master.
+
+Targets tab (goals for the year):
+
+1. Open the Targets tab.
+2. Under "Applies to," choose Full year or one specific month.
+3. Enter or adjust target numbers.
+4. Click Save targets at the bottom.
+
+Note: Full year is the default for every month. Only pick a single month when that month's goal should differ from the rest of the year.
+
+Monthly actuals tab (real results by month):
+
+1. Open the Monthly actuals tab.
+2. Choose the month you are updating.
+3. For each KPI, enter this year and last year.
+4. Save that month.
+5. Charts should update when people refresh the app.
+
+
+SETTINGS
+
+Go to Administration, then Settings.
+
+Account:
+1. Enter your first and last name.
+2. Click Save name.
+3. Use Sign out when you are done on a shared computer.
+
+NMAC charts — Clear cache (if charts look wrong after saving):
+1. Click Clear cache.
+2. Confirm.
+3. Refresh the page or reopen the app in Bitrix.
+
+
+GOOD HABITS
+
+• Save after each batch of changes — do not assume it saved automatically.
+• Where possible, have one person update a given week or month at a time.
+• After big updates, open a chart and check the numbers look right.
+• If charts still look wrong after saving, use Clear cache in Settings, then refresh.
+
+
+IF SOMETHING GOES WRONG
+
+• Can't open the app or see "no access" — Ask an admin to add your Bitrix email as Editor.
+• Don't see Data entry or NMAC master — Ask an admin to set your role to Editor or Admin.
+• Save failed or red error — Note the message, wait a moment, try again.
+• Charts don't match what you entered — Clear chart cache in Settings, then refresh the Bitrix tab.
+• Wrong year or KPI on screen — Check the Year and KPI dropdowns before entering data.
+
+For access or role changes, contact an administrator.

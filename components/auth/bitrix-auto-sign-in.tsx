@@ -73,7 +73,7 @@ export function BitrixAutoSignIn({
           return;
         }
 
-        router.replace("/");
+        router.replace("/nmac-2026");
         router.refresh();
       } catch {
         if (!cancelled) {

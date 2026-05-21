@@ -1,13 +1,6 @@
-import { DashboardClient } from "@/components/dashboard/dashboard-client";
-import { MainShell } from "@/components/dashboard/main-shell";
+import { redirect } from "next/navigation";
 
-export default function DashboardPage() {
-  return (
-    <MainShell
-      title="Performance overview"
-      subtitle="Weekly KPIs — compare this year, last year, and your target (FY 2026)"
-    >
-      <DashboardClient />
-    </MainShell>
-  );
+/** Default landing: NMAC master Performance overview (not legacy weekly KPIs). */
+export default function HomePage() {
+  redirect("/nmac-2026");
 }

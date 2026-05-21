@@ -47,7 +47,7 @@ export async function middleware(request: NextRequest) {
     const embedded = isBitrixEmbeddedRequest(request);
 
     if (pathname === "/login") {
-      const res = NextResponse.redirect(new URL("/", request.url));
+      const res = NextResponse.redirect(new URL("/nmac-2026", request.url));
       if (sync.refreshedToken) {
         res.cookies.set(SESSION_COOKIE_NAME, sync.refreshedToken, buildSessionCookieOptions(embedded));
       }
@@ -56,7 +56,7 @@ export async function middleware(request: NextRequest) {
 
     const denyUsers = pathname.startsWith("/admin/users") && session.role !== "admin";
     const res = denyUsers
-      ? NextResponse.redirect(new URL("/", request.url))
+      ? NextResponse.redirect(new URL("/nmac-2026", request.url))
       : NextResponse.next();
 
     if (sync.refreshedToken) {

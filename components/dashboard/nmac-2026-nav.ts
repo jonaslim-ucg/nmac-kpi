@@ -37,7 +37,7 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
     title: "Practice",
     legacySection: true,
     items: [
-      { href: "/", label: "Weekly KPIs", icon: LayoutDashboard },
+      { href: "/weekly", label: "Weekly KPIs", icon: LayoutDashboard },
       { href: "/doctors", label: "Doctors", icon: Stethoscope },
     ],
   },

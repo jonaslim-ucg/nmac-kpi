@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>NMAC KPI — Editor Guide</title>
+  <style>
+    @page { size: letter; margin: 0.55in; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 10pt;
+      line-height: 1.38;
+      color: #1a1a1a;
+      max-width: 7.2in;
+      margin: 0 auto;
+    }
+    .cover {
+      text-align: center;
+      padding: 1.1in 0 0.7in;
+      page-break-after: always;
+    }
+    .cover h1 { font-size: 26pt; color: #0d6b6e; margin: 0 0 0.15in; }
+    .cover p { font-size: 11pt; color: #444; margin: 0.08in 0; }
+    .intro { margin-bottom: 0.2in; }
+    .intro h2 { font-size: 12pt; color: #0d6b6e; margin: 0 0 0.08in; }
+    .guide-step {
+      margin: 0 0 0.22in;
+      padding: 0.12in 0.14in 0.14in;
+      border: 1px solid #d0e0e3;
+      border-radius: 10px;
+      background: #fafcfc;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .figure-badge {
+      display: inline-block;
+      background: #0d6b6e;
+      color: #fff;
+      font-size: 8.5pt;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+      letter-spacing: 0.03em;
+    }
+    .guide-step h2 {
+      font-size: 12pt;
+      color: #0d6b6e;
+      margin: 0 0 6px;
+      border: none;
+      padding: 0;
+    }
+    .where {
+      font-size: 9.5pt;
+      background: #e8f4f5;
+      padding: 6px 8px;
+      border-radius: 6px;
+      margin: 0 0 8px;
+    }
+    .steps { margin: 0 0 8px; padding-left: 1.1em; }
+    .steps li { margin-bottom: 2px; }
+    .shot {
+      width: 100%;
+      border: 2px solid #0d6b6e;
+      border-radius: 6px;
+      display: block;
+      margin: 0;
+    }
+    .match {
+      font-size: 9pt;
+      color: #333;
+      margin: 8px 0 0;
+      padding: 8px;
+      background: #fff;
+      border-radius: 6px;
+      border: 1px dashed #9eb8bc;
+    }
+    .match strong { color: #0d6b6e; }
+    .match ul { margin: 4px 0 0; padding-left: 1.1em; }
+    .text-only { page-break-inside: avoid; margin: 0.15in 0; }
+    .text-only h2 { font-size: 12pt; color: #0d6b6e; border-bottom: 2px solid #b8e0e2; padding-bottom: 3px; }
+    footer { margin-top: 0.2in; font-size: 8pt; color: #888; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <div class="cover">
+    <h1>NMAC KPI</h1>
+    <p>Editor guide with screenshots</p>
+    <p>North Shore Medical Center · Bitrix24</p>
+  </div>
+
+  <div class="intro">
+    <h2>Purpose &amp; sign-in</h2>
+    <p>NMAC KPI shows practice performance: <strong>this year</strong> vs <strong>last year</strong> vs <strong>goals</strong>. Open it from <strong>Bitrix24</strong>; you sign in with your Bitrix email. If you see <strong>Access not available</strong>, ask an admin to add you as <strong>Editor</strong>. Check your name and role at the bottom of the sidebar.</p>
+    <p>Each section below matches <strong>one screenshot</strong>. Follow the steps, then find the same labels in the photo.</p>
+  </div>
+
+  <section class="guide-step">
+    <span class="figure-badge">FIGURE 1</span>
+    <h2>View charts (read only)</h2>
+    <p class="where"><strong>Where in the app:</strong> Left sidebar → <strong>NMAC master KPI</strong> → e.g. <strong>Performance overview</strong> (other chart pages work the same way)</p>
+    <ol class="steps">
+      <li>Use these pages to <strong>review</strong> numbers — you do not enter data here.</li>
+      <li>Change <strong>FY year</strong> and filters at the top right.</li>
+    </ol>
+    <img class="shot" src="guide-screenshots/01-performance-overview.png" alt="Performance overview" />
+    <div class="match">
+      <strong>In this screenshot:</strong>
+      <ul>
+        <li>Left menu = chart sections (Performance overview, Visit volume, etc.)</li>
+        <li>Large chart = weekly comparison (this year, last year, target)</li>
+        <li>Top right = year selector (e.g. FY 2026)</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="guide-step">
+    <span class="figure-badge">FIGURE 2</span>
+    <h2>Data entry — weekly KPIs</h2>
+    <p class="where"><strong>Where in the app:</strong> Left sidebar → <strong>Administration</strong> → <strong>Data entry</strong></p>
+    <ol class="steps">
+      <li>Choose <strong>KPI</strong> and <strong>Year</strong> at the top.</li>
+      <li>Enter <strong>this year</strong> and <strong>last year</strong> for each week.</li>
+      <li>Click <strong>Add week</strong> if needed, then <strong>Save</strong>.</li>
+    </ol>
+    <img class="shot" src="guide-screenshots/02-data-entry.png" alt="Data entry" />
+    <div class="match">
+      <strong>In this screenshot:</strong>
+      <ul>
+        <li>Highlighted <strong>Data entry</strong> in the sidebar (under Administration)</li>
+        <li><strong>KPI</strong> and <strong>Year</strong> dropdowns at the top</li>
+        <li>Table rows = Week 1, Week 2, … with two number columns</li>
+        <li><strong>Save</strong> button — click when finished</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="guide-step">
+    <span class="figure-badge">FIGURE 3</span>
+    <h2>NMAC master — Targets (goals)</h2>
+    <p class="where"><strong>Where in the app:</strong> <strong>Administration</strong> → <strong>NMAC master</strong> → <strong>Targets</strong> tab (selected)</p>
+    <ol class="steps">
+      <li>Under <strong>Applies to</strong>, choose <strong>Full year</strong> or one month.</li>
+      <li>Enter target numbers in the list.</li>
+      <li>Click <strong>Save targets</strong> at the bottom.</li>
+    </ol>
+    <img class="shot" src="guide-screenshots/03-nmac-master-targets.png" alt="NMAC master targets" />
+    <div class="match">
+      <strong>In this screenshot:</strong>
+      <ul>
+        <li><strong>Targets</strong> tab is active (not Monthly actuals)</li>
+        <li><strong>Applies to</strong> dropdown = Full year or a single month</li>
+        <li>KPI list with target values + <strong>Save targets</strong></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="guide-step">
+    <span class="figure-badge">FIGURE 4</span>
+    <h2>NMAC master — Monthly actuals</h2>
+    <p class="where"><strong>Where in the app:</strong> <strong>Administration</strong> → <strong>NMAC master</strong> → <strong>Monthly actuals</strong> tab (selected)</p>
+    <ol class="steps">
+      <li>Click the <strong>Monthly actuals</strong> tab.</li>
+      <li><strong>Choose the month</strong> (month buttons/chips).</li>
+      <li>Enter <strong>this year</strong> and <strong>last year</strong> for each KPI.</li>
+      <li>Click <strong>Save month</strong>, then refresh Bitrix to update charts.</li>
+    </ol>
+    <img class="shot" src="guide-screenshots/04-nmac-master-monthly.png" alt="NMAC master monthly" />
+    <div class="match">
+      <strong>In this screenshot:</strong>
+      <ul>
+        <li><strong>Monthly actuals</strong> tab is active (not Targets)</li>
+        <li>Title: “Monthly this year / last year”</li>
+        <li>Month selector and data grid with two columns per KPI</li>
+        <li><strong>Save month</strong> button at the bottom of the form</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="guide-step">
+    <span class="figure-badge">FIGURE 5</span>
+    <h2>Settings</h2>
+    <p class="where"><strong>Where in the app:</strong> Left sidebar → <strong>Administration</strong> → <strong>Settings</strong></p>
+    <ol class="steps">
+      <li><strong>Account:</strong> enter first/last name → <strong>Save name</strong>.</li>
+      <li><strong>Clear cache:</strong> if charts look wrong after saving → <strong>Clear cache</strong> → confirm → refresh Bitrix.</li>
+      <li>Use <strong>Sign out</strong> on a shared computer.</li>
+    </ol>
+    <img class="shot" src="guide-screenshots/05-settings.png" alt="Settings" />
+    <div class="match">
+      <strong>In this screenshot:</strong>
+      <ul>
+        <li><strong>Account</strong> card — your name and role</li>
+        <li><strong>NMAC charts — Clear cache</strong> section with Clear cache button</li>
+        <li><strong>Sign out</strong> at the bottom of Account</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="text-only">
+    <h2>Good habits</h2>
+    <ul>
+      <li>Always <strong>Save</strong> / <strong>Save targets</strong> / <strong>Save month</strong> — nothing auto-saves.</li>
+      <li>One person per week or month when possible.</li>
+      <li>After big updates, open a chart (Figure 1) to verify numbers.</li>
+      <li>Charts still wrong? Use Figure 5 → Clear cache → refresh.</li>
+    </ul>
+    <h2 style="margin-top:0.15in;">If something goes wrong</h2>
+    <ul>
+      <li><strong>No access</strong> — admin adds your Bitrix email as Editor.</li>
+      <li><strong>Missing Data entry or NMAC master</strong> — confirm Editor role.</li>
+      <li><strong>Save failed</strong> — read the message and try again.</li>
+      <li><strong>Wrong charts</strong> — Figure 5, Clear cache, refresh.</li>
+    </ul>
+  </div>
+
+  <footer>NMAC KPI Editor Guide · Each figure matches the app screen above it</footer>
+
+</body>
+</html>

@@ -23,6 +23,8 @@ function matchesQuery(k: KpiRow, q: string): boolean {
 /** Grouped editors for NMAC master target overrides (full map including defaults). */
 export function NmacTargetsForm({ targets, onChange, disabled, baselineTargets, baselineLabel }: Props) {
   const [query, setQuery] = useState("");
+  /** Lets users clear the field while typing; default is restored on blur when still empty. */
+  const [editing, setEditing] = useState<Record<string, string>>({});
 
   const baseline = useMemo(() => {
     if (baselineTargets) return baselineTargets;
@@ -42,7 +44,7 @@ export function NmacTargetsForm({ targets, onChange, disabled, baselineTargets, 
     return m;
   }, []);
 
-  function setTarget(id: string, raw: string) {
+  function commitTarget(id: string, raw: string) {
     const v = raw.trim();
     const num = v === "" ? NaN : Number(v);
     const next = { ...targets };
@@ -53,6 +55,31 @@ export function NmacTargetsForm({ targets, onChange, disabled, baselineTargets, 
       next[id] = num;
     }
     onChange(next);
+  }
+
+  function displayTarget(id: string, current: number): string {
+    if (Object.prototype.hasOwnProperty.call(editing, id)) return editing[id];
+    return String(current);
+  }
+
+  function handleTargetChange(id: string, raw: string) {
+    setEditing((prev) => ({ ...prev, [id]: raw }));
+    const v = raw.trim();
+    if (v === "") return;
+    const num = Number(v);
+    if (Number.isFinite(num)) {
+      onChange({ ...targets, [id]: num });
+    }
+  }
+
+  function handleTargetBlur(id: string, current: number) {
+    const raw = Object.prototype.hasOwnProperty.call(editing, id) ? editing[id] : String(current);
+    commitTarget(id, raw);
+    setEditing((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   }
 
   const unitLabel = (u: string) => (u === "" ? "count" : u);
@@ -141,8 +168,9 @@ export function NmacTargetsForm({ targets, onChange, disabled, baselineTargets, 
                                 step="any"
                                 inputMode="decimal"
                                 disabled={disabled}
-                                value={String(current)}
-                                onChange={(e) => setTarget(k.id, e.target.value)}
+                                value={displayTarget(k.id, current)}
+                                onChange={(e) => handleTargetChange(k.id, e.target.value)}
+                                onBlur={() => handleTargetBlur(k.id, current)}
                                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-base font-semibold tabular-nums leading-none text-foreground outline-none transition focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/25 disabled:opacity-60 sm:text-sm"
                               />
                             </label>

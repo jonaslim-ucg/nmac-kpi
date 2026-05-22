@@ -10,7 +10,9 @@ import { canEditKpiData, canManageUsers } from "@/lib/auth/types";
 import { useDashboardPreferences } from "@/components/auth/dashboard-preferences-provider";
 
 function linkActive(pathname: string, href: string): boolean {
-  if (href === "/weekly") return pathname === "/weekly" || pathname.startsWith("/weekly/");
+  if (href === "/practice/weekly") {
+    return pathname === "/practice/weekly" || pathname.startsWith("/practice/weekly/");
+  }
   if (href === "/admin") return pathname === "/admin";
   if (href.startsWith("/admin/")) return pathname === href || pathname.startsWith(href + "/");
   if (href.startsWith("/nmac-2026")) {

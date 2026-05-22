@@ -9,6 +9,11 @@ function isBitrixEmbeddedRequest(request: NextRequest): boolean {
   return /bitrix24\.com/i.test(referer);
 }
 
+/** Home + legacy Bitrix URLs that pointed at weekly KPIs → NMAC master Performance overview. */
+function isLandingRedirectPath(pathname: string): boolean {
+  return pathname === "/" || pathname === "/weekly";
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -47,6 +52,14 @@ export async function middleware(request: NextRequest) {
     const embedded = isBitrixEmbeddedRequest(request);
 
     if (pathname === "/login") {
+      const res = NextResponse.redirect(new URL("/nmac-2026", request.url));
+      if (sync.refreshedToken) {
+        res.cookies.set(SESSION_COOKIE_NAME, sync.refreshedToken, buildSessionCookieOptions(embedded));
+      }
+      return res;
+    }
+
+    if (isLandingRedirectPath(pathname)) {
       const res = NextResponse.redirect(new URL("/nmac-2026", request.url));
       if (sync.refreshedToken) {
         res.cookies.set(SESSION_COOKIE_NAME, sync.refreshedToken, buildSessionCookieOptions(embedded));

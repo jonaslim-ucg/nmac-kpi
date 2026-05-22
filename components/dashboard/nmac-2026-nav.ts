@@ -34,14 +34,6 @@ export type SidebarSection = {
 
 export const SIDEBAR_SECTIONS: SidebarSection[] = [
   {
-    title: "Practice",
-    legacySection: true,
-    items: [
-      { href: "/weekly", label: "Weekly KPIs", icon: LayoutDashboard },
-      { href: "/doctors", label: "Doctors", icon: Stethoscope },
-    ],
-  },
-  {
     title: "NMAC master KPI",
     items: [
       { href: "/nmac-2026", label: "Performance overview", icon: BarChart3 },
@@ -52,6 +44,14 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
       { href: "/nmac-2026/nursing", label: "Nursing KPIs", icon: HeartPulse },
       { href: "/nmac-2026/specialty", label: "Specialty clinics", icon: Stethoscope },
       { href: "/nmac-2026/compliance", label: "Compliance & quality", icon: ClipboardList },
+    ],
+  },
+  {
+    title: "Practice",
+    legacySection: true,
+    items: [
+      { href: "/practice/weekly", label: "Weekly KPIs", icon: LayoutDashboard },
+      { href: "/doctors", label: "Doctors", icon: Stethoscope },
     ],
   },
   {

@@ -61,10 +61,10 @@
 }
 
 .nk26-tabs {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 28px;
-  flex-wrap: wrap;
   background: var(--nk26-surface);
   border: 1px solid var(--nk26-border);
   border-radius: 12px;
@@ -73,7 +73,7 @@
 }
 
 .nk26-tab {
-  padding: 8px 14px;
+  padding: 8px 10px;
   font-size: 13px;
   border-radius: 8px;
   cursor: pointer;
@@ -86,12 +86,30 @@
     border-color 0.22s ease,
     box-shadow 0.22s ease,
     transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
-  flex: 1;
+  width: 100%;
   text-align: center;
-  min-width: 56px;
+  min-width: 0;
   min-height: 40px;
   background: transparent;
   font-family: inherit;
+}
+
+@media (min-width: 520px) {
+  .nk26-tabs {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 960px) {
+  .nk26-tabs {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .nk26-tab {
+    flex: 1 1 0;
+    min-width: 56px;
+  }
 }
 
 .nk26-tab:hover {

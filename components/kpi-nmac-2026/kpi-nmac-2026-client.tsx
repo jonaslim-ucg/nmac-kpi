@@ -11,6 +11,7 @@ import {
   nk26ThisYearLineStyle,
   revenueChartConfig,
   rnVisitsBarConfig,
+  emphasizeSelectedMonthBarColors,
   trendDatasets,
   utilNoshowConfig,
 } from "@/lib/kpi-nmac-2026/chart-config";
@@ -76,6 +77,16 @@ function readDocThemeClass(): AppThemeName {
 }
 
 type Props = { view: string };
+
+/** KPI ids shown in the month stat row (below month tabs) per section view. */
+const VIEW_MONTH_STATS: Partial<Record<Nk26View, string[]>> = {
+  scheduling: ["util", "noshow", "leads", "ph"],
+  finance: ["revenue", "copay", "leakage", "shop"],
+  calls: ["callrate", "callvol"],
+  nursing: ["ecg", "spiro", "nursing_ann"],
+  specialty: ["trich", "ht", "fp", "wl"],
+  compliance: ["productivity", "survey", "engage", "sop"],
+};
 
 export function KpiNmac2026Client({ view }: Props) {
   const v: Nk26View = isNk26View(view) ? view : "overview";
@@ -174,9 +185,12 @@ export function KpiNmac2026Client({ view }: Props) {
         chartsRef.current.push(new ChartCtor(canvas, cfg));
       };
 
+      const highlight = selectedMonth;
+
       const simpleBar = (id: string, kpiId: string) => {
         const row0 = findKpi(kpiId, kpisPerMonth[0] ?? KPIs);
         const targetsArr = MONTHS.map((_, i) => findKpi(kpiId, kpisPerMonth[i] ?? KPIs).target);
+        const barColors = colorBar(db, kpiId, targetsArr, row0.higher);
         mount(
           id,
           barBase(
@@ -185,10 +199,12 @@ export function KpiNmac2026Client({ view }: Props) {
               {
                 label: row0.label,
                 data: MONTHS.map((_, i) => getVal(db, i, kpiId)),
-                backgroundColor: colorBar(db, kpiId, targetsArr, row0.higher),
+                backgroundColor: emphasizeSelectedMonthBarColors(barColors, highlight),
               },
             ],
             targetsArr,
+            undefined,
+            highlight,
           ),
         );
       };
@@ -208,9 +224,13 @@ export function KpiNmac2026Client({ view }: Props) {
                 borderColor: lineStyle.borderColor,
                 backgroundColor: lineStyle.backgroundColor,
                 fill: true,
+                pointRadius: MONTHS.map((_, i) => (i === highlight ? 6 : 3)),
               },
             ],
             targetsArr,
+            "Target",
+            undefined,
+            highlight,
           ),
         );
       };
@@ -229,12 +249,12 @@ export function KpiNmac2026Client({ view }: Props) {
           simpleBar("nk26-c-exec", "exec");
           break;
         case "scheduling":
-          mount("nk26-c-util-noshow", utilNoshowConfig(db, kpisPerMonth));
+          mount("nk26-c-util-noshow", utilNoshowConfig(db, kpisPerMonth, highlight));
           simpleBar("nk26-c-leads", "leads");
           simpleBar("nk26-c-ph", "ph");
           break;
         case "finance":
-          mount("nk26-c-rev2", revenueChartConfig(db, colorBar, kpisPerMonth));
+          mount("nk26-c-rev2", revenueChartConfig(db, colorBar, kpisPerMonth, highlight));
           simpleBar("nk26-c-copay", "copay");
           simpleBar("nk26-c-leakage", "leakage");
           simpleBar("nk26-c-shop", "shop");
@@ -247,7 +267,7 @@ export function KpiNmac2026Client({ view }: Props) {
           simpleBar("nk26-c-ecg", "ecg");
           simpleBar("nk26-c-spiro", "spiro");
           simpleBar("nk26-c-nursing-annuals", "nursing_ann");
-          mount("nk26-c-rn-visits", rnVisitsBarConfig(db, kpisPerMonth));
+          mount("nk26-c-rn-visits", rnVisitsBarConfig(db, kpisPerMonth, highlight));
           break;
         case "specialty":
           simpleLine("nk26-c-trich", "trich");
@@ -272,7 +292,7 @@ export function KpiNmac2026Client({ view }: Props) {
       chartsRef.current.forEach((c) => c.destroy());
       chartsRef.current = [];
     };
-  }, [v, db, kpisPerMonth, chartThemeKey]);
+  }, [v, db, kpisPerMonth, chartThemeKey, selectedMonth]);
 
   const badge = (kpiId: string) => {
     const k = findKpi(kpiId, kpisForSelected);
@@ -305,38 +325,43 @@ export function KpiNmac2026Client({ view }: Props) {
     );
   });
 
-  const visitsStats = ["visits", "annuals", "exec"].map((id) => {
-    const k = findKpi(id, kpisForSelected);
-    const val = getVal(db, selectedMonth, id);
-    const ly = getLastYearVal(db, selectedMonth, id);
-    const sc = statusColor(k, val);
-    return (
-      <div key={id} className={"nk26-stat " + sc}>
-        <div className="nk26-slab">{k.label}</div>
-        <div className={"nk26-sval " + sc}>{formatVal(k, val)}</div>
-        <div className="nk26-ssub">
-          Target: {k.higher ? "≥" : "≤"} {k.target}
-          {k.unit} · vs LY {rateVsLastYearPct(val, ly)}
+  const monthKpiStats = (ids: string[]) =>
+    ids.map((id) => {
+      const k = findKpi(id, kpisForSelected);
+      const val = getVal(db, selectedMonth, id);
+      const ly = getLastYearVal(db, selectedMonth, id);
+      const sc = statusColor(k, val);
+      return (
+        <div key={id} className={"nk26-stat " + sc}>
+          <div className="nk26-slab">{k.label}</div>
+          <div className={"nk26-sval " + sc}>{formatVal(k, val)}</div>
+          <div className="nk26-ssub">
+            Target: {k.higher ? "≥" : "≤"} {k.target}
+            {k.unit} · vs LY {rateVsLastYearPct(val, ly)}
+          </div>
+          <div className="nk26-mwrap">
+            <div
+              className="nk26-mbar"
+              style={{
+                width: `${pct(k, val) || 0}%`,
+                background:
+                  sc === "green"
+                    ? "var(--nk26-green)"
+                    : sc === "yellow"
+                      ? "var(--nk26-yellow)"
+                      : sc === "red"
+                        ? "var(--nk26-red)"
+                        : "var(--chart-this-year)",
+              }}
+            />
+          </div>
         </div>
-        <div className="nk26-mwrap">
-          <div
-            className="nk26-mbar"
-            style={{
-              width: `${pct(k, val) || 0}%`,
-              background:
-                sc === "green"
-                  ? "var(--nk26-green)"
-                  : sc === "yellow"
-                    ? "var(--nk26-yellow)"
-                    : sc === "red"
-                      ? "var(--nk26-red)"
-                      : "var(--chart-this-year)",
-            }}
-          />
-        </div>
-      </div>
-    );
-  });
+      );
+    });
+
+  const visitsStats = monthKpiStats(["visits", "annuals", "exec"]);
+
+  const sectionMonthStats = VIEW_MONTH_STATS[v] ? monthKpiStats(VIEW_MONTH_STATS[v]!) : null;
 
   return (
     <div className="nk26-root nk26-shell">
@@ -478,16 +503,26 @@ export function KpiNmac2026Client({ view }: Props) {
             <div className="nk26-section-title">Scheduling & utilization</div>
             <div className="nk26-section-sub">
               Provider utilization ≥ 90% · no-show rate ≤ 7% · lead conversion &gt; 70–80%
+              <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
+            {sectionMonthStats ? (
+              <div key={selectedMonth} className="nk26-tab-content-enter nk26-stats">
+                {sectionMonthStats}
+              </div>
+            ) : null}
             <div className="nk26-charts">
             <div className="nk26-card nk26-card-full">
               <div className="nk26-chd">
                 <div>
                   <div className="nk26-ctitle">Provider utilization vs no-show rate</div>
                   <div className="nk26-csub">Dual-axis monthly comparison</div>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  {badge("util")}
+                  {badge("noshow")}
                 </div>
               </div>
               <div className="nk26-canvas" style={{ height: 220 }}>
@@ -500,6 +535,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">Lead → booking conversion</div>
                   <div className="nk26-csub">Target: &gt; 70–80%</div>
                 </div>
+                {badge("leads")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-leads" />
@@ -511,6 +547,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">PH-generated visits</div>
                   <div className="nk26-csub">Target: 180–200 / associate / month</div>
                 </div>
+                {badge("ph")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-ph" />
@@ -527,10 +564,16 @@ export function KpiNmac2026Client({ view }: Props) {
             <div className="nk26-section-title">Finance & revenue</div>
             <div className="nk26-section-sub">
               Revenue target: $7.9M annual · copay collection ≥ 95% · unbilled encounters &lt; 10%
+              <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
+            {sectionMonthStats ? (
+              <div key={selectedMonth} className="nk26-tab-content-enter nk26-stats">
+                {sectionMonthStats}
+              </div>
+            ) : null}
             <div className="nk26-charts">
             <div className="nk26-card nk26-card-full">
               <div className="nk26-chd">
@@ -538,6 +581,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">Revenue run-rate vs $7.9M target</div>
                   <div className="nk26-csub">Monthly actuals with YTD cumulative</div>
                 </div>
+                {badge("revenue")}
               </div>
               <div className="nk26-canvas" style={{ height: 220 }}>
                 <canvas id="nk26-c-rev2" />
@@ -549,6 +593,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">Copay collection rate</div>
                   <div className="nk26-csub">Target: ≥ 95%</div>
                 </div>
+                {badge("copay")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-copay" />
@@ -560,6 +605,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">Revenue leakage (unbilled)</div>
                   <div className="nk26-csub">Target: &lt; 10%</div>
                 </div>
+                {badge("leakage")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-leakage" />
@@ -571,6 +617,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">ShopNMAC retail sales</div>
                   <div className="nk26-csub">Target: ≥ $45,000 / year ($3,750/mo)</div>
                 </div>
+                {badge("shop")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-shop" />
@@ -585,10 +632,18 @@ export function KpiNmac2026Client({ view }: Props) {
         <>
           <header className="nk26-page-head">
             <div className="nk26-section-title">Call performance</div>
-            <div className="nk26-section-sub">Call answer rate ≥ 90% · inbound calls ≥ 300 / month</div>
+            <div className="nk26-section-sub">
+              Call answer rate ≥ 90% · inbound calls ≥ 300 / month
+              <span className="mt-1 block text-foreground/90">{monthLabel}</span>
+            </div>
           </header>
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
+            {sectionMonthStats ? (
+              <div key={selectedMonth} className="nk26-tab-content-enter nk26-stats">
+                {sectionMonthStats}
+              </div>
+            ) : null}
             <div className="nk26-charts">
             <div className="nk26-card">
               <div className="nk26-chd">
@@ -596,6 +651,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">Call answer rate</div>
                   <div className="nk26-csub">Target: ≥ 90%</div>
                 </div>
+                {badge("callrate")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-callrate" />
@@ -607,6 +663,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">Inbound call volume</div>
                   <div className="nk26-csub">Target: ≥ 300 / month</div>
                 </div>
+                {badge("callvol")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-callvol" />
@@ -623,10 +680,16 @@ export function KpiNmac2026Client({ view }: Props) {
             <div className="nk26-section-title">Nursing KPIs</div>
             <div className="nk26-section-sub">
               ECG/EKG ≥ 180/mo · spirometry ≥ 20/mo · annuals supported ≥ 150/mo · RN visits (CPT 99211) target 600–700+/yr
+              <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
+            {sectionMonthStats ? (
+              <div key={selectedMonth} className="nk26-tab-content-enter nk26-stats">
+                {sectionMonthStats}
+              </div>
+            ) : null}
             <div className="nk26-charts">
             <div className="nk26-card">
               <div className="nk26-chd">
@@ -634,6 +697,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">ECG / EKG completed</div>
                   <div className="nk26-csub">Target: ≥ 180 / month</div>
                 </div>
+                {badge("ecg")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-ecg" />
@@ -645,6 +709,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">Spirometry tests</div>
                   <div className="nk26-csub">Target: ≥ 20 / month</div>
                 </div>
+                {badge("spiro")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-spiro" />
@@ -656,6 +721,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">Annual exams supported</div>
                   <div className="nk26-csub">Target: ≥ 150 / month</div>
                 </div>
+                {badge("nursing_ann")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-nursing-annuals" />
@@ -683,10 +749,16 @@ export function KpiNmac2026Client({ view }: Props) {
             <div className="nk26-section-title">Specialty clinics</div>
             <div className="nk26-section-sub">
               Trichology ≥ 90% · hair transplant ≥ 90% · facial plastics (target-based) · weight loss compliance ≥ 95%
+              <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
+            {sectionMonthStats ? (
+              <div key={selectedMonth} className="nk26-tab-content-enter nk26-stats">
+                {sectionMonthStats}
+              </div>
+            ) : null}
             <div className="nk26-charts">
             <div className="nk26-card">
               <div className="nk26-chd">
@@ -694,6 +766,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">Trichology productivity</div>
                   <div className="nk26-csub">Target: ≥ 90%</div>
                 </div>
+                {badge("trich")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-trich" />
@@ -705,6 +778,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">Hair transplant productivity</div>
                   <div className="nk26-csub">Target: ≥ 90%</div>
                 </div>
+                {badge("ht")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-ht" />
@@ -716,6 +790,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">Facial plastics bookings</div>
                   <div className="nk26-csub">Monthly procedure bookings</div>
                 </div>
+                {badge("fp")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-fp" />
@@ -727,6 +802,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">Weight loss visit compliance</div>
                   <div className="nk26-csub">Target: ≥ 95%</div>
                 </div>
+                {badge("wl")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-wl" />
@@ -743,10 +819,16 @@ export function KpiNmac2026Client({ view }: Props) {
             <div className="nk26-section-title">Compliance & patient experience</div>
             <div className="nk26-section-sub">
               SOPs 100% current · survey score ≥ 4.7/5 · overall clinic productivity ≥ 90% · staff engagement ≥ 80%
+              <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
+            {sectionMonthStats ? (
+              <div key={selectedMonth} className="nk26-tab-content-enter nk26-stats">
+                {sectionMonthStats}
+              </div>
+            ) : null}
             <div className="nk26-charts">
             <div className="nk26-card">
               <div className="nk26-chd">
@@ -754,6 +836,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">Clinic productivity (global gate)</div>
                   <div className="nk26-csub">Target: ≥ 90% — FAIL pauses all incentives</div>
                 </div>
+                {badge("productivity")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-prod" />
@@ -765,6 +848,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">Patient experience score</div>
                   <div className="nk26-csub">Target: ≥ 4.7 / 5</div>
                 </div>
+                {badge("survey")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-exp" />
@@ -776,6 +860,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">Staff engagement index</div>
                   <div className="nk26-csub">Target: ≥ 80%</div>
                 </div>
+                {badge("engage")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-engage" />
@@ -787,6 +872,7 @@ export function KpiNmac2026Client({ view }: Props) {
                   <div className="nk26-ctitle">SOP compliance</div>
                   <div className="nk26-csub">Target: 100%</div>
                 </div>
+                {badge("sop")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-sop" />

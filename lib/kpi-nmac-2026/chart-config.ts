@@ -88,6 +88,7 @@ export function lineBase(
   targetLine?: number | readonly number[],
   referenceLineLabel = "Target",
   theme: Nk26ChartTheme = resolveNk26ChartTheme(),
+  highlightMonth?: number,
 ): ChartConfiguration {
   const allDatasets: Record<string, unknown>[] = datasets.map((d) => {
     const o = d as Record<string, unknown>;
@@ -126,9 +127,33 @@ export function lineBase(
       interaction: { mode: "index", intersect: false },
       plugins: { legend: { labels: { color: theme.textColor, font: { size: 12 }, boxWidth: 14 } } },
       scales: {
-        x: { ticks: { color: theme.textColor, font: { size: 12 } }, grid: { color: theme.gridColor } },
+        x: {
+          ticks: highlightMonth === undefined ? { color: theme.textColor, font: { size: 12 } } : xAxisTicksForMonth(theme, highlightMonth),
+          grid: { color: theme.gridColor },
+        },
         y: { ticks: { color: theme.textColor, font: { size: 12 } }, grid: { color: theme.gridColor } },
       },
+    },
+  };
+}
+
+/** Dim non-selected months so the active month tab is obvious on 12-month charts. */
+export function emphasizeSelectedMonthBarColors(colors: string[], selectedMonth: number): string[] {
+  return colors.map((c, i) => {
+    if (i === selectedMonth) return c;
+    const m = c.match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/);
+    if (!m) return c;
+    return `rgba(${m[1]},${m[2]},${m[3]},0.22)`;
+  });
+}
+
+function xAxisTicksForMonth(theme: Nk26ChartTheme, highlightMonth?: number) {
+  return {
+    color: (ctx: { index: number }) =>
+      ctx.index === highlightMonth ? resolveNk26CssColor("--chart-this-year") : theme.textColor,
+    font: {
+      size: 12,
+      weight: (ctx: { index: number }) => (ctx.index === highlightMonth ? "bold" : "normal") as "bold" | "normal",
     },
   };
 }
@@ -138,6 +163,7 @@ export function barBase(
   datasets: Record<string, unknown>[],
   targetLine?: number | readonly number[],
   theme: Nk26ChartTheme = resolveNk26ChartTheme(),
+  highlightMonth?: number,
 ): ChartConfiguration {
   const allDatasets: Record<string, unknown>[] = datasets.map((d) => ({ ...d, borderWidth: 0, borderRadius: 4 }));
   if (targetLine !== undefined) {
@@ -166,7 +192,10 @@ export function barBase(
       interaction: { mode: "index", intersect: false },
       plugins: { legend: { labels: { color: theme.textColor, font: { size: 12 }, boxWidth: 14 } } },
       scales: {
-        x: { ticks: { color: theme.textColor, font: { size: 12 } }, grid: { color: theme.gridColor } },
+        x: {
+          ticks: highlightMonth === undefined ? { color: theme.textColor, font: { size: 12 } } : xAxisTicksForMonth(theme, highlightMonth),
+          grid: { color: theme.gridColor },
+        },
         y: { ticks: { color: theme.textColor, font: { size: 12 } }, grid: { color: theme.gridColor } },
       },
     },
@@ -199,12 +228,17 @@ export function trendDatasets(db: Record<number, MonthDb>, kpis: readonly KpiRow
 export function utilNoshowConfig(
   db: Record<number, MonthDb>,
   kpisPerMonth: readonly (readonly KpiRow[])[],
+  highlightMonth?: number,
   theme: Nk26ChartTheme = resolveNk26ChartTheme(),
 ): ChartConfiguration {
   const utilData = monthlyData(db, "util");
   const noshowData = monthlyData(db, "noshow");
   const utilLine = MONTHS.map((_, i) => findKpi("util", kpisPerMonth[i] ?? KPIs).target);
   const nsLine = MONTHS.map((_, i) => findKpi("noshow", kpisPerMonth[i] ?? KPIs).target);
+  const utilBarColors = MONTHS.map((_, i) =>
+    i === highlightMonth ? "rgba(59,130,246,0.95)" : "rgba(59,130,246,0.22)",
+  );
+  const noshowPoints = MONTHS.map((_, i) => (i === highlightMonth ? 6 : 3));
   return {
     type: "bar",
     data: {
@@ -214,7 +248,7 @@ export function utilNoshowConfig(
           type: "bar",
           label: "Provider Utilization %",
           data: utilData,
-          backgroundColor: "rgba(59,130,246,0.6)",
+          backgroundColor: utilBarColors,
           yAxisID: "y",
           borderRadius: 4,
           order: 3,
@@ -228,7 +262,7 @@ export function utilNoshowConfig(
           yAxisID: "y2",
           borderWidth: 2.5,
           tension: 0.4,
-          pointRadius: 3,
+          pointRadius: noshowPoints,
           order: 0,
         },
         {
@@ -262,7 +296,13 @@ export function utilNoshowConfig(
       interaction: { mode: "index", intersect: false },
       plugins: { legend: { labels: { color: theme.textColor, font: { size: 12 }, boxWidth: 14 } } },
       scales: {
-        x: { ticks: { color: theme.textColor, font: { size: 12 } }, grid: { color: theme.gridColor } },
+        x: {
+          ticks:
+            highlightMonth === undefined
+              ? { color: theme.textColor, font: { size: 12 } }
+              : xAxisTicksForMonth(theme, highlightMonth),
+          grid: { color: theme.gridColor },
+        },
         y: {
           type: "linear",
           position: "left",
@@ -286,6 +326,7 @@ export function revenueChartConfig(
   db: Record<number, MonthDb>,
   colorBarFn: typeof import("@/lib/kpi-nmac-2026/model").colorBar,
   kpisPerMonth: readonly (readonly KpiRow[])[],
+  highlightMonth?: number,
   theme: Nk26ChartTheme = resolveNk26ChartTheme(),
 ): ChartConfiguration {
   const revData = monthlyData(db, "revenue");
@@ -307,7 +348,10 @@ export function revenueChartConfig(
           type: "bar",
           label: "Monthly Revenue",
           data: revData,
-          backgroundColor: colorBarFn(db, "revenue", revTargets, true),
+          backgroundColor:
+            highlightMonth === undefined
+              ? colorBarFn(db, "revenue", revTargets, true)
+              : emphasizeSelectedMonthBarColors(colorBarFn(db, "revenue", revTargets, true), highlightMonth),
           borderRadius: 4,
           order: 3,
         },
@@ -342,7 +386,13 @@ export function revenueChartConfig(
       interaction: { mode: "index", intersect: false },
       plugins: { legend: { labels: { color: theme.textColor, font: { size: 12 }, boxWidth: 14 } } },
       scales: {
-        x: { ticks: { color: theme.textColor, font: { size: 12 } }, grid: { color: theme.gridColor } },
+        x: {
+          ticks:
+            highlightMonth === undefined
+              ? { color: theme.textColor, font: { size: 12 } }
+              : xAxisTicksForMonth(theme, highlightMonth),
+          grid: { color: theme.gridColor },
+        },
         y: {
           ticks: {
             color: theme.textColor,
@@ -369,6 +419,7 @@ export function revenueChartConfig(
 export function rnVisitsBarConfig(
   db: Record<number, MonthDb>,
   kpisPerMonth: readonly (readonly KpiRow[])[],
+  highlightMonth?: number,
   theme: Nk26ChartTheme = resolveNk26ChartTheme(),
 ): ChartConfiguration {
   const rnData = monthlyData(db, "rn_visits");
@@ -397,10 +448,12 @@ export function rnVisitsBarConfig(
       {
         label: "YTD RN Visits",
         data: ytd,
-        backgroundColor: bg,
+        backgroundColor:
+          highlightMonth === undefined ? bg : emphasizeSelectedMonthBarColors(bg, highlightMonth),
       },
     ],
     lineRef,
     theme,
+    highlightMonth,
   );
 }

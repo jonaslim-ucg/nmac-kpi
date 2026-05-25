@@ -1,7 +1,7 @@
 "use client";
 
-import { Loader2, Pencil, Trash2, UserPlus, Users } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { Loader2, MoreVertical, UserPlus, Users } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { MainShell } from "@/components/dashboard/main-shell";
 import { useSession } from "@/components/auth/session-provider";
 import { Snackbar, type SnackbarVariant } from "@/components/ui/snackbar";
@@ -48,6 +48,7 @@ export default function AdminUsersPage() {
   const [editLast, setEditLast] = useState("");
   const [editRole, setEditRole] = useState<AppRole>("viewer");
   const editDialogRef = useRef<HTMLDialogElement>(null);
+  const [openMenu, setOpenMenu] = useState<null | { rowId: string; top: number; left: number }>(null);
 
   const show = useCallback((text: string, variant: SnackbarVariant) => {
     setSnackbar({ text, variant });
@@ -87,7 +88,29 @@ export default function AdminUsersPage() {
     }
   }, [editUser]);
 
+  useEffect(() => {
+    if (!openMenu) return;
+    const close = () => setOpenMenu(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [openMenu]);
+
+  function toggleRowMenu(row: Row, e: MouseEvent<HTMLButtonElement>) {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (openMenu?.rowId === row.id) {
+      setOpenMenu(null);
+      return;
+    }
+    setOpenMenu({
+      rowId: row.id,
+      top: rect.bottom + 4,
+      left: Math.max(8, rect.right - 132),
+    });
+  }
+
   function openEdit(row: Row) {
+    setOpenMenu(null);
     cancelNameEdit();
     setEditUser(row);
     setEditEmail(row.email);
@@ -223,6 +246,7 @@ export default function AdminUsersPage() {
   }
 
   async function removeUser(row: Row) {
+    setOpenMenu(null);
     if (
       !window.confirm(
         `Remove ${row.email} from NMAC KPI?\n\nThey will lose access immediately and must be added again to sign in.`,
@@ -277,8 +301,16 @@ export default function AdminUsersPage() {
   const actionBtn =
     "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition hover:bg-surface-muted/80 disabled:pointer-events-none disabled:opacity-50";
 
-  const actionBtnDanger =
-    "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-red-500/35 bg-red-500/10 px-3 text-xs font-medium text-red-700 transition hover:bg-red-500/15 disabled:pointer-events-none disabled:opacity-50 dark:text-red-300";
+  const menuBtn =
+    "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-muted-foreground transition hover:border-border hover:bg-surface-muted/80 hover:text-foreground disabled:pointer-events-none disabled:opacity-50";
+
+  const menuItem =
+    "flex w-full items-center px-3 py-2 text-left text-sm text-foreground transition hover:bg-surface-muted/80 disabled:pointer-events-none disabled:opacity-50";
+
+  const menuItemDanger =
+    "flex w-full items-center px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-500/10 disabled:pointer-events-none disabled:opacity-50 dark:text-red-400";
+
+  const menuRow = openMenu ? rows.find((r) => r.id === openMenu.rowId) : null;
 
   return (
     <MainShell title="Users" subtitle="Invite by email and set each person’s access">
@@ -404,7 +436,7 @@ export default function AdminUsersPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-left text-sm">
+              <table className="w-full min-w-[640px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-border bg-surface-muted/30">
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -419,8 +451,8 @@ export default function AdminUsersPage() {
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Role
                     </th>
-                    <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Actions
+                    <th className="w-12 px-2 py-3">
+                      <span className="sr-only">Actions</span>
                     </th>
                   </tr>
                 </thead>
@@ -517,28 +549,18 @@ export default function AdminUsersPage() {
                           ) : null}
                         </div>
                       </td>
-                      <td className="px-4 py-3 align-middle">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            className={actionBtn}
-                            disabled={savingId === row.id}
-                            onClick={() => openEdit(row)}
-                          >
-                            <Pencil className="h-3.5 w-3.5" aria-hidden />
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            className={actionBtnDanger}
-                            disabled={savingId === row.id || user?.email === row.email}
-                            title={user?.email === row.email ? "You cannot remove your own account" : "Remove user"}
-                            onClick={() => void removeUser(row)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                            Remove
-                          </button>
-                        </div>
+                      <td className="px-2 py-3 align-middle">
+                        <button
+                          type="button"
+                          className={menuBtn}
+                          disabled={savingId === row.id}
+                          aria-label={`Actions for ${row.email}`}
+                          aria-expanded={openMenu?.rowId === row.id}
+                          aria-haspopup="menu"
+                          onClick={(e) => toggleRowMenu(row, e)}
+                        >
+                          <MoreVertical className="h-4 w-4" aria-hidden />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -548,6 +570,35 @@ export default function AdminUsersPage() {
           )}
         </section>
       </div>
+
+      {openMenu && menuRow ? (
+        <div
+          role="menu"
+          className="fixed z-50 min-w-[8.25rem] rounded-lg border border-border bg-card py-1 shadow-lg ring-1 ring-black/5 dark:ring-white/10"
+          style={{ top: openMenu.top, left: openMenu.left }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            className={menuItem}
+            disabled={savingId === menuRow.id}
+            onClick={() => openEdit(menuRow)}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={menuItemDanger}
+            disabled={savingId === menuRow.id || user?.email === menuRow.email}
+            title={user?.email === menuRow.email ? "You cannot remove your own account" : undefined}
+            onClick={() => void removeUser(menuRow)}
+          >
+            Remove
+          </button>
+        </div>
+      ) : null}
 
       <dialog
         ref={editDialogRef}

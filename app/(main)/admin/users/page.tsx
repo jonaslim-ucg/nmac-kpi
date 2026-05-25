@@ -43,6 +43,7 @@ export default function AdminUsersPage() {
   const [nameEditor, setNameEditor] = useState<null | { id: string; field: "first" | "last" }>(null);
   const [nameDraft, setNameDraft] = useState("");
   const [editUser, setEditUser] = useState<Row | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<Row | null>(null);
   const [editEmail, setEditEmail] = useState("");
   const [editFirst, setEditFirst] = useState("");
   const [editLast, setEditLast] = useState("");
@@ -78,18 +79,21 @@ export default function AdminUsersPage() {
   }, [user?.role, loading, refresh]);
 
   useEffect(() => {
-    if (!editUser) return;
+    const modalOpen = editUser || removeTarget;
+    if (!modalOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeEdit();
+      if (e.key !== "Escape") return;
+      if (removeTarget) closeRemoveConfirm();
+      else closeEdit();
     };
     document.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = prev;
       document.removeEventListener("keydown", onKey);
     };
-  }, [editUser]);
+  }, [editUser, removeTarget]);
 
   useEffect(() => {
     if (!openMenu) return;
@@ -248,15 +252,18 @@ export default function AdminUsersPage() {
     }
   }
 
-  async function removeUser(row: Row) {
+  function openRemoveConfirm(row: Row) {
     setOpenMenu(null);
-    if (
-      !window.confirm(
-        `Remove ${row.email} from NMAC KPI?\n\nThey will lose access immediately and must be added again to sign in.`,
-      )
-    ) {
-      return;
-    }
+    setRemoveTarget(row);
+  }
+
+  function closeRemoveConfirm() {
+    setRemoveTarget(null);
+  }
+
+  async function confirmRemove() {
+    if (!removeTarget) return;
+    const row = removeTarget;
     setSnackbar(null);
     setSavingId(row.id);
     try {
@@ -269,6 +276,7 @@ export default function AdminUsersPage() {
         show(j.error ?? "Could not remove user.", "error");
         return;
       }
+      closeRemoveConfirm();
       if (editUser?.id === row.id) closeEdit();
       show("User removed.", "success");
       await refresh();
@@ -303,6 +311,9 @@ export default function AdminUsersPage() {
 
   const actionBtn =
     "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition hover:bg-surface-muted/80 disabled:pointer-events-none disabled:opacity-50";
+
+  const actionBtnDanger =
+    "inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-medium text-white transition hover:bg-red-700 disabled:pointer-events-none disabled:opacity-50 dark:bg-red-600 dark:hover:bg-red-500";
 
   const menuBtn =
     "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-muted-foreground transition hover:border-border hover:bg-surface-muted/80 hover:text-foreground disabled:pointer-events-none disabled:opacity-50";
@@ -596,10 +607,61 @@ export default function AdminUsersPage() {
             className={menuItemDanger}
             disabled={savingId === menuRow.id || user?.email === menuRow.email}
             title={user?.email === menuRow.email ? "You cannot remove your own account" : undefined}
-            onClick={() => void removeUser(menuRow)}
+            onClick={() => openRemoveConfirm(menuRow)}
           >
             Remove
           </button>
+        </div>
+      ) : null}
+
+      {removeTarget ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50"
+            aria-label="Close remove user"
+            onClick={closeRemoveConfirm}
+          />
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="remove-user-title"
+            aria-describedby="remove-user-desc"
+            className="relative z-10 w-full max-w-md rounded-xl border border-border bg-card p-0 text-foreground shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4">
+              <h2 id="remove-user-title" className="text-base font-semibold text-foreground">
+                Remove user?
+              </h2>
+              <p id="remove-user-desc" className="mt-2 text-sm leading-relaxed text-foreground">
+                Remove{" "}
+                <span className="font-medium">{removeTarget.email}</span> from NMAC KPI?
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                They will lose access immediately and must be added again to sign in.
+              </p>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-border px-5 py-4">
+              <button
+                type="button"
+                className={actionBtn}
+                disabled={savingId === removeTarget.id}
+                onClick={closeRemoveConfirm}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={actionBtnDanger}
+                disabled={savingId === removeTarget.id}
+                onClick={() => void confirmRemove()}
+              >
+                {savingId === removeTarget.id ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+                Remove
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
 

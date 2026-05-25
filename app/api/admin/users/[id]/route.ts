@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isValidEmailFormat } from "@/lib/auth/email-policy";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { normalizePersonName } from "@/lib/auth/name-normalize";
 import type { AppRole } from "@/lib/auth/types";
@@ -14,7 +15,12 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
 
   const { id } = await ctx.params;
-  const body = (await req.json()) as { role?: string; first_name?: unknown; last_name?: unknown };
+  const body = (await req.json()) as {
+    role?: string;
+    email?: string;
+    first_name?: unknown;
+    last_name?: unknown;
+  };
 
   const supabase = createServiceRoleClient();
 
@@ -51,6 +57,24 @@ export async function PATCH(req: Request, ctx: Ctx) {
     updates.last_name = normalizePersonName(body.last_name);
   }
 
+  if (body.email !== undefined) {
+    const emailRaw = typeof body.email === "string" ? body.email.trim() : "";
+    if (!isValidEmailFormat(emailRaw)) {
+      return NextResponse.json({ error: "Invalid email." }, { status: 400 });
+    }
+    const email = emailRaw.toLowerCase();
+    const { data: duplicate } = await supabase
+      .from("app_users")
+      .select("id")
+      .eq("email", email)
+      .neq("id", id)
+      .maybeSingle();
+    if (duplicate) {
+      return NextResponse.json({ error: "That email is already in the directory." }, { status: 400 });
+    }
+    updates.email = email;
+  }
+
   if (Object.keys(updates).length === 1) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
@@ -68,4 +92,44 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
 
   return NextResponse.json({ user: data });
+}
+
+export async function DELETE(_req: Request, ctx: Ctx) {
+  const session = await getSessionFromCookies();
+  if (!session || !canManageUsers(session.role)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
+  const { id } = await ctx.params;
+  const supabase = createServiceRoleClient();
+
+  const { data: target } = await supabase.from("app_users").select("id,role,email").eq("id", id).maybeSingle();
+  if (!target) {
+    return NextResponse.json({ error: "User not found." }, { status: 404 });
+  }
+
+  if (session.sub === id) {
+    return NextResponse.json(
+      { error: "You cannot remove your own account. Ask another admin to do this." },
+      { status: 400 },
+    );
+  }
+
+  if (target.role === "admin") {
+    const { count } = await supabase.from("app_users").select("*", { count: "exact", head: true }).eq("role", "admin");
+    if ((count ?? 0) <= 1) {
+      return NextResponse.json(
+        { error: "Cannot remove the last admin. Promote another user first." },
+        { status: 400 },
+      );
+    }
+  }
+
+  const { error } = await supabase.from("app_users").delete().eq("id", id);
+  if (error) {
+    console.error(error);
+    return NextResponse.json({ error: "Could not remove user." }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
 }

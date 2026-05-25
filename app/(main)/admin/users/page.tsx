@@ -1,7 +1,7 @@
 "use client";
 
-import { Loader2, UserPlus, Users } from "lucide-react";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Loader2, Pencil, Trash2, UserPlus, Users } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { MainShell } from "@/components/dashboard/main-shell";
 import { useSession } from "@/components/auth/session-provider";
 import { Snackbar, type SnackbarVariant } from "@/components/ui/snackbar";
@@ -42,6 +42,12 @@ export default function AdminUsersPage() {
   const [snackbar, setSnackbar] = useState<{ text: string; variant: SnackbarVariant } | null>(null);
   const [nameEditor, setNameEditor] = useState<null | { id: string; field: "first" | "last" }>(null);
   const [nameDraft, setNameDraft] = useState("");
+  const [editUser, setEditUser] = useState<Row | null>(null);
+  const [editEmail, setEditEmail] = useState("");
+  const [editFirst, setEditFirst] = useState("");
+  const [editLast, setEditLast] = useState("");
+  const [editRole, setEditRole] = useState<AppRole>("viewer");
+  const editDialogRef = useRef<HTMLDialogElement>(null);
 
   const show = useCallback((text: string, variant: SnackbarVariant) => {
     setSnackbar({ text, variant });
@@ -70,6 +76,29 @@ export default function AdminUsersPage() {
   useEffect(() => {
     if (!loading && canManageUsers(user?.role)) void refresh();
   }, [user?.role, loading, refresh]);
+
+  useEffect(() => {
+    const dialog = editDialogRef.current;
+    if (!dialog) return;
+    if (editUser) {
+      if (!dialog.open) dialog.showModal();
+    } else if (dialog.open) {
+      dialog.close();
+    }
+  }, [editUser]);
+
+  function openEdit(row: Row) {
+    cancelNameEdit();
+    setEditUser(row);
+    setEditEmail(row.email);
+    setEditFirst(row.first_name ?? "");
+    setEditLast(row.last_name ?? "");
+    setEditRole(row.role);
+  }
+
+  function closeEdit() {
+    setEditUser(null);
+  }
 
   async function addUser(e: FormEvent) {
     e.preventDefault();
@@ -161,6 +190,68 @@ export default function AdminUsersPage() {
     setNameEditor(null);
   }
 
+  async function saveEdit(e: FormEvent) {
+    e.preventDefault();
+    if (!editUser) return;
+    setSnackbar(null);
+    setSavingId(editUser.id);
+    try {
+      const r = await fetch(`/api/admin/users/${editUser.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: editEmail.trim(),
+          role: editRole,
+          first_name: editFirst.trim() || null,
+          last_name: editLast.trim() || null,
+        }),
+      });
+      const j = (await r.json()) as { error?: string };
+      if (!r.ok) {
+        show(j.error ?? "Could not update user.", "error");
+        return;
+      }
+      show("User updated.", "success");
+      closeEdit();
+      await refresh();
+    } catch {
+      show("Could not update user.", "error");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function removeUser(row: Row) {
+    if (
+      !window.confirm(
+        `Remove ${row.email} from NMAC KPI?\n\nThey will lose access immediately and must be added again to sign in.`,
+      )
+    ) {
+      return;
+    }
+    setSnackbar(null);
+    setSavingId(row.id);
+    try {
+      const r = await fetch(`/api/admin/users/${row.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const j = (await r.json()) as { error?: string };
+      if (!r.ok) {
+        show(j.error ?? "Could not remove user.", "error");
+        return;
+      }
+      if (editUser?.id === row.id) closeEdit();
+      show("User removed.", "success");
+      await refresh();
+    } catch {
+      show("Could not remove user.", "error");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   if (loading) {
     return (
       <MainShell title="Users" subtitle="Loading">
@@ -182,6 +273,12 @@ export default function AdminUsersPage() {
 
   const nameCellInput =
     "w-full min-w-[8rem] rounded-md border border-border bg-background px-2 py-1.5 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-accent";
+
+  const actionBtn =
+    "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition hover:bg-surface-muted/80 disabled:pointer-events-none disabled:opacity-50";
+
+  const actionBtnDanger =
+    "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-red-500/35 bg-red-500/10 px-3 text-xs font-medium text-red-700 transition hover:bg-red-500/15 disabled:pointer-events-none disabled:opacity-50 dark:text-red-300";
 
   return (
     <MainShell title="Users" subtitle="Invite by email and set each person’s access">
@@ -307,7 +404,7 @@ export default function AdminUsersPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-left text-sm">
+              <table className="w-full min-w-[720px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-border bg-surface-muted/30">
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -321,6 +418,9 @@ export default function AdminUsersPage() {
                     </th>
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Role
+                    </th>
+                    <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -417,6 +517,29 @@ export default function AdminUsersPage() {
                           ) : null}
                         </div>
                       </td>
+                      <td className="px-4 py-3 align-middle">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            className={actionBtn}
+                            disabled={savingId === row.id}
+                            onClick={() => openEdit(row)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" aria-hidden />
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className={actionBtnDanger}
+                            disabled={savingId === row.id || user?.email === row.email}
+                            title={user?.email === row.email ? "You cannot remove your own account" : "Remove user"}
+                            onClick={() => void removeUser(row)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                            Remove
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -425,6 +548,82 @@ export default function AdminUsersPage() {
           )}
         </section>
       </div>
+
+      <dialog
+        ref={editDialogRef}
+        className="w-[min(100%,28rem)] max-w-lg rounded-xl border border-border bg-card p-0 text-foreground shadow-xl backdrop:bg-black/50"
+        onClose={closeEdit}
+        onCancel={closeEdit}
+      >
+        {editUser ? (
+          <form onSubmit={saveEdit} className="flex flex-col">
+            <div className="border-b border-border px-5 py-4">
+              <h2 className="text-base font-semibold text-foreground">Edit user</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">Update directory details for this person.</p>
+            </div>
+            <div className="flex flex-col gap-4 px-5 py-4">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">Work email</span>
+                <input
+                  type="email"
+                  required
+                  className={inputClass}
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                />
+              </label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">First name</span>
+                  <input
+                    className={inputClass}
+                    value={editFirst}
+                    onChange={(e) => setEditFirst(e.target.value)}
+                    placeholder="Optional"
+                  />
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Last name</span>
+                  <input
+                    className={inputClass}
+                    value={editLast}
+                    onChange={(e) => setEditLast(e.target.value)}
+                    placeholder="Optional"
+                  />
+                </label>
+              </div>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">Role</span>
+                <select className={selectClass} value={editRole} onChange={(e) => setEditRole(e.target.value as AppRole)}>
+                  {ROLES.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-border px-5 py-4">
+              <button
+                type="button"
+                className={actionBtn}
+                disabled={savingId === editUser.id}
+                onClick={closeEdit}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingId === editUser.id}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-white transition hover:opacity-95 disabled:opacity-50"
+              >
+                {savingId === editUser.id ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+                Save changes
+              </button>
+            </div>
+          </form>
+        ) : null}
+      </dialog>
     </MainShell>
   );
 }

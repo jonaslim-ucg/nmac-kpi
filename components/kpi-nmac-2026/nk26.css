@@ -75,7 +75,6 @@
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
-  scroll-padding-inline: 10px;
   scrollbar-width: thin;
   background: var(--nk26-surface);
   border: 1px solid var(--nk26-border);
@@ -85,8 +84,8 @@
 }
 
 .nk26-tab {
-  flex: 0 0 auto;
-  padding: 8px 12px;
+  flex: 1 1 0;
+  padding: 8px 10px;
   font-size: 13px;
   border-radius: 8px;
   cursor: pointer;
@@ -100,21 +99,10 @@
     box-shadow 0.22s ease,
     transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
   text-align: center;
-  min-width: 2.75rem;
+  min-width: 2.5rem;
   min-height: 40px;
   background: transparent;
   font-family: inherit;
-}
-
-@media (min-width: 1100px) {
-  .nk26-tabs {
-    overflow-x: hidden;
-  }
-
-  .nk26-tab {
-    flex: 1 1 0;
-    min-width: 0;
-  }
 }
 
 .nk26-tab:hover {

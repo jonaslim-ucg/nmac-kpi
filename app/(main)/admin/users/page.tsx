@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2, MoreVertical, UserPlus, Users } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent, type MouseEvent } from "react";
 import { MainShell } from "@/components/dashboard/main-shell";
 import { useSession } from "@/components/auth/session-provider";
 import { Snackbar, type SnackbarVariant } from "@/components/ui/snackbar";
@@ -47,7 +47,6 @@ export default function AdminUsersPage() {
   const [editFirst, setEditFirst] = useState("");
   const [editLast, setEditLast] = useState("");
   const [editRole, setEditRole] = useState<AppRole>("viewer");
-  const editDialogRef = useRef<HTMLDialogElement>(null);
   const [openMenu, setOpenMenu] = useState<null | { rowId: string; top: number; left: number }>(null);
 
   const show = useCallback((text: string, variant: SnackbarVariant) => {
@@ -79,13 +78,17 @@ export default function AdminUsersPage() {
   }, [user?.role, loading, refresh]);
 
   useEffect(() => {
-    const dialog = editDialogRef.current;
-    if (!dialog) return;
-    if (editUser) {
-      if (!dialog.open) dialog.showModal();
-    } else if (dialog.open) {
-      dialog.close();
-    }
+    if (!editUser) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeEdit();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener("keydown", onKey);
+    };
   }, [editUser]);
 
   useEffect(() => {
@@ -102,11 +105,11 @@ export default function AdminUsersPage() {
       setOpenMenu(null);
       return;
     }
-    setOpenMenu({
-      rowId: row.id,
-      top: rect.bottom + 4,
-      left: Math.max(8, rect.right - 132),
-    });
+    const menuWidth = 132;
+    const left = Math.min(Math.max(8, rect.right - menuWidth), window.innerWidth - menuWidth - 8);
+    const top =
+      rect.bottom + 120 > window.innerHeight ? Math.max(8, rect.top - 88) : rect.bottom + 4;
+    setOpenMenu({ rowId: row.id, top, left });
   }
 
   function openEdit(row: Row) {
@@ -600,81 +603,96 @@ export default function AdminUsersPage() {
         </div>
       ) : null}
 
-      <dialog
-        ref={editDialogRef}
-        className="w-[min(100%,28rem)] max-w-lg rounded-xl border border-border bg-card p-0 text-foreground shadow-xl backdrop:bg-black/50"
-        onClose={closeEdit}
-        onCancel={closeEdit}
-      >
-        {editUser ? (
-          <form onSubmit={saveEdit} className="flex flex-col">
-            <div className="border-b border-border px-5 py-4">
-              <h2 className="text-base font-semibold text-foreground">Edit user</h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">Update directory details for this person.</p>
-            </div>
-            <div className="flex flex-col gap-4 px-5 py-4">
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Work email</span>
-                <input
-                  type="email"
-                  required
-                  className={inputClass}
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                />
-              </label>
-              <div className="grid gap-4 sm:grid-cols-2">
+      {editUser ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50"
+            aria-label="Close edit user"
+            onClick={closeEdit}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-user-title"
+            className="relative z-10 flex max-h-[min(90dvh,40rem)] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-border bg-card text-foreground shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <form onSubmit={saveEdit} className="flex min-h-0 flex-col">
+              <div className="border-b border-border px-5 py-4">
+                <h2 id="edit-user-title" className="text-base font-semibold text-foreground">
+                  Edit user
+                </h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">Update directory details for this person.</p>
+              </div>
+              <div className="flex flex-col gap-4 overflow-y-auto px-5 py-4">
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium text-muted-foreground">First name</span>
+                  <span className="text-xs font-medium text-muted-foreground">Work email</span>
                   <input
+                    type="email"
+                    required
                     className={inputClass}
-                    value={editFirst}
-                    onChange={(e) => setEditFirst(e.target.value)}
-                    placeholder="Optional"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
                   />
                 </label>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-medium text-muted-foreground">First name</span>
+                    <input
+                      className={inputClass}
+                      value={editFirst}
+                      onChange={(e) => setEditFirst(e.target.value)}
+                      placeholder="Optional"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-medium text-muted-foreground">Last name</span>
+                    <input
+                      className={inputClass}
+                      value={editLast}
+                      onChange={(e) => setEditLast(e.target.value)}
+                      placeholder="Optional"
+                    />
+                  </label>
+                </div>
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium text-muted-foreground">Last name</span>
-                  <input
-                    className={inputClass}
-                    value={editLast}
-                    onChange={(e) => setEditLast(e.target.value)}
-                    placeholder="Optional"
-                  />
+                  <span className="text-xs font-medium text-muted-foreground">Role</span>
+                  <select
+                    className={selectClass}
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value as AppRole)}
+                  >
+                    {ROLES.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </select>
                 </label>
               </div>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Role</span>
-                <select className={selectClass} value={editRole} onChange={(e) => setEditRole(e.target.value as AppRole)}>
-                  {ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <div className="flex flex-wrap justify-end gap-2 border-t border-border px-5 py-4">
-              <button
-                type="button"
-                className={actionBtn}
-                disabled={savingId === editUser.id}
-                onClick={closeEdit}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={savingId === editUser.id}
-                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-white transition hover:opacity-95 disabled:opacity-50"
-              >
-                {savingId === editUser.id ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                Save changes
-              </button>
-            </div>
-          </form>
-        ) : null}
-      </dialog>
+              <div className="flex flex-wrap justify-end gap-2 border-t border-border px-5 py-4">
+                <button
+                  type="button"
+                  className={actionBtn}
+                  disabled={savingId === editUser.id}
+                  onClick={closeEdit}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingId === editUser.id}
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-white transition hover:opacity-95 disabled:opacity-50"
+                >
+                  {savingId === editUser.id ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+                  Save changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </MainShell>
   );
 }

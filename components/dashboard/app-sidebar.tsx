@@ -24,7 +24,7 @@ function linkActive(pathname: string, href: string): boolean {
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { user, loading, logout } = useSession();
+  const { user, loading } = useSession();
   const { hideLegacyNav } = useDashboardPreferences();
 
   const sections = SIDEBAR_SECTIONS.map((section) => {
@@ -98,13 +98,6 @@ export function AppSidebar() {
           <p className="truncate text-xs capitalize text-muted-foreground">
             {loading ? "" : user?.role ?? ""}
           </p>
-          <button
-            type="button"
-            onClick={() => void logout()}
-            className="mt-2 w-full rounded-md border border-border bg-background/80 py-1.5 text-xs font-medium text-foreground transition hover:border-accent/40 hover:bg-accent-muted/30"
-          >
-            Sign out
-          </button>
         </div>
       </div>
     </aside>

@@ -80,7 +80,7 @@ function SwitchRow({ title, description, checked, disabled, onCheckedChange, ico
 type Feedback = { tone: "ok" | "err"; text: string } | null;
 
 export default function SettingsPage() {
-  const { user, loading, logout, refresh } = useSession();
+  const { user, loading, refresh } = useSession();
   const {
     ready: prefsReady,
     canEdit: canEditOrgPrefs,
@@ -398,14 +398,6 @@ export default function SettingsPage() {
                     </li>
                   </ul>
                 </details>
-
-                <button
-                  type="button"
-                  onClick={() => void logout()}
-                  className="mt-5 w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-accent-muted/35 sm:w-auto"
-                >
-                  Sign out
-                </button>
               </>
             )}
           </div>

@@ -57,16 +57,25 @@
 .nk26-shell {
   width: 100%;
   max-width: 1440px;
+  min-width: 0;
   margin-inline: auto;
 }
 
 .nk26-tabs {
   display: flex;
   flex-wrap: nowrap;
+  align-items: stretch;
   gap: 6px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   margin-bottom: 28px;
   overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: 10px;
   scrollbar-width: thin;
   background: var(--nk26-surface);
   border: 1px solid var(--nk26-border);
@@ -97,14 +106,14 @@
   font-family: inherit;
 }
 
-@media (min-width: 960px) {
+@media (min-width: 1100px) {
   .nk26-tabs {
-    overflow-x: visible;
+    overflow-x: hidden;
   }
 
   .nk26-tab {
     flex: 1 1 0;
-    min-width: 56px;
+    min-width: 0;
   }
 }
 
@@ -656,6 +665,8 @@
 }
 
 .nk26-route-enter {
+  min-width: 0;
+  max-width: 100%;
   animation: nk26-route-in 0.32s ease-out both;
 }
 

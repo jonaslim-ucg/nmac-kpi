@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   DOMAINS_ORDER,
   getLastYearVal,
@@ -23,8 +23,17 @@ export function MonthTabs({
   selectedMonth: number;
   onSelect: (i: number) => void;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!root) return;
+    const active = root.querySelector<HTMLElement>(".nk26-tab-active");
+    active?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  }, [selectedMonth]);
+
   return (
-    <div className="nk26-tabs">
+    <div className="nk26-tabs" ref={scrollRef}>
       {MONTHS.map((m, i) => (
         <button
           key={m}

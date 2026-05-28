@@ -8,6 +8,9 @@ export const TARGETS_STORAGE_KEY = "nmac_kpi_targets_2026";
 /** FY / dataset year used with Supabase `nmac_master_monthly` and localStorage snapshot. */
 export const NMAC_MASTER_DATA_YEAR = 2026;
 
+/** Featured on Performance overview — stakeholder reporting priorities. */
+export const OVERVIEW_PRIORITY_KPIS = ["satisfaction", "copay", "util", "feedback"] as const;
+
 export type KpiRow = {
   id: string;
   label: string;
@@ -24,11 +27,11 @@ export const KPIs: KpiRow[] = [
   { id: "annuals", label: "Annual Exams", unit: "", target: 150, gate: false, domain: "Volume", higher: true },
   { id: "exec", label: "Executive Physicals", unit: "", target: 50, gate: false, domain: "Volume", higher: true },
   { id: "wl", label: "WL Visit Compliance", unit: "%", target: 95, gate: true, domain: "Specialty", higher: true },
-  { id: "util", label: "Provider Utilization", unit: "%", target: 90, gate: false, domain: "Scheduling", higher: true },
+  { id: "util", label: "Doctor Utilisation", unit: "%", target: 90, gate: false, domain: "Scheduling", higher: true },
   { id: "noshow", label: "No-Show Rate", unit: "%", target: 7, gate: false, domain: "Scheduling", higher: false },
   { id: "callrate", label: "Call Answer Rate", unit: "%", target: 90, gate: false, domain: "Calls", higher: true },
   { id: "callvol", label: "Inbound Calls", unit: "", target: 300, gate: false, domain: "Calls", higher: true },
-  { id: "copay", label: "Copay Collection Rate", unit: "%", target: 95, gate: false, domain: "Finance", higher: true },
+  { id: "copay", label: "% Copay Collection Rate", unit: "%", target: 95, gate: false, domain: "Finance", higher: true },
   { id: "leakage", label: "Revenue Leakage", unit: "%", target: 10, gate: false, domain: "Finance", higher: false },
   { id: "eod", label: "EOD Variances", unit: "", target: 0, gate: false, domain: "Finance", higher: false },
   { id: "ph", label: "PH-Generated Visits", unit: "", target: 190, gate: false, domain: "Scheduling", higher: true },
@@ -37,6 +40,8 @@ export const KPIs: KpiRow[] = [
   { id: "ht", label: "Hair Transplant Prod.", unit: "%", target: 90, gate: true, domain: "Specialty", higher: true },
   { id: "fp", label: "Facial Plastics Bookings", unit: "", target: 20, gate: false, domain: "Specialty", higher: true },
   { id: "shop", label: "ShopNMAC Sales ($)", unit: "$", target: 3750, gate: false, domain: "Finance", higher: true },
+  { id: "satisfaction", label: "Ave Patient Satisfaction Score", unit: "", target: 85, gate: false, domain: "Compliance", higher: true },
+  { id: "feedback", label: "% Patients Completing Feedback", unit: "%", target: 15, gate: false, domain: "Compliance", higher: true },
   { id: "survey", label: "Patient Survey Score", unit: "", target: 4.7, gate: false, domain: "Compliance", higher: true },
   { id: "sop", label: "SOP Compliance", unit: "%", target: 100, gate: false, domain: "Compliance", higher: true },
   { id: "engage", label: "Staff Engagement", unit: "%", target: 80, gate: false, domain: "Compliance", higher: true },
@@ -315,6 +320,8 @@ const SEEDS: Seed[] = [
   { id: "ht", base: 92, variance: 2, gate: true, higher: true, target: 90 },
   { id: "fp", base: 23, variance: 4, gate: false, higher: true, target: 20 },
   { id: "shop", base: 4000, variance: 350, gate: false, higher: true, target: 3750 },
+  { id: "satisfaction", base: 88, variance: 4, gate: false, higher: true, target: 85 },
+  { id: "feedback", base: 6.2, variance: 1.2, gate: false, higher: true, target: 15 },
   { id: "survey", base: 4.78, variance: 0.08, gate: false, higher: true, target: 4.7 },
   { id: "sop", base: 100, variance: 0, gate: false, higher: true, target: 100 },
   { id: "engage", base: 83, variance: 3, gate: false, higher: true, target: 80 },

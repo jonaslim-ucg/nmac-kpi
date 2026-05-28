@@ -207,8 +207,8 @@ export function findKpi(id: string, kpis: readonly KpiRow[] = KPIs): KpiRow {
 }
 
 export function trendDatasets(db: Record<number, MonthDb>, kpis: readonly KpiRow[] = KPIs) {
-  const keyKPIs = ["visits", "productivity", "callrate", "copay", "noshow", "util"] as const;
-  const colors = ["#3b82f6", "#22c55e", "#06b6d4", "#f59e0b", "#ef4444", "#a78bfa"];
+  const keyKPIs = ["satisfaction", "copay", "util", "feedback", "visits", "productivity"] as const;
+  const colors = ["#22c55e", "#f59e0b", "#a78bfa", "#06b6d4", "#3b82f6", "#ef4444"];
   return keyKPIs.map((id, i) => {
     const k = findKpi(id, kpis);
     return {
@@ -246,7 +246,7 @@ export function utilNoshowConfig(
       datasets: [
         {
           type: "bar",
-          label: "Provider Utilization %",
+          label: "Doctor Utilisation %",
           data: utilData,
           backgroundColor: utilBarColors,
           yAxisID: "y",

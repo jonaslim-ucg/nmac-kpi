@@ -28,6 +28,7 @@ import {
   monthDbHasValues,
   MONTHS,
   NMAC_MASTER_DATA_YEAR,
+  OVERVIEW_PRIORITY_KPIS,
   pct,
   saveAll,
   saveTargetPack,
@@ -85,7 +86,7 @@ const VIEW_MONTH_STATS: Partial<Record<Nk26View, string[]>> = {
   calls: ["callrate", "callvol"],
   nursing: ["ecg", "spiro", "nursing_ann"],
   specialty: ["trich", "ht", "fp", "wl"],
-  compliance: ["productivity", "survey", "engage", "sop"],
+  compliance: ["satisfaction", "feedback", "survey", "engage", "sop"],
 };
 
 export function KpiNmac2026Client({ view }: Props) {
@@ -238,6 +239,10 @@ export function KpiNmac2026Client({ view }: Props) {
       switch (v) {
         case "overview":
           mount("nk26-c-trend", lineBase(MONTHS, trendDatasets(db, kpisPerMonth[0] ?? KPIs), 0, "0% vs LY (flat)"));
+          simpleBar("nk26-c-overview-satisfaction", "satisfaction");
+          simpleBar("nk26-c-overview-copay", "copay");
+          simpleBar("nk26-c-overview-util", "util");
+          simpleBar("nk26-c-overview-feedback", "feedback");
           simpleBar("nk26-c-visits", "visits");
           simpleBar("nk26-c-noshow", "noshow");
           simpleLine("nk26-c-calls", "callrate");
@@ -301,7 +306,17 @@ export function KpiNmac2026Client({ view }: Props) {
     return <span className={"nk26-badge " + sc}>{formatVal(k, val)}</span>;
   };
 
-  const miniCards = kpisForSelected.slice(0, 18).map((k) => {
+  const miniCardRows =
+    v === "overview"
+      ? [
+          ...OVERVIEW_PRIORITY_KPIS.map((id) => kpisForSelected.find((k) => k.id === id)).filter(
+            (k): k is KpiRow => k !== undefined,
+          ),
+          ...kpisForSelected.filter((k) => !(OVERVIEW_PRIORITY_KPIS as readonly string[]).includes(k.id)),
+        ]
+      : kpisForSelected.slice(0, 18);
+
+  const miniCards = miniCardRows.map((k) => {
     const val = getVal(db, selectedMonth, k.id);
     const ly = getLastYearVal(db, selectedMonth, k.id);
     const p = pct(k, val) ?? 0;
@@ -361,6 +376,8 @@ export function KpiNmac2026Client({ view }: Props) {
 
   const visitsStats = monthKpiStats(["visits", "annuals", "exec"]);
 
+  const overviewPriorityStats = monthKpiStats([...OVERVIEW_PRIORITY_KPIS]);
+
   const sectionMonthStats = VIEW_MONTH_STATS[v] ? monthKpiStats(VIEW_MONTH_STATS[v]!) : null;
 
   return (
@@ -374,7 +391,64 @@ export function KpiNmac2026Client({ view }: Props) {
           </header>
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
-          <div key={selectedMonth} className="nk26-tab-content-enter nk26-grid-mini">
+          <div className="nk26-section-sub nk26-overview-priority-intro">
+            Key reporting metrics — enter monthly values under Administration → NMAC master
+          </div>
+          <div key={selectedMonth} className="nk26-tab-content-enter nk26-stats nk26-stats-featured">
+            {overviewPriorityStats}
+          </div>
+          <div className="nk26-charts nk26-charts-featured">
+            <div className="nk26-card">
+              <div className="nk26-chd">
+                <div>
+                  <div className="nk26-ctitle">Ave Patient Satisfaction Score</div>
+                  <div className="nk26-csub">Target: ≥ 85</div>
+                </div>
+                {badge("satisfaction")}
+              </div>
+              <div className="nk26-canvas">
+                <canvas id="nk26-c-overview-satisfaction" />
+              </div>
+            </div>
+            <div className="nk26-card">
+              <div className="nk26-chd">
+                <div>
+                  <div className="nk26-ctitle">% Copay Collection Rate</div>
+                  <div className="nk26-csub">Target: ≥ 95%</div>
+                </div>
+                {badge("copay")}
+              </div>
+              <div className="nk26-canvas">
+                <canvas id="nk26-c-overview-copay" />
+              </div>
+            </div>
+            <div className="nk26-card">
+              <div className="nk26-chd">
+                <div>
+                  <div className="nk26-ctitle">Doctor Utilisation</div>
+                  <div className="nk26-csub">All rostered providers · target ≥ 90%</div>
+                </div>
+                {badge("util")}
+              </div>
+              <div className="nk26-canvas">
+                <canvas id="nk26-c-overview-util" />
+              </div>
+            </div>
+            <div className="nk26-card">
+              <div className="nk26-chd">
+                <div>
+                  <div className="nk26-ctitle">% Patients Completing Feedback</div>
+                  <div className="nk26-csub">Target: ≥ 15%</div>
+                </div>
+                {badge("feedback")}
+              </div>
+              <div className="nk26-canvas">
+                <canvas id="nk26-c-overview-feedback" />
+              </div>
+            </div>
+          </div>
+          <div className="nk26-section-sub nk26-overview-more-intro">All KPIs</div>
+          <div key={`${selectedMonth}-mini`} className="nk26-tab-content-enter nk26-grid-mini">
             {miniCards}
           </div>
           <div className="nk26-charts">
@@ -502,7 +576,7 @@ export function KpiNmac2026Client({ view }: Props) {
           <header className="nk26-page-head">
             <div className="nk26-section-title">Scheduling & utilization</div>
             <div className="nk26-section-sub">
-              Provider utilization ≥ 90% · no-show rate ≤ 7% · lead conversion &gt; 70–80%
+              Doctor utilisation ≥ 90% (all rostered providers) · no-show rate ≤ 7% · lead conversion &gt; 70–80%
               <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>
@@ -517,7 +591,7 @@ export function KpiNmac2026Client({ view }: Props) {
             <div className="nk26-card nk26-card-full">
               <div className="nk26-chd">
                 <div>
-                  <div className="nk26-ctitle">Provider utilization vs no-show rate</div>
+                  <div className="nk26-ctitle">Doctor utilisation vs no-show rate</div>
                   <div className="nk26-csub">Dual-axis monthly comparison</div>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
@@ -590,7 +664,7 @@ export function KpiNmac2026Client({ view }: Props) {
             <div className="nk26-card">
               <div className="nk26-chd">
                 <div>
-                  <div className="nk26-ctitle">Copay collection rate</div>
+                  <div className="nk26-ctitle">% Copay Collection Rate</div>
                   <div className="nk26-csub">Target: ≥ 95%</div>
                 </div>
                 {badge("copay")}

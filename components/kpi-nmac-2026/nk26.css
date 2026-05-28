@@ -332,18 +332,31 @@
   height: 280px;
 }
 
-.nk26-stats-featured {
-  grid-template-columns: repeat(2, 1fr);
+.nk26-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.nk26-stats.nk26-stats-featured {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 @media (min-width: 960px) {
-  .nk26-stats-featured {
-    grid-template-columns: repeat(4, 1fr);
+  .nk26-stats.nk26-stats-featured {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
 .nk26-charts-featured {
   margin-bottom: 28px;
+}
+
+@media (min-width: 960px) {
+  .nk26-charts.nk26-charts-featured {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .nk26-overview-priority-intro,
@@ -358,13 +371,6 @@
 
 .nk26-overview-more-intro {
   margin-top: 8px;
-}
-
-.nk26-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 14px;
-  margin-bottom: 28px;
 }
 
 .nk26-stat {

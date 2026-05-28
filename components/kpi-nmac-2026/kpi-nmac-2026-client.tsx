@@ -391,9 +391,6 @@ export function KpiNmac2026Client({ view }: Props) {
           </header>
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
-          <div className="nk26-section-sub nk26-overview-priority-intro">
-            Key reporting metrics — enter monthly values under Administration → NMAC master
-          </div>
           <div key={selectedMonth} className="nk26-tab-content-enter nk26-stats nk26-stats-featured">
             {overviewPriorityStats}
           </div>

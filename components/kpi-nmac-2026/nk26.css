@@ -359,18 +359,14 @@
   }
 }
 
-.nk26-overview-priority-intro,
 .nk26-overview-more-intro {
   margin-bottom: 12px;
+  margin-top: 8px;
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--nk26-muted);
-}
-
-.nk26-overview-more-intro {
-  margin-top: 8px;
 }
 
 .nk26-stat {

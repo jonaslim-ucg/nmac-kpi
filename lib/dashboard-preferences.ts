@@ -1,5 +1,6 @@
-import { STORAGE_KEY } from "@/lib/kpi-nmac-2026/model";
+import { nmacStorageKey } from "@/lib/kpi-nmac-2026/model";
 import type { AppDashboardSettings } from "@/lib/auth/app-settings";
+import { SUPPORTED_KPI_YEARS } from "@/lib/kpi/years";
 
 export const DASHBOARD_PREFS_EVENT = "kpi-dashboard-prefs";
 
@@ -112,7 +113,9 @@ export function loadUseNmacTestData(): boolean {
 export function clearNmacMonthlyLocalCacheOnly() {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.removeItem(STORAGE_KEY);
+    for (const year of SUPPORTED_KPI_YEARS) {
+      window.localStorage.removeItem(nmacStorageKey(year));
+    }
   } catch {
     /* ignore */
   }

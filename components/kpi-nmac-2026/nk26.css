@@ -61,6 +61,33 @@
   margin-inline: auto;
 }
 
+.nk26-year-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.nk26-year-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nk26-muted);
+}
+
+.nk26-year-select {
+  min-height: 40px;
+  min-width: 108px;
+  border: 1px solid var(--nk26-border);
+  border-radius: 8px;
+  background: var(--nk26-surface);
+  color: var(--nk26-text);
+  padding: 8px 12px;
+  font: inherit;
+  font-weight: 700;
+  box-shadow: var(--nk26-card-shadow);
+}
+
 .nk26-tabs {
   display: flex;
   flex-wrap: nowrap;

@@ -11,6 +11,7 @@ import {
   loadWeeklyRows,
 } from "@/lib/kpi/data-source";
 import type { KpiDefinition, WeeklyRow } from "@/lib/kpi/types";
+import { DEFAULT_KPI_YEAR, SUPPORTED_KPI_YEARS } from "@/lib/kpi/years";
 import { formatWeekLabel } from "@/lib/kpi/week-label";
 import { upsertWeeklyRows } from "@/lib/supabase/kpi-service";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
@@ -25,7 +26,7 @@ export default function AdminPage() {
   const { user, loading: sessionLoading } = useSession();
   const [kpis, setKpis] = useState<KpiDefinition[]>([]);
   const [slug, setSlug] = useState("");
-  const [year, setYear] = useState(2026);
+  const [year, setYear] = useState(DEFAULT_KPI_YEAR);
   const [rows, setRows] = useState<WeeklyRow[]>([]);
   const [kpiLoading, setKpiLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -181,7 +182,7 @@ export default function AdminPage() {
               value={String(year)}
               onChange={(e) => setYear(Number(e.target.value))}
             >
-              {[2026, 2025, 2024].map((optionYear) => (
+              {SUPPORTED_KPI_YEARS.map((optionYear) => (
                 <option key={optionYear} value={optionYear}>
                   {optionYear}
                 </option>

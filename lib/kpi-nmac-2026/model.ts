@@ -1,12 +1,24 @@
+import { DEFAULT_KPI_YEAR } from "@/lib/kpi/years";
+
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
 
-export const STORAGE_KEY = "nmac_kpi_2026";
+export const STORAGE_KEY_PREFIX = "nmac_kpi";
+export const STORAGE_KEY = `${STORAGE_KEY_PREFIX}_${DEFAULT_KPI_YEAR}`;
 
 /** Browser cache for NMAC target overrides (mirrors Supabase `nmac_master_targets`). */
-export const TARGETS_STORAGE_KEY = "nmac_kpi_targets_2026";
+export const TARGETS_STORAGE_KEY_PREFIX = "nmac_kpi_targets";
+export const TARGETS_STORAGE_KEY = `${TARGETS_STORAGE_KEY_PREFIX}_${DEFAULT_KPI_YEAR}`;
 
 /** FY / dataset year used with Supabase `nmac_master_monthly` and localStorage snapshot. */
-export const NMAC_MASTER_DATA_YEAR = 2026;
+export const NMAC_MASTER_DATA_YEAR = DEFAULT_KPI_YEAR;
+
+export function nmacStorageKey(year = DEFAULT_KPI_YEAR) {
+  return `${STORAGE_KEY_PREFIX}_${year}`;
+}
+
+export function nmacTargetsStorageKey(year = DEFAULT_KPI_YEAR) {
+  return `${TARGETS_STORAGE_KEY_PREFIX}_${year}`;
+}
 
 /** Featured on Performance overview — stakeholder reporting priorities. */
 export const OVERVIEW_PRIORITY_KPIS = ["satisfaction", "copay", "util", "feedback"] as const;
@@ -46,7 +58,9 @@ export const KPIs: KpiRow[] = [
   { id: "sop", label: "SOP Compliance", unit: "%", target: 100, gate: false, domain: "Compliance", higher: true },
   { id: "engage", label: "Staff Engagement", unit: "%", target: 80, gate: false, domain: "Compliance", higher: true },
   { id: "revenue", label: "Monthly Revenue ($)", unit: "$", target: 658333, gate: false, domain: "Finance", higher: true },
+  { id: "bp_24hr", label: "24Hr Blood Pressure", unit: "", target: 25, gate: false, domain: "Nursing", higher: true },
   { id: "ecg", label: "ECG / EKG Completed", unit: "", target: 180, gate: false, domain: "Nursing", higher: true },
+  { id: "random_sugars", label: "Random Blood Sugars", unit: "", target: 200, gate: false, domain: "Nursing", higher: true },
   { id: "spiro", label: "Spirometry Tests", unit: "", target: 20, gate: false, domain: "Nursing", higher: true },
   { id: "nursing_ann", label: "Annuals Supported (Nursing)", unit: "", target: 150, gate: false, domain: "Nursing", higher: true },
   { id: "rn_visits", label: "RN Visits (CPT 99211)", unit: "", target: 58, gate: false, domain: "Nursing", higher: true },
@@ -86,12 +100,12 @@ export type NmacTargetPack = {
   byMonth: Partial<Record<number, Record<string, number>>>;
 };
 
-export function loadTargetPack(): NmacTargetPack {
+export function loadTargetPack(year = DEFAULT_KPI_YEAR): NmacTargetPack {
   if (typeof window === "undefined" || typeof window.localStorage === "undefined") {
     return { fy: {}, byMonth: {} };
   }
   try {
-    const raw = localStorage.getItem(TARGETS_STORAGE_KEY);
+    const raw = localStorage.getItem(nmacTargetsStorageKey(year));
     if (!raw) return { fy: {}, byMonth: {} };
     const o = JSON.parse(raw) as unknown;
     if (o && typeof o === "object" && !Array.isArray(o) && "fy" in o) {
@@ -104,24 +118,24 @@ export function loadTargetPack(): NmacTargetPack {
   }
 }
 
-export function saveTargetPack(pack: NmacTargetPack) {
+export function saveTargetPack(pack: NmacTargetPack, year = DEFAULT_KPI_YEAR) {
   if (typeof window === "undefined" || typeof window.localStorage === "undefined") return;
   try {
-    localStorage.setItem(TARGETS_STORAGE_KEY, JSON.stringify(pack));
+    localStorage.setItem(nmacTargetsStorageKey(year), JSON.stringify(pack));
   } catch {
     /* ignore */
   }
 }
 
 /** Legacy: FY overrides only (for callers that predate per-month targets). */
-export function loadTargetOverrides(): Record<string, number> {
-  return loadTargetPack().fy;
+export function loadTargetOverrides(year = DEFAULT_KPI_YEAR): Record<string, number> {
+  return loadTargetPack(year).fy;
 }
 
 /** Persists FY overrides and keeps any cached per-month overrides intact. */
-export function saveTargetOverrides(m: Record<string, number>) {
-  const prev = loadTargetPack();
-  saveTargetPack({ ...prev, fy: m });
+export function saveTargetOverrides(m: Record<string, number>, year = DEFAULT_KPI_YEAR) {
+  const prev = loadTargetPack(year);
+  saveTargetPack({ ...prev, fy: m }, year);
 }
 
 /** Resolved KPI rows for each calendar month (FY + optional month patch). */
@@ -210,12 +224,12 @@ export function emptyNmacMonthDbs(): Record<number, MonthDb> {
   return Object.fromEntries(Array.from({ length: 12 }, (_, m) => [m, {}])) as Record<number, MonthDb>;
 }
 
-export function loadData(): Record<number, MonthDb> {
+export function loadData(year = DEFAULT_KPI_YEAR): Record<number, MonthDb> {
   if (typeof window === "undefined" || typeof window.localStorage === "undefined") {
     return emptyNmacMonthDbs();
   }
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(nmacStorageKey(year));
     const parsed = raw ? (JSON.parse(raw) as Record<string, Record<string, unknown>>) : {};
     const out: Record<number, MonthDb> = {};
     for (let m = 0; m < 12; m++) {
@@ -228,10 +242,10 @@ export function loadData(): Record<number, MonthDb> {
   }
 }
 
-export function saveAll(d: Record<number, MonthDb>) {
+export function saveAll(d: Record<number, MonthDb>, year = DEFAULT_KPI_YEAR) {
   if (typeof window === "undefined" || typeof window.localStorage === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+    localStorage.setItem(nmacStorageKey(year), JSON.stringify(d));
   } catch {
     /* quota / private mode */
   }
@@ -326,7 +340,9 @@ const SEEDS: Seed[] = [
   { id: "sop", base: 100, variance: 0, gate: false, higher: true, target: 100 },
   { id: "engage", base: 83, variance: 3, gate: false, higher: true, target: 80 },
   { id: "revenue", base: 675000, variance: 22000, gate: false, higher: true, target: 658333 },
+  { id: "bp_24hr", base: 25, variance: 8, gate: false, higher: true, target: 25 },
   { id: "ecg", base: 188, variance: 10, gate: false, higher: true, target: 180 },
+  { id: "random_sugars", base: 240, variance: 45, gate: false, higher: true, target: 200 },
   { id: "spiro", base: 23, variance: 3, gate: false, higher: true, target: 20 },
   { id: "nursing_ann", base: 155, variance: 8, gate: false, higher: true, target: 150 },
   { id: "rn_visits", base: 61, variance: 6, gate: false, higher: true, target: 58 },

@@ -17,6 +17,7 @@ import {
   loadWeeklyRows,
 } from "@/lib/kpi/data-source";
 import type { KpiDefinition, WeeklyRow } from "@/lib/kpi/types";
+import { DEFAULT_KPI_YEAR } from "@/lib/kpi/years";
 
 const KpiChart = dynamic(
   () => import("@/components/dashboard/kpi-chart").then((m) => m.KpiChart),
@@ -51,7 +52,7 @@ function latestVsTarget(kpi: KpiDefinition, rows: WeeklyRow[]) {
 export function DashboardClient() {
   const [kpis, setKpis] = useState<KpiDefinition[]>([]);
   const [slug, setSlug] = useState("");
-  const [year, setYear] = useState(2026);
+  const [year, setYear] = useState(DEFAULT_KPI_YEAR);
   const [weekPreset, setWeekPreset] = useState("all");
   const [rateColumn, setRateColumn] = useState<RateColumnMode>("none");
   const [search, setSearch] = useState("");

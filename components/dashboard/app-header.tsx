@@ -22,7 +22,7 @@ export function AppHeader({ title, subtitle }: Props) {
       </div>
       <div className="flex shrink-0 items-center gap-3">
         <span className="hidden rounded-full border border-border bg-surface-muted px-3.5 py-1 font-mono text-xs font-medium text-accent sm:inline-block">
-          FY 2026
+          FY 2023-2026
         </span>
         <Link
           href="/settings"

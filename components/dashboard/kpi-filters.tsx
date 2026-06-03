@@ -2,6 +2,7 @@
 
 import { Search } from "lucide-react";
 import type { KpiDefinition } from "@/lib/kpi/types";
+import { SUPPORTED_KPI_YEARS } from "@/lib/kpi/years";
 
 import type { RateColumnMode } from "@/lib/kpi/rate";
 
@@ -63,7 +64,7 @@ export function KpiFilters({
           value={String(year)}
           onChange={(e) => onYearChange(Number(e.target.value))}
         >
-          {[2026, 2025, 2024].map((y) => (
+          {SUPPORTED_KPI_YEARS.map((y) => (
             <option key={y} value={y}>
               {y}
             </option>

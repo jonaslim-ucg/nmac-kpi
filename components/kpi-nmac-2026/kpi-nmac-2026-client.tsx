@@ -27,7 +27,6 @@ import {
   loadTargetPack,
   monthDbHasValues,
   MONTHS,
-  NMAC_MASTER_DATA_YEAR,
   OVERVIEW_PRIORITY_KPIS,
   pct,
   saveAll,
@@ -44,6 +43,7 @@ import {
   loadUseNmacTestData,
   type DashboardPrefsDetail,
 } from "@/lib/dashboard-preferences";
+import { DEFAULT_KPI_YEAR, SUPPORTED_KPI_YEARS } from "@/lib/kpi/years";
 import { fetchNmacMasterMonthly } from "@/lib/supabase/nmac-master-service";
 import { fetchNmacTargetMonths, fetchNmacTargets } from "@/lib/supabase/nmac-targets-service";
 import { MonthTabs } from "./nmac-master-entry-panel";
@@ -56,11 +56,11 @@ function loadChartJs() {
 
 type Db = Record<number, MonthDb>;
 
-function readBrowserNmacDb(): Db {
+function readBrowserNmacDb(year: number): Db {
   if (typeof window === "undefined") return emptyNmacMonthDbs();
   try {
-    const raw = loadData();
-    return loadUseNmacTestData() ? seedDemoIfEmpty(raw) : raw;
+    const raw = loadData(year);
+    return loadUseNmacTestData() && year === DEFAULT_KPI_YEAR ? seedDemoIfEmpty(raw) : raw;
   } catch {
     return emptyNmacMonthDbs();
   }
@@ -84,7 +84,7 @@ const VIEW_MONTH_STATS: Partial<Record<Nk26View, string[]>> = {
   scheduling: ["util", "noshow", "leads", "ph"],
   finance: ["revenue", "copay", "leakage", "shop"],
   calls: ["callrate", "callvol"],
-  nursing: ["ecg", "spiro", "nursing_ann"],
+  nursing: ["bp_24hr", "ecg", "random_sugars", "spiro", "nursing_ann"],
   specialty: ["trich", "ht", "fp", "wl"],
   compliance: ["satisfaction", "feedback", "survey", "engage", "sop"],
 };
@@ -96,9 +96,10 @@ export function KpiNmac2026Client({ view }: Props) {
     if (resolvedTheme === "light" || resolvedTheme === "dark") return resolvedTheme;
     return readDocThemeClass();
   }, [resolvedTheme]);
+  const [selectedYear, setSelectedYear] = useState(DEFAULT_KPI_YEAR);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
-  const [db, setDb] = useState<Db>(() => readBrowserNmacDb());
-  const initialPack = loadTargetPack();
+  const [db, setDb] = useState<Db>(() => readBrowserNmacDb(DEFAULT_KPI_YEAR));
+  const initialPack = loadTargetPack(DEFAULT_KPI_YEAR);
   const [fyTargets, setFyTargets] = useState<Record<string, number>>(() => initialPack.fy);
   const [targetsByMonth, setTargetsByMonth] = useState<Partial<Record<number, Record<string, number>>>>(() => initialPack.byMonth);
   const chartsRef = useRef<Chart[]>([]);
@@ -110,21 +111,28 @@ export function KpiNmac2026Client({ view }: Props) {
   const kpisForSelected: readonly KpiRow[] = kpisPerMonth[selectedMonth] ?? kpisPerMonth[0]!;
 
   const monthLabel = useMemo(
-    () => `Showing: ${MONTHS[selectedMonth]} 2026 data — click a month tab to switch`,
-    [selectedMonth],
+    () => `Showing: ${MONTHS[selectedMonth]} ${selectedYear} data — click a month tab to switch`,
+    [selectedMonth, selectedYear],
   );
 
   const hydrateLocalDb = useCallback(() => {
-    const raw = loadData();
-    setDb(loadUseNmacTestData() ? seedDemoIfEmpty(raw) : raw);
+    setDb(readBrowserNmacDb(selectedYear));
+  }, [selectedYear]);
+
+  const onYearChange = useCallback((year: number) => {
+    setSelectedYear(year);
+    setDb(readBrowserNmacDb(year));
+    const pack = loadTargetPack(year);
+    setFyTargets(pack.fy);
+    setTargetsByMonth(pack.byMonth);
   }, []);
 
   const pullNmacFromServer = useCallback(async () => {
     const myGen = ++pullGen.current;
     const [mRes, tRes, tmRes] = await Promise.all([
-      fetchNmacMasterMonthly(NMAC_MASTER_DATA_YEAR),
-      fetchNmacTargets(NMAC_MASTER_DATA_YEAR),
-      fetchNmacTargetMonths(NMAC_MASTER_DATA_YEAR),
+      fetchNmacMasterMonthly(selectedYear),
+      fetchNmacTargets(selectedYear),
+      fetchNmacTargetMonths(selectedYear),
     ]);
     if (myGen !== pullGen.current) return;
     if (!mRes.error) {
@@ -132,13 +140,13 @@ export function KpiNmac2026Client({ view }: Props) {
       if (hasRemote) {
         setDb((prev) => {
           if (stableDbEqual(prev, mRes.data)) return prev;
-          saveAll(mRes.data);
+          saveAll(mRes.data, selectedYear);
           return mRes.data;
         });
       }
     }
     if (myGen !== pullGen.current) return;
-    const prev = loadTargetPack();
+    const prev = loadTargetPack(selectedYear);
     let nextFy = prev.fy;
     let nextMo = prev.byMonth;
     if (!tRes.error) {
@@ -150,9 +158,9 @@ export function KpiNmac2026Client({ view }: Props) {
       setTargetsByMonth(tmRes.data);
     }
     if (!tRes.error || !tmRes.error) {
-      saveTargetPack({ fy: nextFy, byMonth: nextMo });
+      saveTargetPack({ fy: nextFy, byMonth: nextMo }, selectedYear);
     }
-  }, []);
+  }, [selectedYear]);
 
   useEffect(() => {
     const onPrefs = (ev: Event) => {
@@ -165,8 +173,11 @@ export function KpiNmac2026Client({ view }: Props) {
   }, [hydrateLocalDb, pullNmacFromServer]);
 
   useEffect(() => {
-    void pullNmacFromServer();
+    const timer = window.setTimeout(() => {
+      void pullNmacFromServer();
+    }, 0);
     return () => {
+      window.clearTimeout(timer);
       pullGen.current += 1;
     };
   }, [pullNmacFromServer]);
@@ -269,7 +280,9 @@ export function KpiNmac2026Client({ view }: Props) {
           simpleBar("nk26-c-callvol", "callvol");
           break;
         case "nursing":
+          simpleBar("nk26-c-bp-24hr", "bp_24hr");
           simpleBar("nk26-c-ecg", "ecg");
+          simpleBar("nk26-c-random-sugars", "random_sugars");
           simpleBar("nk26-c-spiro", "spiro");
           simpleBar("nk26-c-nursing-annuals", "nursing_ann");
           mount("nk26-c-rn-visits", rnVisitsBarConfig(db, kpisPerMonth, highlight));
@@ -382,6 +395,24 @@ export function KpiNmac2026Client({ view }: Props) {
 
   return (
     <div className="nk26-root nk26-shell">
+      <div className="nk26-year-bar">
+        <label className="nk26-year-label" htmlFor="nk26-reporting-year">
+          Reporting year
+        </label>
+        <select
+          id="nk26-reporting-year"
+          className="nk26-year-select"
+          value={String(selectedYear)}
+          onChange={(e) => onYearChange(Number(e.target.value))}
+        >
+          {SUPPORTED_KPI_YEARS.map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {v === "overview" ? (
         <>
           <header className="nk26-page-head">
@@ -750,7 +781,7 @@ export function KpiNmac2026Client({ view }: Props) {
           <header className="nk26-page-head">
             <div className="nk26-section-title">Nursing KPIs</div>
             <div className="nk26-section-sub">
-              ECG/EKG ≥ 180/mo · spirometry ≥ 20/mo · annuals supported ≥ 150/mo · RN visits (CPT 99211) target 600–700+/yr
+              24Hr blood pressure, ECG/EKG, random blood sugars, spirometry, annuals supported, and RN visits.
               <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>
@@ -765,8 +796,19 @@ export function KpiNmac2026Client({ view }: Props) {
             <div className="nk26-card">
               <div className="nk26-chd">
                 <div>
+                  <div className="nk26-ctitle">24Hr blood pressure</div>
+                  <div className="nk26-csub">Target follows selected year</div>
+                </div>
+              </div>
+              <div className="nk26-canvas">
+                <canvas id="nk26-c-bp-24hr" />
+              </div>
+            </div>
+            <div className="nk26-card">
+              <div className="nk26-chd">
+                <div>
                   <div className="nk26-ctitle">ECG / EKG completed</div>
-                  <div className="nk26-csub">Target: ≥ 180 / month</div>
+                  <div className="nk26-csub">Target follows selected year</div>
                 </div>
                 {badge("ecg")}
               </div>
@@ -777,8 +819,19 @@ export function KpiNmac2026Client({ view }: Props) {
             <div className="nk26-card">
               <div className="nk26-chd">
                 <div>
+                  <div className="nk26-ctitle">Random blood sugars</div>
+                  <div className="nk26-csub">Target follows selected year</div>
+                </div>
+              </div>
+              <div className="nk26-canvas">
+                <canvas id="nk26-c-random-sugars" />
+              </div>
+            </div>
+            <div className="nk26-card">
+              <div className="nk26-chd">
+                <div>
                   <div className="nk26-ctitle">Spirometry tests</div>
-                  <div className="nk26-csub">Target: ≥ 20 / month</div>
+                  <div className="nk26-csub">Target follows selected year</div>
                 </div>
                 {badge("spiro")}
               </div>
@@ -790,7 +843,7 @@ export function KpiNmac2026Client({ view }: Props) {
               <div className="nk26-chd">
                 <div>
                   <div className="nk26-ctitle">Annual exams supported</div>
-                  <div className="nk26-csub">Target: ≥ 150 / month</div>
+                  <div className="nk26-csub">Target follows selected year</div>
                 </div>
                 {badge("nursing_ann")}
               </div>

@@ -15,10 +15,10 @@ import {
   loadTargetPack,
   mergeDefaultTargets,
   MONTHS,
-  NMAC_MASTER_DATA_YEAR,
   saveTargetOverrides,
   saveTargetPack,
 } from "@/lib/kpi-nmac-2026/model";
+import { DEFAULT_KPI_YEAR, SUPPORTED_KPI_YEARS } from "@/lib/kpi/years";
 import { fetchNmacMasterMonthly, upsertNmacMasterMonth } from "@/lib/supabase/nmac-master-service";
 import {
   deleteNmacTargetMonth,
@@ -36,6 +36,7 @@ type TargetScope = "fy" | number;
 export default function AdminNmacMasterPage() {
   const { user, loading: sessionLoading } = useSession();
   const [tab, setTab] = useState<Tab>("targets");
+  const [year, setYear] = useState(DEFAULT_KPI_YEAR);
   const [db, setDb] = useState<NmacMasterDb>(() => emptyNmacMonthDbs());
   const [fyPartial, setFyPartial] = useState<Record<string, number>>({});
   const [monthPartials, setMonthPartials] = useState<Partial<Record<number, Record<string, number>>>>({});
@@ -86,9 +87,9 @@ export default function AdminNmacMasterPage() {
       }
       setLoading(true);
       const [mRes, tRes, tmRes] = await Promise.all([
-        fetchNmacMasterMonthly(NMAC_MASTER_DATA_YEAR),
-        fetchNmacTargets(NMAC_MASTER_DATA_YEAR),
-        fetchNmacTargetMonths(NMAC_MASTER_DATA_YEAR),
+        fetchNmacMasterMonthly(year),
+        fetchNmacTargets(year),
+        fetchNmacTargetMonths(year),
       ]);
       if (!active) return;
       if (mRes.error) showSnackbar(mRes.error, "error");
@@ -102,12 +103,12 @@ export default function AdminNmacMasterPage() {
       else setFyPartial({});
       if (!tmRes.error) setMonthPartials(mo);
       else setMonthPartials({});
-      const prev = loadTargetPack();
+      const prev = loadTargetPack(year);
       if (!tRes.error || !tmRes.error) {
         saveTargetPack({
           fy: !tRes.error ? fy : prev.fy,
           byMonth: !tmRes.error ? mo : prev.byMonth,
-        });
+        }, year);
       }
       setTargetScope("fy");
       applyScopeToForm("fy", !tRes.error ? fy : {}, !tmRes.error ? mo : {});
@@ -117,7 +118,7 @@ export default function AdminNmacMasterPage() {
     return () => {
       active = false;
     };
-  }, [showSnackbar, applyScopeToForm]);
+  }, [showSnackbar, applyScopeToForm, year]);
 
   const onPersist = useCallback(
     async (next: NmacMasterDb, month: number) => {
@@ -129,7 +130,7 @@ export default function AdminNmacMasterPage() {
         return false;
       }
       setSavingMonth(true);
-      const { error } = await upsertNmacMasterMonth(NMAC_MASTER_DATA_YEAR, month, next[month]);
+      const { error } = await upsertNmacMasterMonth(year, month, next[month]);
       setSavingMonth(false);
       if (error) {
         showSnackbar(`Couldn’t save: ${error}`, "error");
@@ -138,7 +139,7 @@ export default function AdminNmacMasterPage() {
       setDb(next);
       return true;
     },
-    [showSnackbar],
+    [showSnackbar, year],
   );
 
   const saveTargets = useCallback(async () => {
@@ -151,7 +152,7 @@ export default function AdminNmacMasterPage() {
     }
     setSavingTargets(true);
     if (targetScope === "fy") {
-      const { error } = await upsertNmacTargets(NMAC_MASTER_DATA_YEAR, targetsFull);
+      const { error } = await upsertNmacTargets(year, targetsFull);
       setSavingTargets(false);
       if (error) {
         showSnackbar(`Couldn’t save targets: ${error}`, "error");
@@ -159,7 +160,7 @@ export default function AdminNmacMasterPage() {
       }
       setFyPartial({ ...targetsFull });
       setSavedTargets({ ...targetsFull });
-      saveTargetOverrides(targetsFull);
+      saveTargetOverrides(targetsFull, year);
       showSnackbar("FY targets saved to Supabase.", "success");
       return;
     }
@@ -168,7 +169,7 @@ export default function AdminNmacMasterPage() {
     const patch = diffTargetsVsFy(fyPartial, targetsFull);
     let nextMonths = { ...monthPartials };
     if (Object.keys(patch).length === 0) {
-      const { error } = await deleteNmacTargetMonth(NMAC_MASTER_DATA_YEAR, m);
+      const { error } = await deleteNmacTargetMonth(year, m);
       setSavingTargets(false);
       if (error) {
         showSnackbar(`Couldn’t clear month targets: ${error}`, "error");
@@ -177,7 +178,7 @@ export default function AdminNmacMasterPage() {
       delete nextMonths[m];
       setMonthPartials(nextMonths);
     } else {
-      const { error } = await upsertNmacTargetMonth(NMAC_MASTER_DATA_YEAR, m, patch);
+      const { error } = await upsertNmacTargetMonth(year, m, patch);
       setSavingTargets(false);
       if (error) {
         showSnackbar(`Couldn’t save month targets: ${error}`, "error");
@@ -187,9 +188,9 @@ export default function AdminNmacMasterPage() {
       setMonthPartials(nextMonths);
     }
     setSavedTargets({ ...targetsFull });
-    saveTargetPack({ fy: fyPartial, byMonth: nextMonths });
+    saveTargetPack({ fy: fyPartial, byMonth: nextMonths }, year);
     showSnackbar(`Targets for ${MONTHS[m]} saved.`, "success");
-  }, [showSnackbar, targetsFull, targetScope, fyPartial, monthPartials]);
+  }, [showSnackbar, targetsFull, targetScope, fyPartial, monthPartials, year]);
 
   const resetTargetsToDefaults = useCallback(() => {
     if (targetScope === "fy") {
@@ -238,7 +239,7 @@ export default function AdminNmacMasterPage() {
   return (
     <MainShell
       title="NMAC master"
-      subtitle={`FY ${NMAC_MASTER_DATA_YEAR} · Targets and monthly this year / last year actuals sync to Supabase and the NMAC dashboard.`}
+      subtitle={`FY ${year} · Targets and monthly this year / last year actuals sync to Supabase and the NMAC dashboard.`}
     >
       <Snackbar
         message={snackbar?.text ?? null}
@@ -247,6 +248,28 @@ export default function AdminNmacMasterPage() {
       />
 
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
+        <div className="flex flex-col gap-2 rounded-xl border border-border bg-card px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-foreground">NMAC master year</p>
+            <p className="text-xs text-muted-foreground">Choose the dataset year before editing targets or monthly actuals.</p>
+          </div>
+          <label className="flex w-full flex-col gap-1 sm:w-40">
+            <span className="text-xs font-medium text-muted-foreground">Year</span>
+            <select
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground"
+              value={String(year)}
+              onChange={(e) => setYear(Number(e.target.value))}
+              disabled={loading || savingMonth || savingTargets}
+            >
+              {SUPPORTED_KPI_YEARS.map((optionYear) => (
+                <option key={optionYear} value={optionYear}>
+                  {optionYear}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
         {!isSupabaseConfigured() ? (
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-4 text-sm text-foreground">
             <p className="font-medium text-amber-900 dark:text-amber-100">Supabase is not configured</p>
@@ -319,7 +342,7 @@ export default function AdminNmacMasterPage() {
             {tab === "targets" ? (
               <section className="flex max-h-[min(85vh,760px)] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-md">
                 <header className="shrink-0 border-b border-border bg-card px-4 py-4 sm:px-6 sm:py-5">
-                  <h2 className="text-lg font-semibold tracking-tight text-foreground">Targets for {NMAC_MASTER_DATA_YEAR}</h2>
+                  <h2 className="text-lg font-semibold tracking-tight text-foreground">Targets for {year}</h2>
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <p className="max-w-2xl text-sm text-muted-foreground">
                       FY row is the default for every month. Choose a month to override goals for that month only (charts

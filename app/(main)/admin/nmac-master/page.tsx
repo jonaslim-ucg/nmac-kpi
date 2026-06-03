@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarRange, Loader2, RotateCcw, Target } from "lucide-react";
+import { CalendarRange, Loader2, RotateCcw, Table2, Target } from "lucide-react";
 import { useSession } from "@/components/auth/session-provider";
 import { MainShell } from "@/components/dashboard/main-shell";
 import { NmacMasterEntryPanel, type NmacMasterDb } from "@/components/kpi-nmac-2026/nmac-master-entry-panel";
+import { NmacMasterSheetPanel } from "@/components/kpi-nmac-2026/nmac-master-sheet-panel";
 import { NmacTargetsForm } from "@/components/kpi-nmac-2026/nmac-targets-form";
 import { canEditKpiData } from "@/lib/auth/types";
 import {
@@ -30,7 +31,7 @@ import {
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { Snackbar, type SnackbarVariant } from "@/components/ui/snackbar";
 
-type Tab = "targets" | "monthly";
+type Tab = "targets" | "monthly" | "sheet";
 type TargetScope = "fy" | number;
 
 export default function AdminNmacMasterPage() {
@@ -47,6 +48,7 @@ export default function AdminNmacMasterPage() {
   const [loading, setLoading] = useState(true);
   const [savingMonth, setSavingMonth] = useState(false);
   const [savingTargets, setSavingTargets] = useState(false);
+  const [savingSheet, setSavingSheet] = useState(false);
   const [snackbar, setSnackbar] = useState<{ text: string; variant: SnackbarVariant } | null>(null);
 
   const kpisForEntry = useMemo(
@@ -58,6 +60,8 @@ export default function AdminNmacMasterPage() {
     () => KPIs.some((k) => targetsFull[k.id] !== savedTargets[k.id]),
     [targetsFull, savedTargets],
   );
+
+  const sheetTargets = useMemo(() => mergeDefaultTargets(fyPartial), [fyPartial]);
 
   const showSnackbar = useCallback((text: string, variant: SnackbarVariant) => {
     setSnackbar({ text, variant });
@@ -140,6 +144,62 @@ export default function AdminNmacMasterPage() {
       return true;
     },
     [showSnackbar, year],
+  );
+
+  const onPersistSheet = useCallback(
+    async ({
+      nextDb,
+      dirtyMonths,
+      nextTargets,
+      targetsDirty: sheetTargetsDirty,
+    }: {
+      nextDb: NmacMasterDb;
+      dirtyMonths: number[];
+      nextTargets: Record<string, number>;
+      targetsDirty: boolean;
+    }) => {
+      if (!isSupabaseConfigured()) {
+        showSnackbar(
+          "Saving isn’t available: the data connection isn’t configured. Ask whoever manages this app to set the environment variables.",
+          "error",
+        );
+        return false;
+      }
+
+      setSavingSheet(true);
+      try {
+        if (sheetTargetsDirty) {
+          const { error } = await upsertNmacTargets(year, nextTargets);
+          if (error) {
+            showSnackbar(`Couldn’t save targets: ${error}`, "error");
+            return false;
+          }
+        }
+
+        for (const month of dirtyMonths) {
+          const { error } = await upsertNmacMasterMonth(year, month, nextDb[month]);
+          if (error) {
+            showSnackbar(`Couldn’t save ${MONTHS[month]}: ${error}`, "error");
+            return false;
+          }
+        }
+
+        if (sheetTargetsDirty) {
+          setFyPartial({ ...nextTargets });
+          saveTargetOverrides(nextTargets, year);
+          if (targetScope === "fy") {
+            setTargetsFull({ ...nextTargets });
+            setSavedTargets({ ...nextTargets });
+          }
+        }
+        if (dirtyMonths.length > 0) setDb(nextDb);
+        showSnackbar("Spreadsheet changes saved to Supabase.", "success");
+        return true;
+      } finally {
+        setSavingSheet(false);
+      }
+    },
+    [showSnackbar, targetScope, year],
   );
 
   const saveTargets = useCallback(async () => {
@@ -259,7 +319,7 @@ export default function AdminNmacMasterPage() {
               className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground"
               value={String(year)}
               onChange={(e) => setYear(Number(e.target.value))}
-              disabled={loading || savingMonth || savingTargets}
+              disabled={loading || savingMonth || savingTargets || savingSheet}
             >
               {SUPPORTED_KPI_YEARS.map((optionYear) => (
                 <option key={optionYear} value={optionYear}>
@@ -336,6 +396,21 @@ export default function AdminNmacMasterPage() {
               >
                 <CalendarRange className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
                 Monthly actuals
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "sheet"}
+                onClick={() => setTab("sheet")}
+                className={
+                  "inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition sm:flex-initial sm:px-5 " +
+                  (tab === "sheet"
+                    ? "bg-card text-foreground shadow-sm ring-1 ring-border"
+                    : "text-muted-foreground hover:bg-background/80 hover:text-foreground")
+                }
+              >
+                <Table2 className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+                Spreadsheet
               </button>
             </div>
 
@@ -419,7 +494,7 @@ export default function AdminNmacMasterPage() {
                   </div>
                 </footer>
               </section>
-            ) : (
+            ) : tab === "monthly" ? (
               <section className="overflow-hidden rounded-2xl border border-border shadow-md ring-1 ring-border/60">
                 <div className="border-b border-border bg-muted/40 px-4 py-3 sm:px-5">
                   <h2 className="text-sm font-semibold text-foreground">Monthly this year / last year</h2>
@@ -445,6 +520,26 @@ export default function AdminNmacMasterPage() {
                         </p>
                       </div>
                     }
+                  />
+                </div>
+              </section>
+            ) : (
+              <section className="overflow-hidden rounded-2xl border border-border shadow-md ring-1 ring-border/60">
+                <div className="border-b border-border bg-muted/40 px-4 py-3 sm:px-5">
+                  <h2 className="text-sm font-semibold text-foreground">Spreadsheet editor</h2>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Edit targets and month values in one grid. Switch between this-year and last-year values before saving.
+                  </p>
+                </div>
+                <div className="nk26-root nk26-shell p-4 sm:p-6">
+                  <NmacMasterSheetPanel
+                    db={db}
+                    targets={sheetTargets}
+                    year={year}
+                    supportedYears={SUPPORTED_KPI_YEARS}
+                    onYearChange={setYear}
+                    onSave={onPersistSheet}
+                    saving={savingSheet}
                   />
                 </div>
               </section>

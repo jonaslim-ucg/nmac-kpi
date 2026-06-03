@@ -529,6 +529,235 @@
   color: var(--nk26-muted);
 }
 
+.nk26-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.nk26-sheet-fullscreen {
+  position: fixed;
+  inset: 12px;
+  z-index: 80;
+  padding: 14px;
+  border: 1px solid var(--nk26-border);
+  border-radius: 12px;
+  background: var(--nk26-bg);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.35);
+}
+
+.nk26-sheet-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.nk26-sheet-search {
+  position: relative;
+  min-width: min(100%, 280px);
+  flex: 1 1 280px;
+}
+
+.nk26-sheet-search-icon {
+  pointer-events: none;
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  height: 16px;
+  width: 16px;
+  transform: translateY(-50%);
+  color: var(--nk26-muted);
+}
+
+.nk26-sheet-search-input {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--nk26-border);
+  border-radius: 8px;
+  background: var(--nk26-surface2);
+  padding: 9px 12px 9px 36px;
+  font-size: 14px;
+  color: var(--nk26-text);
+  outline: none;
+}
+
+.nk26-sheet-search-input:focus,
+.nk26-sheet-mode select:focus,
+.nk26-sheet-table input:focus {
+  border-color: var(--nk26-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--nk26-accent) 22%, transparent);
+}
+
+.nk26-sheet-mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  border: 1px solid var(--nk26-border);
+  border-radius: 8px;
+  background: var(--nk26-surface);
+  padding: 4px 8px 4px 10px;
+  color: var(--nk26-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.nk26-sheet-mode select {
+  min-height: 30px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--nk26-surface2);
+  color: var(--nk26-text);
+  padding: 4px 8px;
+  font: inherit;
+  outline: none;
+}
+
+.nk26-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.nk26-btn-icon {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+.nk26-sheet-meta {
+  min-height: 18px;
+  color: var(--nk26-subtitle);
+  font-size: 12px;
+}
+
+.nk26-sheet-scroll {
+  overflow: auto;
+  max-height: min(72vh, 720px);
+  border: 1px solid var(--nk26-border);
+  border-radius: 12px;
+  background: var(--nk26-surface);
+  box-shadow: var(--nk26-card-shadow);
+}
+
+.nk26-sheet-fullscreen .nk26-sheet-scroll {
+  flex: 1;
+  max-height: none;
+}
+
+.nk26-sheet-table {
+  table-layout: fixed;
+  width: 1264px;
+  min-width: 1264px;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: var(--nk26-text);
+}
+
+.nk26-sheet-table th,
+.nk26-sheet-table td {
+  border-right: 1px solid var(--nk26-border);
+  border-bottom: 1px solid var(--nk26-border);
+  background: var(--nk26-surface);
+  padding: 4px;
+}
+
+.nk26-sheet-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  width: 78px;
+  min-width: 78px;
+  max-width: 78px;
+  background: var(--nk26-surface2);
+  color: var(--nk26-muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.nk26-sheet-table .nk26-sheet-indicator {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  width: 196px;
+  min-width: 196px;
+  max-width: 196px;
+  background: var(--nk26-surface);
+  text-align: left;
+}
+
+.nk26-sheet-table thead .nk26-sheet-indicator {
+  z-index: 4;
+  background: var(--nk26-surface2);
+}
+
+.nk26-sheet-table .nk26-sheet-target {
+  width: 90px;
+  min-width: 90px;
+  max-width: 90px;
+}
+
+.nk26-sheet-label {
+  display: block;
+  color: var(--nk26-text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nk26-sheet-domain {
+  display: block;
+  margin-top: 3px;
+  color: var(--nk26-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.nk26-sheet-table input {
+  width: 70px;
+  min-width: 0;
+  max-width: 70px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: var(--nk26-surface2);
+  color: var(--nk26-text);
+  padding: 6px 6px;
+  font-family: var(--font-dm-mono, ui-monospace, monospace);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  outline: none;
+}
+
+.nk26-sheet-table .nk26-sheet-target input {
+  width: 80px;
+  max-width: 80px;
+}
+
+.nk26-sheet-table input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.nk26-sheet-table input.nk26-sheet-edited {
+  border-color: color-mix(in srgb, var(--nk26-accent) 60%, var(--nk26-border));
+  background: color-mix(in srgb, var(--nk26-accent) 9%, var(--nk26-surface2));
+}
+
+.nk26-sheet-empty {
+  padding: 32px !important;
+  color: var(--nk26-muted);
+  text-align: center;
+}
+
 .nk26-igroup {
   background: var(--nk26-surface);
   border: 1px solid var(--nk26-border);

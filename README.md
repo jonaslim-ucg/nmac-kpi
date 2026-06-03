@@ -31,6 +31,7 @@ cp .env.example .env.local
    - [`supabase/seed.sql`](supabase/seed.sql) — KPI definitions + 2026 weekly sample data (weeks 1–8)  
    - If your project already had `schema.sql` applied before NMAC monthly storage existed, run [`supabase/nmac-master-monthly.sql`](supabase/nmac-master-monthly.sql) once in the SQL Editor.
    - If `nmac_master_targets` is missing, run [`supabase/nmac-master-targets.sql`](supabase/nmac-master-targets.sql) once.
+   - If you see **Could not find the table `public.nmac_master_target_months`**, run [`supabase/nmac-master-target-months.sql`](supabase/nmac-master-target-months.sql) once.
    - For organization-wide Settings (hide legacy nav, sample data, chart cache reset), run [`supabase/app-settings.sql`](supabase/app-settings.sql) once.
 
 5. Start locally:
@@ -44,7 +45,7 @@ npm run dev
 - **`kpi_definitions`** — KPI metadata and targets (`slug`, `label`, `unit`, `suffix`, `target`, `sort_order`).
 - **`kpi_weekly_values`** — Weekly `this_year` / `last_year` by `kpi_slug`, `year`, `week_index`.
 - **`nmac_master_monthly`** — NMAC master dashboard: one row per `year` + `month_index` (0–11). Column `values` is JSON: each KPI id maps to `{ "ty": number, "ly": number }` (this year / last year actuals). Legacy rows with a plain number per id are read as `{ "ty": n }`. Written from **Administration → NMAC master (Supabase)**; charts load that data into the browser when available.
-- **`nmac_master_targets`** — One row per `year`, `values` JSON map of NMAC KPI id → numeric **target for this year** (merged with app defaults where omitted). Edited under **Administration → NMAC master (Supabase)**; cached in the browser as `nmac_kpi_targets_2026` for charts.
+- **`nmac_master_targets`** — One row per `year`, `values` JSON map of NMAC KPI id → numeric **target for this year** (merged with app defaults where omitted). Edited under **Administration → NMAC master (Supabase)**; cached in the browser per year as `nmac_kpi_targets_<year>` for charts.
 - **`app_users`** — `email`, optional `first_name` / `last_name` (shown in the UI instead of email when set), and role (`viewer`, `editor`, `admin`).
 - **`app_settings`** — Single row (`id = default`): organization-wide `hide_legacy_nav`, `use_nmac_test_data`, and `nmac_month_cache_revision` (any signed-in user can change; all accounts see the same values). First successful sign-up becomes **admin** when the table was empty; after that, new users default to **viewer** unless listed in `AUTH_BOOTSTRAP_ADMIN_EMAILS` or an admin changes their role under **Users**. If the table already exists without name columns, run [`supabase/add-user-names.sql`](supabase/add-user-names.sql) in the SQL Editor.
 - **`auth_otp_codes`** — Short-lived hashed OTP for email sign-in (service role only).

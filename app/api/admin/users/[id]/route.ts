@@ -8,6 +8,11 @@ import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 type Ctx = { params: Promise<{ id: string }> };
 
+async function countAdmins(supabase: ReturnType<typeof createServiceRoleClient>): Promise<number> {
+  const { count } = await supabase.from("app_users").select("*", { count: "exact", head: true }).eq("role", "admin");
+  return count ?? 0;
+}
+
 export async function PATCH(req: Request, ctx: Ctx) {
   const session = await getSessionFromCookies();
   if (!session || !canManageUsers(session.role)) {
@@ -39,8 +44,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       return NextResponse.json({ error: "Invalid role." }, { status: 400 });
     }
     if (session.sub === id && target.role === "admin" && role !== "admin") {
-      const { count } = await supabase.from("app_users").select("*", { count: "exact", head: true }).eq("role", "admin");
-      if ((count ?? 0) <= 1) {
+      if ((await countAdmins(supabase)) <= 1) {
         return NextResponse.json(
           { error: "Cannot remove the last admin. Promote another user first." },
           { status: 400 },
@@ -116,14 +120,16 @@ export async function DELETE(_req: Request, ctx: Ctx) {
   }
 
   if (target.role === "admin") {
-    const { count } = await supabase.from("app_users").select("*", { count: "exact", head: true }).eq("role", "admin");
-    if ((count ?? 0) <= 1) {
+    if ((await countAdmins(supabase)) <= 1) {
       return NextResponse.json(
         { error: "Cannot remove the last admin. Promote another user first." },
         { status: 400 },
       );
     }
   }
+
+  const email = (target.email as string).toLowerCase();
+  await supabase.from("auth_otp_codes").delete().eq("email", email);
 
   const { error } = await supabase.from("app_users").delete().eq("id", id);
   if (error) {

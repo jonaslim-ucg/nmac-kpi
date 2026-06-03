@@ -82,7 +82,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  return NextResponse.redirect(new URL("/login?access=denied", request.url));
+  return NextResponse.redirect(new URL("/login", request.url));
 }
 
 export const config = {

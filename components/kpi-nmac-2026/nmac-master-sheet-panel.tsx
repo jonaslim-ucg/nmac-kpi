@@ -231,8 +231,7 @@ export function NmacMasterSheetPanel({
                   </th>
                   <td className="nk26-sheet-target">
                     <input
-                      type="number"
-                      step="any"
+                      type="text"
                       inputMode="decimal"
                       value={targetValue(k.id, k.target)}
                       onChange={(e) => setTargetDrafts((prev) => ({ ...prev, [k.id]: e.target.value }))}
@@ -246,8 +245,7 @@ export function NmacMasterSheetPanel({
                     return (
                       <td key={month}>
                         <input
-                          type="number"
-                          step="any"
+                          type="text"
                           inputMode="decimal"
                           value={cellValue(monthIndex, k.id)}
                           onChange={(e) =>

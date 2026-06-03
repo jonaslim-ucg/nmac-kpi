@@ -735,6 +735,13 @@
   font-variant-numeric: tabular-nums;
   text-align: right;
   outline: none;
+  -moz-appearance: textfield;
+}
+
+.nk26-sheet-table input::-webkit-outer-spin-button,
+.nk26-sheet-table input::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
 }
 
 .nk26-sheet-table .nk26-sheet-target input {

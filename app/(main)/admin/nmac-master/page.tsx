@@ -308,27 +308,29 @@ export default function AdminNmacMasterPage() {
       />
 
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
-        <div className="flex flex-col gap-2 rounded-xl border border-border bg-card px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-foreground">NMAC master year</p>
-            <p className="text-xs text-muted-foreground">Choose the dataset year before editing targets or monthly actuals.</p>
+        {tab !== "sheet" ? (
+          <div className="flex flex-col gap-2 rounded-xl border border-border bg-card px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-foreground">NMAC master year</p>
+              <p className="text-xs text-muted-foreground">Choose the dataset year before editing targets or monthly actuals.</p>
+            </div>
+            <label className="flex w-full flex-col gap-1 sm:w-40">
+              <span className="text-xs font-medium text-muted-foreground">Year</span>
+              <select
+                className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground"
+                value={String(year)}
+                onChange={(e) => setYear(Number(e.target.value))}
+                disabled={loading || savingMonth || savingTargets || savingSheet}
+              >
+                {SUPPORTED_KPI_YEARS.map((optionYear) => (
+                  <option key={optionYear} value={optionYear}>
+                    {optionYear}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-          <label className="flex w-full flex-col gap-1 sm:w-40">
-            <span className="text-xs font-medium text-muted-foreground">Year</span>
-            <select
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground"
-              value={String(year)}
-              onChange={(e) => setYear(Number(e.target.value))}
-              disabled={loading || savingMonth || savingTargets || savingSheet}
-            >
-              {SUPPORTED_KPI_YEARS.map((optionYear) => (
-                <option key={optionYear} value={optionYear}>
-                  {optionYear}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        ) : null}
 
         {!isSupabaseConfigured() ? (
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-4 text-sm text-foreground">

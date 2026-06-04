@@ -389,8 +389,6 @@ export function KpiNmac2026Client({ view }: Props) {
 
   const visitsStats = monthKpiStats(["visits", "annuals", "exec"]);
 
-  const overviewPriorityStats = monthKpiStats([...OVERVIEW_PRIORITY_KPIS]);
-
   const sectionMonthStats = VIEW_MONTH_STATS[v] ? monthKpiStats(VIEW_MONTH_STATS[v]!) : null;
 
   return (
@@ -422,59 +420,6 @@ export function KpiNmac2026Client({ view }: Props) {
           </header>
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
-          <div key={selectedMonth} className="nk26-tab-content-enter nk26-stats nk26-stats-featured">
-            {overviewPriorityStats}
-          </div>
-          <div className="nk26-charts nk26-charts-featured">
-            <div className="nk26-card">
-              <div className="nk26-chd">
-                <div>
-                  <div className="nk26-ctitle">Ave Patient Satisfaction Score</div>
-                  <div className="nk26-csub">Target: ≥ 85</div>
-                </div>
-                {badge("satisfaction")}
-              </div>
-              <div className="nk26-canvas">
-                <canvas id="nk26-c-overview-satisfaction" />
-              </div>
-            </div>
-            <div className="nk26-card">
-              <div className="nk26-chd">
-                <div>
-                  <div className="nk26-ctitle">% Copay Collection Rate</div>
-                  <div className="nk26-csub">Target: ≥ 95%</div>
-                </div>
-                {badge("copay")}
-              </div>
-              <div className="nk26-canvas">
-                <canvas id="nk26-c-overview-copay" />
-              </div>
-            </div>
-            <div className="nk26-card">
-              <div className="nk26-chd">
-                <div>
-                  <div className="nk26-ctitle">Doctor Utilisation</div>
-                  <div className="nk26-csub">All rostered providers · target ≥ 90%</div>
-                </div>
-                {badge("util")}
-              </div>
-              <div className="nk26-canvas">
-                <canvas id="nk26-c-overview-util" />
-              </div>
-            </div>
-            <div className="nk26-card">
-              <div className="nk26-chd">
-                <div>
-                  <div className="nk26-ctitle">% Patients Completing Feedback</div>
-                  <div className="nk26-csub">Target: ≥ 15%</div>
-                </div>
-                {badge("feedback")}
-              </div>
-              <div className="nk26-canvas">
-                <canvas id="nk26-c-overview-feedback" />
-              </div>
-            </div>
-          </div>
           <div className="nk26-section-sub nk26-overview-more-intro">All KPIs</div>
           <div key={`${selectedMonth}-mini`} className="nk26-tab-content-enter nk26-grid-mini">
             {miniCards}
@@ -492,6 +437,56 @@ export function KpiNmac2026Client({ view }: Props) {
               </div>
               <div className="nk26-canvas nk26-canvas-trend">
                 <canvas id="nk26-c-trend" />
+              </div>
+            </div>
+            <div className="nk26-charts-featured">
+              <div className="nk26-card">
+                <div className="nk26-chd">
+                  <div>
+                    <div className="nk26-ctitle">Ave Patient Satisfaction Score</div>
+                    <div className="nk26-csub">Target: ≥ 85</div>
+                  </div>
+                  {badge("satisfaction")}
+                </div>
+                <div className="nk26-canvas">
+                  <canvas id="nk26-c-overview-satisfaction" />
+                </div>
+              </div>
+              <div className="nk26-card">
+                <div className="nk26-chd">
+                  <div>
+                    <div className="nk26-ctitle">% Copay Collection Rate</div>
+                    <div className="nk26-csub">Target: ≥ 95%</div>
+                  </div>
+                  {badge("copay")}
+                </div>
+                <div className="nk26-canvas">
+                  <canvas id="nk26-c-overview-copay" />
+                </div>
+              </div>
+              <div className="nk26-card">
+                <div className="nk26-chd">
+                  <div>
+                    <div className="nk26-ctitle">Doctor Utilisation</div>
+                    <div className="nk26-csub">All rostered providers · target ≥ 90%</div>
+                  </div>
+                  {badge("util")}
+                </div>
+                <div className="nk26-canvas">
+                  <canvas id="nk26-c-overview-util" />
+                </div>
+              </div>
+              <div className="nk26-card">
+                <div className="nk26-chd">
+                  <div>
+                    <div className="nk26-ctitle">% Patients Completing Feedback</div>
+                    <div className="nk26-csub">Target: ≥ 15%</div>
+                  </div>
+                  {badge("feedback")}
+                </div>
+                <div className="nk26-canvas">
+                  <canvas id="nk26-c-overview-feedback" />
+                </div>
               </div>
             </div>
             <div className="nk26-card">

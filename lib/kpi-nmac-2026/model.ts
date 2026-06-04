@@ -20,7 +20,7 @@ export function nmacTargetsStorageKey(year = DEFAULT_KPI_YEAR) {
   return `${TARGETS_STORAGE_KEY_PREFIX}_${year}`;
 }
 
-/** Featured on Performance overview — stakeholder reporting priorities. */
+/** Listed first in Performance overview “All KPIs” grid — stakeholder reporting priorities. */
 export const OVERVIEW_PRIORITY_KPIS = ["satisfaction", "copay", "util", "feedback"] as const;
 
 export type KpiRow = {

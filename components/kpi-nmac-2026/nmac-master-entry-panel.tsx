@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Search } from "lucide-react";
 import {
+  defaultCompletedMonthIndex,
   DOMAINS_ORDER,
   getLastYearVal,
   getVal,
@@ -80,7 +81,7 @@ export function NmacMasterEntryPanel({
   kpis = KPIs,
   onSelectedMonthChange,
 }: NmacMasterEntryPanelProps) {
-  const [selectedMonth, setSelectedMonth] = useState(() => initialSelectedMonth ?? new Date().getMonth());
+  const [selectedMonth, setSelectedMonth] = useState(() => initialSelectedMonth ?? defaultCompletedMonthIndex());
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState(false);
   const [formEpoch, setFormEpoch] = useState(0);

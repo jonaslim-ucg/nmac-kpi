@@ -20,6 +20,10 @@ export function nmacTargetsStorageKey(year = DEFAULT_KPI_YEAR) {
   return `${TARGETS_STORAGE_KEY_PREFIX}_${year}`;
 }
 
+export function defaultCompletedMonthIndex(date = new Date()): number {
+  return (date.getMonth() + 11) % 12;
+}
+
 /** Listed first in Performance overview “All KPIs” grid — stakeholder reporting priorities. */
 export const OVERVIEW_PRIORITY_KPIS = ["satisfaction", "copay", "util", "feedback"] as const;
 

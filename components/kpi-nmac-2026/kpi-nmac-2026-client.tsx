@@ -18,6 +18,7 @@ import {
 import {
   buildKpisPerMonth,
   colorBar,
+  defaultCompletedMonthIndex,
   emptyNmacMonthDbs,
   formatVal,
   getLastYearVal,
@@ -97,7 +98,7 @@ export function KpiNmac2026Client({ view }: Props) {
     return readDocThemeClass();
   }, [resolvedTheme]);
   const [selectedYear, setSelectedYear] = useState(DEFAULT_KPI_YEAR);
-  const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth());
+  const [selectedMonth, setSelectedMonth] = useState(defaultCompletedMonthIndex);
   const [db, setDb] = useState<Db>(() => readBrowserNmacDb(DEFAULT_KPI_YEAR));
   const initialPack = loadTargetPack(DEFAULT_KPI_YEAR);
   const [fyTargets, setFyTargets] = useState<Record<string, number>>(() => initialPack.fy);

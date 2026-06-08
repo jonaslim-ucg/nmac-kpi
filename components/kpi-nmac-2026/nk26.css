@@ -366,11 +366,19 @@
   margin-bottom: 28px;
 }
 
+.nk26-referral-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
 .nk26-referral-range-bar {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 16px;
 }
 
 .nk26-referral-range-bar .nk26-tab {
@@ -413,22 +421,28 @@
   font-size: 0.875rem;
 }
 
-.nk26-referral-summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 14px;
-  margin-bottom: 24px;
+.nk26-referral-total {
+  border-color: color-mix(in srgb, var(--nk26-accent) 40%, var(--nk26-border));
+  background: color-mix(in srgb, var(--nk26-accent) 6%, var(--nk26-surface));
 }
 
+.nk26-referral-refresh {
+  flex-shrink: 0;
+}
+
+.nk26-referral-kpi-row .nk26-sval,
+.nk26-referral-funnel .nk26-sval,
 .nk26-referral-cards .nk26-sval {
   font-size: 1.75rem;
   font-weight: 700;
   line-height: 1.1;
 }
 
-.nk26-referral-total {
-  border-color: color-mix(in srgb, var(--nk26-accent) 40%, var(--nk26-border));
-  background: color-mix(in srgb, var(--nk26-accent) 6%, var(--nk26-surface));
+.nk26-referral-funnel {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 28px;
 }
 
 .nk26-charts-featured {

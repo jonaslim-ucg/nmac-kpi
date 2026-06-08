@@ -85,8 +85,8 @@ type Props = { view: string };
 const VIEW_MONTH_STATS: Partial<Record<Nk26View, string[]>> = {
   scheduling: ["util", "noshow", "leads", "ph"],
   finance: ["revenue", "copay", "leakage", "shop"],
-  calls: ["callrate", "callvol"],
-  nursing: ["bp_24hr", "ecg", "random_sugars", "spiro", "nursing_ann"],
+  calls: ["call_incoming", "call_answered", "call_missed"],
+  nursing: ["bp_24hr", "ecg", "random_sugars", "spiro"],
   specialty: ["trich", "ht", "fp", "wl"],
   compliance: ["satisfaction", "feedback", "survey", "engage", "sop"],
 };
@@ -258,7 +258,7 @@ export function KpiNmac2026Client({ view }: Props) {
           simpleBar("nk26-c-overview-feedback", "feedback");
           simpleBar("nk26-c-visits", "visits");
           simpleBar("nk26-c-noshow", "noshow");
-          simpleLine("nk26-c-calls", "callrate");
+          simpleBar("nk26-c-calls", "call_incoming");
           simpleBar("nk26-c-revenue", "revenue");
           break;
         case "visits":
@@ -278,15 +278,15 @@ export function KpiNmac2026Client({ view }: Props) {
           simpleBar("nk26-c-shop", "shop");
           break;
         case "calls":
-          simpleLine("nk26-c-callrate", "callrate");
-          simpleBar("nk26-c-callvol", "callvol");
+          simpleBar("nk26-c-call-incoming", "call_incoming");
+          simpleBar("nk26-c-call-answered", "call_answered");
+          simpleBar("nk26-c-call-missed", "call_missed");
           break;
         case "nursing":
           simpleBar("nk26-c-bp-24hr", "bp_24hr");
           simpleBar("nk26-c-ecg", "ecg");
           simpleBar("nk26-c-random-sugars", "random_sugars");
           simpleBar("nk26-c-spiro", "spiro");
-          simpleBar("nk26-c-nursing-annuals", "nursing_ann");
           mount("nk26-c-rn-visits", rnVisitsBarConfig(db, kpisPerMonth, highlight));
           break;
         case "specialty":
@@ -518,10 +518,10 @@ export function KpiNmac2026Client({ view }: Props) {
             <div className="nk26-card">
               <div className="nk26-chd">
                 <div>
-                  <div className="nk26-ctitle">Call answer rate</div>
-                  <div className="nk26-csub">Target: ≥ 90%</div>
+                  <div className="nk26-ctitle">Total incoming calls</div>
+                  <div className="nk26-csub">Target: ≥ 300 / month</div>
                 </div>
-                {badge("callrate")}
+                {badge("call_incoming")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-calls" />
@@ -732,7 +732,7 @@ export function KpiNmac2026Client({ view }: Props) {
           <header className="nk26-page-head">
             <div className="nk26-section-title">Call performance</div>
             <div className="nk26-section-sub">
-              Call answer rate ≥ 90% · inbound calls ≥ 300 / month
+              Incoming calls ≥ 300 / month · answered calls ≥ 270 · missed/abandoned ≤ 30
               <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>
@@ -747,25 +747,37 @@ export function KpiNmac2026Client({ view }: Props) {
             <div className="nk26-card">
               <div className="nk26-chd">
                 <div>
-                  <div className="nk26-ctitle">Call answer rate</div>
-                  <div className="nk26-csub">Target: ≥ 90%</div>
+                  <div className="nk26-ctitle">Total incoming calls</div>
+                  <div className="nk26-csub">Target: ≥ 300 / month</div>
                 </div>
-                {badge("callrate")}
+                {badge("call_incoming")}
               </div>
               <div className="nk26-canvas">
-                <canvas id="nk26-c-callrate" />
+                <canvas id="nk26-c-call-incoming" />
               </div>
             </div>
             <div className="nk26-card">
               <div className="nk26-chd">
                 <div>
-                  <div className="nk26-ctitle">Inbound call volume</div>
-                  <div className="nk26-csub">Target: ≥ 300 / month</div>
+                  <div className="nk26-ctitle">Total answered calls</div>
+                  <div className="nk26-csub">Target: ≥ 270 / month</div>
                 </div>
-                {badge("callvol")}
+                {badge("call_answered")}
               </div>
               <div className="nk26-canvas">
-                <canvas id="nk26-c-callvol" />
+                <canvas id="nk26-c-call-answered" />
+              </div>
+            </div>
+            <div className="nk26-card">
+              <div className="nk26-chd">
+                <div>
+                  <div className="nk26-ctitle">Total missed/abandoned calls</div>
+                  <div className="nk26-csub">Target: ≤ 30 / month</div>
+                </div>
+                {badge("call_missed")}
+              </div>
+              <div className="nk26-canvas">
+                <canvas id="nk26-c-call-missed" />
               </div>
             </div>
           </div>
@@ -778,7 +790,7 @@ export function KpiNmac2026Client({ view }: Props) {
           <header className="nk26-page-head">
             <div className="nk26-section-title">Nursing KPIs</div>
             <div className="nk26-section-sub">
-              24Hr blood pressure, ECG/EKG, random blood sugars, spirometry, annuals supported, and RN visits.
+              24Hr blood pressure, ECG/EKG, random blood sugars, spirometry, and RN visits.
               <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>
@@ -834,18 +846,6 @@ export function KpiNmac2026Client({ view }: Props) {
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-spiro" />
-              </div>
-            </div>
-            <div className="nk26-card">
-              <div className="nk26-chd">
-                <div>
-                  <div className="nk26-ctitle">Annual exams supported</div>
-                  <div className="nk26-csub">Target follows selected year</div>
-                </div>
-                {badge("nursing_ann")}
-              </div>
-              <div className="nk26-canvas">
-                <canvas id="nk26-c-nursing-annuals" />
               </div>
             </div>
             <div className="nk26-card">

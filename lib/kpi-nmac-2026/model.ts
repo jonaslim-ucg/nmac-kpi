@@ -45,8 +45,9 @@ export const KPIs: KpiRow[] = [
   { id: "wl", label: "WL Visit Compliance", unit: "%", target: 95, gate: true, domain: "Specialty", higher: true },
   { id: "util", label: "Doctor Utilisation", unit: "%", target: 90, gate: false, domain: "Scheduling", higher: true },
   { id: "noshow", label: "No-Show Rate", unit: "%", target: 7, gate: false, domain: "Scheduling", higher: false },
-  { id: "callrate", label: "Call Answer Rate", unit: "%", target: 90, gate: false, domain: "Calls", higher: true },
-  { id: "callvol", label: "Inbound Calls", unit: "", target: 300, gate: false, domain: "Calls", higher: true },
+  { id: "call_incoming", label: "Total Incoming Calls", unit: "", target: 300, gate: false, domain: "Calls", higher: true },
+  { id: "call_answered", label: "Total Answered Calls", unit: "", target: 270, gate: false, domain: "Calls", higher: true },
+  { id: "call_missed", label: "Total Missed/Abandoned Calls", unit: "", target: 30, gate: false, domain: "Calls", higher: false },
   { id: "copay", label: "% Copay Collection Rate", unit: "%", target: 95, gate: false, domain: "Finance", higher: true },
   { id: "leakage", label: "Revenue Leakage", unit: "%", target: 10, gate: false, domain: "Finance", higher: false },
   { id: "eod", label: "EOD Variances", unit: "", target: 0, gate: false, domain: "Finance", higher: false },
@@ -66,7 +67,6 @@ export const KPIs: KpiRow[] = [
   { id: "ecg", label: "ECG / EKG Completed", unit: "", target: 180, gate: false, domain: "Nursing", higher: true },
   { id: "random_sugars", label: "Random Blood Sugars", unit: "", target: 200, gate: false, domain: "Nursing", higher: true },
   { id: "spiro", label: "Spirometry Tests", unit: "", target: 20, gate: false, domain: "Nursing", higher: true },
-  { id: "nursing_ann", label: "Annuals Supported (Nursing)", unit: "", target: 150, gate: false, domain: "Nursing", higher: true },
   { id: "rn_visits", label: "RN Visits (CPT 99211)", unit: "", target: 58, gate: false, domain: "Nursing", higher: true },
 ];
 
@@ -327,8 +327,9 @@ const SEEDS: Seed[] = [
   { id: "wl", base: 96.5, variance: 1.2, gate: true, higher: true, target: 95 },
   { id: "util", base: 92, variance: 3, gate: false, higher: true, target: 90 },
   { id: "noshow", base: 5.8, variance: 1, gate: false, higher: false, target: 7 },
-  { id: "callrate", base: 92, variance: 3, gate: false, higher: true, target: 90 },
-  { id: "callvol", base: 345, variance: 35, gate: false, higher: true, target: 300 },
+  { id: "call_incoming", base: 345, variance: 35, gate: false, higher: true, target: 300 },
+  { id: "call_answered", base: 318, variance: 30, gate: false, higher: true, target: 270 },
+  { id: "call_missed", base: 27, variance: 8, gate: false, higher: false, target: 30 },
   { id: "copay", base: 96.5, variance: 1.5, gate: false, higher: true, target: 95 },
   { id: "leakage", base: 7.5, variance: 1.5, gate: false, higher: false, target: 10 },
   { id: "eod", base: 0, variance: 0, gate: false, higher: false, target: 0 },
@@ -348,7 +349,6 @@ const SEEDS: Seed[] = [
   { id: "ecg", base: 188, variance: 10, gate: false, higher: true, target: 180 },
   { id: "random_sugars", base: 240, variance: 45, gate: false, higher: true, target: 200 },
   { id: "spiro", base: 23, variance: 3, gate: false, higher: true, target: 20 },
-  { id: "nursing_ann", base: 155, variance: 8, gate: false, higher: true, target: 150 },
   { id: "rn_visits", base: 61, variance: 6, gate: false, higher: true, target: 58 },
 ];
 

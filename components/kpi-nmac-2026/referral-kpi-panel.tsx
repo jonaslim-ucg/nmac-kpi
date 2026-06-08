@@ -5,10 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Chart, ChartConfiguration } from "chart.js";
 import {
   monthDateBounds,
-  REFERRAL_RANGE_OPTIONS,
   REFERRAL_STATUS_CARDS,
   referralCountForCard,
-  type ReferralRangeMode,
 } from "@/lib/ardts/referral-display";
 import {
   referralOutcomeMonthlyChart,
@@ -44,12 +42,9 @@ type Props = {
   onSelectMonth: (monthIndex: number) => void;
 };
 
-function buildQuery(rangeMode: ReferralRangeMode, year: number, monthIndex: number): string {
-  if (rangeMode === "month") {
-    const { from, to } = monthDateBounds(year, monthIndex);
-    return new URLSearchParams({ range: "custom", from, to }).toString();
-  }
-  return new URLSearchParams({ range: rangeMode }).toString();
+function buildMonthQuery(year: number, monthIndex: number): string {
+  const { from, to } = monthDateBounds(year, monthIndex);
+  return new URLSearchParams({ range: "custom", from, to }).toString();
 }
 
 export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }: Props) {
@@ -59,7 +54,6 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
     return readDocThemeClass();
   }, [resolvedTheme]);
 
-  const [rangeMode, setRangeMode] = useState<ReferralRangeMode>("month");
   const [data, setData] = useState<ArdtsStatusCountsResponse | null>(null);
   const [yearly, setYearly] = useState<ReferralYearlyResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,8 +66,8 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
   const chartFxGen = useRef(0);
 
   const query = useMemo(
-    () => buildQuery(rangeMode, selectedYear, selectedMonth),
-    [rangeMode, selectedYear, selectedMonth],
+    () => buildMonthQuery(selectedYear, selectedMonth),
+    [selectedYear, selectedMonth],
   );
 
   const loadPeriod = useCallback(async () => {
@@ -142,8 +136,6 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
     return `Period: ${data.range.from} to ${data.range.to} (${tz})`;
   }, [data]);
 
-  const highlightMonth = rangeMode === "month" ? selectedMonth : undefined;
-
   useEffect(() => {
     if (!data || !yearly || loading || yearlyLoading) return;
 
@@ -162,8 +154,8 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
         chartsRef.current.push(new ChartCtor(canvas, config));
       };
 
-      mount("nk26-c-ref-sent", referralSentMonthlyChart(months, highlightMonth));
-      mount("nk26-c-ref-outcomes", referralOutcomeMonthlyChart(months, highlightMonth));
+      mount("nk26-c-ref-sent", referralSentMonthlyChart(months, selectedMonth));
+      mount("nk26-c-ref-outcomes", referralOutcomeMonthlyChart(months, selectedMonth));
       mount("nk26-c-ref-status", referralStatusBreakdownChart(data));
     });
 
@@ -172,7 +164,7 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
       chartsRef.current.forEach((c) => c.destroy());
       chartsRef.current = [];
     };
-  }, [data, yearly, loading, yearlyLoading, highlightMonth, chartThemeKey]);
+  }, [data, yearly, loading, yearlyLoading, selectedMonth, chartThemeKey]);
 
   const ytdTotal = useMemo(() => {
     if (!yearly) return 0;
@@ -186,44 +178,25 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
 
   return (
     <div key="referrals-content" className="nk26-route-enter">
-      <div className="nk26-referral-toolbar">
-        <div className="nk26-referral-range-bar">
-          {REFERRAL_RANGE_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              className={"nk26-tab" + (rangeMode === opt.id ? " nk26-tab-active" : "")}
-              onClick={() => setRangeMode(opt.id)}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        <button type="button" className="nk26-btn nk26-btn-sec nk26-referral-refresh" onClick={refresh}>
+      <MonthTabs selectedMonth={selectedMonth} onSelect={onSelectMonth} />
+
+      <div className="nk26-referral-actions">
+        <button type="button" className="nk26-btn nk26-btn-sec" onClick={refresh}>
           Refresh
         </button>
-      </div>
-
-      {rangeMode === "month" ? (
-        <MonthTabs selectedMonth={selectedMonth} onSelect={onSelectMonth} />
-      ) : null}
-
-      <div className="nk26-referral-meta">
-        <p className="nk26-referral-note">
-          Referrals sent in each period (by <strong>date sent</strong>, business hours only). This is activity
-          reporting — not the live ARDTS pipeline backlog.
-        </p>
-        {periodLabel ? <p className="nk26-referral-period">{periodLabel}</p> : null}
-        {rangeMode === "month" ? (
-          <p className="nk26-referral-period">
-            Reporting month: {MONTHS[selectedMonth]} {selectedYear}
-          </p>
-        ) : null}
         {fetchedAt ? (
           <p className="nk26-referral-period">
             As of {fetchedAt.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" })}
           </p>
         ) : null}
+      </div>
+
+      <div className="nk26-referral-meta">
+        <p className="nk26-referral-note">
+          Referrals sent in {MONTHS[selectedMonth]} {selectedYear} (by <strong>date sent</strong>, business hours
+          only).
+        </p>
+        {periodLabel ? <p className="nk26-referral-period">{periodLabel}</p> : null}
       </div>
 
       {loading || yearlyLoading ? <p className="nk26-referral-status">Loading referral data from ARDTS…</p> : null}
@@ -240,11 +213,28 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
 
       {!loading && !error && metrics ? (
         <>
+          <div className="nk26-section-sub nk26-overview-more-intro">All statuses in period</div>
+          <div className="nk26-stats nk26-referral-cards">
+            {REFERRAL_STATUS_CARDS.map((card) => {
+              const count = referralCountForCard(card.key, metrics.total, data?.counts ?? {});
+              return (
+                <div
+                  key={card.key}
+                  className={"nk26-stat" + (card.key === "total" ? " nk26-referral-total" : "")}
+                >
+                  <div className="nk26-slab">{card.label}</div>
+                  <div className="nk26-sval">{count}</div>
+                  <div className="nk26-ssub">{card.sub}</div>
+                </div>
+              );
+            })}
+          </div>
+
           <div className="nk26-stats nk26-referral-kpi-row">
             <div className="nk26-stat nk26-referral-total">
               <div className="nk26-slab">Sent in period</div>
               <div className="nk26-sval">{metrics.total}</div>
-              <div className="nk26-ssub">Referrals sent during selected range</div>
+              <div className="nk26-ssub">Referrals sent during selected month</div>
             </div>
             <div className="nk26-stat">
               <div className="nk26-slab">Booking rate</div>
@@ -309,7 +299,7 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
               <div className="nk26-card nk26-card-full">
                 <div className="nk26-chd">
                   <div>
-                    <div className="nk26-ctitle">Status breakdown — selected period</div>
+                    <div className="nk26-ctitle">Status breakdown — selected month</div>
                     <div className="nk26-csub">
                       {data?.range.from} to {data?.range.to}
                     </div>
@@ -321,23 +311,6 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
               </div>
             </div>
           ) : null}
-
-          <div className="nk26-section-sub nk26-overview-more-intro">All statuses in period</div>
-          <div className="nk26-stats nk26-referral-cards">
-            {REFERRAL_STATUS_CARDS.map((card) => {
-              const count = referralCountForCard(card.key, metrics.total, data?.counts ?? {});
-              return (
-                <div
-                  key={card.key}
-                  className={"nk26-stat" + (card.key === "total" ? " nk26-referral-total" : "")}
-                >
-                  <div className="nk26-slab">{card.label}</div>
-                  <div className="nk26-sval">{count}</div>
-                  <div className="nk26-ssub">{card.sub}</div>
-                </div>
-              );
-            })}
-          </div>
         </>
       ) : null}
     </div>

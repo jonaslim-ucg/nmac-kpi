@@ -9,15 +9,6 @@ export function monthDateBounds(year: number, monthIndex: number): { from: strin
   };
 }
 
-export type ReferralRangeMode = "month" | "last_7_days" | "last_30_days" | "this_month";
-
-export const REFERRAL_RANGE_OPTIONS: Array<{ id: ReferralRangeMode; label: string }> = [
-  { id: "month", label: "Selected month" },
-  { id: "last_7_days", label: "Last 7 days" },
-  { id: "last_30_days", label: "Last 30 days" },
-  { id: "this_month", label: "This month" },
-];
-
 export type ReferralStatusCard = {
   key: ArdtsStatus | "total";
   label: string;

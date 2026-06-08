@@ -366,25 +366,16 @@
   margin-bottom: 28px;
 }
 
-.nk26-referral-toolbar {
+.nk26-referral-actions {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  gap: 12px 16px;
   margin-bottom: 16px;
 }
 
-.nk26-referral-range-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.nk26-referral-range-bar .nk26-tab {
-  flex: 0 1 auto;
-  min-width: 7.5rem;
-  padding-inline: 14px;
+.nk26-referral-actions .nk26-referral-period {
+  margin: 0;
 }
 
 .nk26-referral-meta {
@@ -424,10 +415,6 @@
 .nk26-referral-total {
   border-color: color-mix(in srgb, var(--nk26-accent) 40%, var(--nk26-border));
   background: color-mix(in srgb, var(--nk26-accent) 6%, var(--nk26-surface));
-}
-
-.nk26-referral-refresh {
-  flex-shrink: 0;
 }
 
 .nk26-referral-kpi-row .nk26-sval,

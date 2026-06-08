@@ -7,6 +7,7 @@ export const NK26_VIEWS = [
   "nursing",
   "specialty",
   "compliance",
+  "referrals",
 ] as const;
 
 export type Nk26View = (typeof NK26_VIEWS)[number];
@@ -33,6 +34,8 @@ export function nk26Title(view: string): string {
       return "Specialty clinics";
     case "compliance":
       return "Compliance & quality";
+    case "referrals":
+      return "Referral KPI";
     default:
       return "NMAC 2026 KPI";
   }

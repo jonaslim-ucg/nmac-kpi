@@ -48,6 +48,7 @@ import { DEFAULT_KPI_YEAR, SUPPORTED_KPI_YEARS } from "@/lib/kpi/years";
 import { fetchNmacMasterMonthly } from "@/lib/supabase/nmac-master-service";
 import { fetchNmacTargetMonths, fetchNmacTargets } from "@/lib/supabase/nmac-targets-service";
 import { MonthTabs } from "./nmac-master-entry-panel";
+import { ReferralKpiPanel } from "./referral-kpi-panel";
 
 let chartJsModule: Promise<typeof import("chart.js/auto")> | null = null;
 function loadChartJs() {
@@ -930,6 +931,22 @@ export function KpiNmac2026Client({ view }: Props) {
             </div>
           </div>
           </div>
+        </>
+      ) : null}
+
+      {v === "referrals" ? (
+        <>
+          <header className="nk26-page-head">
+            <div className="nk26-section-title">Referral KPI</div>
+            <div className="nk26-section-sub">
+              Referral activity from ARDTS — items sent in each period, grouped by status.
+            </div>
+          </header>
+          <ReferralKpiPanel
+            selectedYear={selectedYear}
+            selectedMonth={selectedMonth}
+            onSelectMonth={setSelectedMonth}
+          />
         </>
       ) : null}
 

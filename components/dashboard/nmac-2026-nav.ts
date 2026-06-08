@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Phone,
   Settings,
+  Share2,
   Stethoscope,
   UserCog,
   Users,
@@ -44,6 +45,7 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
       { href: "/nmac-2026/nursing", label: "Nursing KPIs", icon: HeartPulse },
       { href: "/nmac-2026/specialty", label: "Specialty clinics", icon: Stethoscope },
       { href: "/nmac-2026/compliance", label: "Compliance & quality", icon: ClipboardList },
+      { href: "/nmac-2026/referrals", label: "Referral KPI", icon: Share2 },
     ],
   },
   {

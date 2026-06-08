@@ -366,6 +366,71 @@
   margin-bottom: 28px;
 }
 
+.nk26-referral-range-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.nk26-referral-range-bar .nk26-tab {
+  flex: 0 1 auto;
+  min-width: 7.5rem;
+  padding-inline: 14px;
+}
+
+.nk26-referral-meta {
+  margin-bottom: 20px;
+}
+
+.nk26-referral-note {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--nk26-subtitle);
+  margin: 0 0 8px;
+  max-width: 72ch;
+}
+
+.nk26-referral-period {
+  font-size: 0.8125rem;
+  color: var(--nk26-muted);
+  margin: 0 0 4px;
+}
+
+.nk26-referral-status {
+  font-size: 0.875rem;
+  color: var(--nk26-muted);
+  margin: 0 0 20px;
+}
+
+.nk26-referral-error {
+  border: 1px solid color-mix(in srgb, var(--nk26-red) 35%, var(--nk26-border));
+  background: color-mix(in srgb, var(--nk26-red) 8%, var(--nk26-surface));
+  color: var(--nk26-text);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  font-size: 0.875rem;
+}
+
+.nk26-referral-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.nk26-referral-cards .nk26-sval {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.nk26-referral-total {
+  border-color: color-mix(in srgb, var(--nk26-accent) 40%, var(--nk26-border));
+  background: color-mix(in srgb, var(--nk26-accent) 6%, var(--nk26-surface));
+}
+
 .nk26-charts-featured {
   grid-column: 1 / -1;
   display: grid;

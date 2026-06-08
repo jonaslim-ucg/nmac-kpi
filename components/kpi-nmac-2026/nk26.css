@@ -417,6 +417,28 @@
   background: color-mix(in srgb, var(--nk26-accent) 6%, var(--nk26-surface));
 }
 
+.nk26-referral-cards {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.nk26-referral-kpi-row {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.nk26-referral-cards .nk26-stat,
+.nk26-referral-kpi-row .nk26-stat,
+.nk26-referral-funnel .nk26-stat {
+  min-height: 7.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.nk26-referral-cards .nk26-ssub,
+.nk26-referral-kpi-row .nk26-ssub,
+.nk26-referral-funnel .nk26-ssub {
+  margin-top: auto;
+}
+
 .nk26-referral-kpi-row .nk26-sval,
 .nk26-referral-funnel .nk26-sval,
 .nk26-referral-cards .nk26-sval {
@@ -427,9 +449,70 @@
 
 .nk26-referral-funnel {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 28px;
+}
+
+@media (max-width: 1100px) {
+  .nk26-referral-kpi-row {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .nk26-referral-kpi-row > .nk26-stat {
+    grid-column: span 2;
+  }
+
+  .nk26-referral-kpi-row > .nk26-stat:nth-child(4) {
+    grid-column: 2 / span 2;
+  }
+
+  .nk26-referral-kpi-row > .nk26-stat:nth-child(5) {
+    grid-column: 4 / span 2;
+  }
+}
+
+@media (max-width: 720px) {
+  .nk26-referral-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nk26-referral-cards > .nk26-stat:last-child {
+    grid-column: 1 / -1;
+    max-width: 50%;
+    justify-self: center;
+  }
+
+  .nk26-referral-kpi-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nk26-referral-kpi-row > .nk26-stat {
+    grid-column: auto;
+  }
+
+  .nk26-referral-kpi-row > .nk26-stat:nth-child(5) {
+    grid-column: 1 / -1;
+    max-width: 50%;
+    justify-self: center;
+  }
+
+  .nk26-referral-funnel {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .nk26-referral-cards,
+  .nk26-referral-kpi-row {
+    grid-template-columns: 1fr;
+  }
+
+  .nk26-referral-cards > .nk26-stat:last-child,
+  .nk26-referral-kpi-row > .nk26-stat:nth-child(5) {
+    max-width: none;
+    justify-self: stretch;
+  }
 }
 
 .nk26-charts-featured {

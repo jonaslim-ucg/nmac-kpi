@@ -230,6 +230,7 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
             })}
           </div>
 
+          <div className="nk26-section-sub nk26-overview-more-intro">Period summary</div>
           <div className="nk26-stats nk26-referral-kpi-row">
             <div className="nk26-stat nk26-referral-total">
               <div className="nk26-slab">Sent in period</div>

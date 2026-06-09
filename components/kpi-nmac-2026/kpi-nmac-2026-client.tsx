@@ -83,8 +83,8 @@ type Props = { view: string };
 
 /** KPI ids shown in the month stat row (below month tabs) per section view. */
 const VIEW_MONTH_STATS: Partial<Record<Nk26View, string[]>> = {
-  scheduling: ["util", "noshow", "leads", "ph"],
-  finance: ["revenue", "copay", "leakage", "shop"],
+  scheduling: ["util", "noshow", "leads", "appt_confirm", "checkin_checkout", "ph"],
+  finance: ["revenue", "net_margin", "revenue_trend", "copay", "leakage", "shop"],
   calls: ["call_incoming", "call_answered", "call_missed"],
   nursing: ["bp_24hr", "ecg", "random_sugars", "spiro"],
   specialty: ["trich", "ht", "fp", "wl"],
@@ -269,10 +269,14 @@ export function KpiNmac2026Client({ view }: Props) {
         case "scheduling":
           mount("nk26-c-util-noshow", utilNoshowConfig(db, kpisPerMonth, highlight));
           simpleBar("nk26-c-leads", "leads");
+          simpleLine("nk26-c-appt-confirm", "appt_confirm");
+          simpleLine("nk26-c-checkin-checkout", "checkin_checkout");
           simpleBar("nk26-c-ph", "ph");
           break;
         case "finance":
           mount("nk26-c-rev2", revenueChartConfig(db, colorBar, kpisPerMonth, highlight));
+          simpleLine("nk26-c-net-margin", "net_margin");
+          simpleLine("nk26-c-revenue-trend", "revenue_trend");
           simpleBar("nk26-c-copay", "copay");
           simpleBar("nk26-c-leakage", "leakage");
           simpleBar("nk26-c-shop", "shop");
@@ -530,8 +534,8 @@ export function KpiNmac2026Client({ view }: Props) {
             <div className="nk26-card">
               <div className="nk26-chd">
                 <div>
-                  <div className="nk26-ctitle">Revenue vs $7.9M target</div>
-                  <div className="nk26-csub">Monthly run-rate tracking</div>
+                  <div className="nk26-ctitle">Billed revenue (run-rate)</div>
+                  <div className="nk26-csub">Monthly run-rate vs $7.9M target</div>
                 </div>
                 {badge("revenue")}
               </div>
@@ -601,7 +605,7 @@ export function KpiNmac2026Client({ view }: Props) {
           <header className="nk26-page-head">
             <div className="nk26-section-title">Scheduling & utilization</div>
             <div className="nk26-section-sub">
-              Doctor utilisation ≥ 90% (all rostered providers) · no-show rate ≤ 7% · lead conversion &gt; 70–80%
+              Doctor utilisation ≥ 90% · no-show ≤ 7% · lead → appointment conversion ≥ 75% · confirmation rate ≥ 90%
               <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>
@@ -631,13 +635,37 @@ export function KpiNmac2026Client({ view }: Props) {
             <div className="nk26-card">
               <div className="nk26-chd">
                 <div>
-                  <div className="nk26-ctitle">Lead → booking conversion</div>
-                  <div className="nk26-csub">Target: &gt; 70–80%</div>
+                  <div className="nk26-ctitle">Lead → appointment conversion</div>
+                  <div className="nk26-csub">Target: ≥ 75%</div>
                 </div>
                 {badge("leads")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-leads" />
+              </div>
+            </div>
+            <div className="nk26-card">
+              <div className="nk26-chd">
+                <div>
+                  <div className="nk26-ctitle">Appointment confirmation rate</div>
+                  <div className="nk26-csub">Target: ≥ 90%</div>
+                </div>
+                {badge("appt_confirm")}
+              </div>
+              <div className="nk26-canvas">
+                <canvas id="nk26-c-appt-confirm" />
+              </div>
+            </div>
+            <div className="nk26-card">
+              <div className="nk26-chd">
+                <div>
+                  <div className="nk26-ctitle">Avg. check-in → check-out</div>
+                  <div className="nk26-csub">Target: ≤ 30 min</div>
+                </div>
+                {badge("checkin_checkout")}
+              </div>
+              <div className="nk26-canvas">
+                <canvas id="nk26-c-checkin-checkout" />
               </div>
             </div>
             <div className="nk26-card">
@@ -662,7 +690,7 @@ export function KpiNmac2026Client({ view }: Props) {
           <header className="nk26-page-head">
             <div className="nk26-section-title">Finance & revenue</div>
             <div className="nk26-section-sub">
-              Revenue target: $7.9M annual · copay collection ≥ 95% · unbilled encounters &lt; 10%
+              Billed revenue run-rate · net margin ≥ 15% · copay collection ≥ 95% · unbilled &lt; 10%
               <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>
@@ -677,13 +705,37 @@ export function KpiNmac2026Client({ view }: Props) {
             <div className="nk26-card nk26-card-full">
               <div className="nk26-chd">
                 <div>
-                  <div className="nk26-ctitle">Revenue run-rate vs $7.9M target</div>
+                  <div className="nk26-ctitle">Billed revenue (run-rate) vs $7.9M target</div>
                   <div className="nk26-csub">Monthly actuals with YTD cumulative</div>
                 </div>
                 {badge("revenue")}
               </div>
               <div className="nk26-canvas" style={{ height: 220 }}>
                 <canvas id="nk26-c-rev2" />
+              </div>
+            </div>
+            <div className="nk26-card">
+              <div className="nk26-chd">
+                <div>
+                  <div className="nk26-ctitle">Net income margin</div>
+                  <div className="nk26-csub">Target: ≥ 15%</div>
+                </div>
+                {badge("net_margin")}
+              </div>
+              <div className="nk26-canvas">
+                <canvas id="nk26-c-net-margin" />
+              </div>
+            </div>
+            <div className="nk26-card">
+              <div className="nk26-chd">
+                <div>
+                  <div className="nk26-ctitle">Revenue trend vs. prev month</div>
+                  <div className="nk26-csub">Month-over-month % change</div>
+                </div>
+                {badge("revenue_trend")}
+              </div>
+              <div className="nk26-canvas">
+                <canvas id="nk26-c-revenue-trend" />
               </div>
             </div>
             <div className="nk26-card">

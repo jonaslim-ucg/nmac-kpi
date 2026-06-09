@@ -1,0 +1,8 @@
+version,app_slug,release_summary,release_details,change_type,change_title
+v1.2.0,nmac-kpi,"Referral KPI from ARDTS, updated call metrics, and nursing KPI cleanup","The dashboard now includes a Referral KPI section with live data from ARDTS — monthly status counts, booking and completion rates, pipeline stages, and trend charts. Call performance KPIs now track total incoming, answered, and missed/abandoned calls. Nursing KPIs no longer include Annuals Supported (Nursing). The reporting month defaults to the last completed month.",new,"Referral KPI section in the NMAC master KPI navigation"
+v1.2.0,nmac-kpi,,,new,"Live ARDTS referral status counts by selected month"
+v1.2.0,nmac-kpi,,,new,"Referral trend charts — sent by month, booked vs needs action, status breakdown"
+v1.2.0,nmac-kpi,,,improved,"Call performance KPIs — Total Incoming, Answered, and Missed/Abandoned Calls"
+v1.2.0,nmac-kpi,,,improved,"Referral KPI layout — month tabs, balanced status cards, and period summary"
+v1.2.0,nmac-kpi,,,improved,"Removed Annuals Supported (Nursing) from Nursing KPIs"
+v1.2.0,nmac-kpi,,,improved,"Default reporting month opens on the last completed month"

@@ -1,0 +1,7 @@
+version,app_slug,release_summary,release_details,change_type,change_title
+v1.3.0,nmac-kpi,"New finance and scheduling KPIs, plus clearer revenue and lead labels","Finance and revenue now includes Net Income Margin, Revenue Trend vs. Prev Month, and a renamed Billed Revenue (Run-Rate) chart. Scheduling adds Appointment Confirmation Rate and Avg. Check-In to Check-Out, and Lead to Appointment Conversion replaces the old lead conversion name. Enter monthly values for the new KPIs under Administration - NMAC master.",new,"Net Income Margin on Finance and revenue"
+v1.3.0,nmac-kpi,,,new,"Revenue Trend vs. Prev Month on Finance and revenue"
+v1.3.0,nmac-kpi,,,new,"Appointment Confirmation Rate on Scheduling"
+v1.3.0,nmac-kpi,,,new,"Avg. Check-In to Check-Out on Scheduling"
+v1.3.0,nmac-kpi,,,improved,"Renamed Monthly Revenue ($) to Billed Revenue (Run-Rate)"
+v1.3.0,nmac-kpi,,,improved,"Renamed Lead Conversion Rate to Lead to Appointment Conversion"

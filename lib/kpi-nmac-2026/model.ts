@@ -52,7 +52,9 @@ export const KPIs: KpiRow[] = [
   { id: "leakage", label: "Revenue Leakage", unit: "%", target: 10, gate: false, domain: "Finance", higher: false },
   { id: "eod", label: "EOD Variances", unit: "", target: 0, gate: false, domain: "Finance", higher: false },
   { id: "ph", label: "PH-Generated Visits", unit: "", target: 190, gate: false, domain: "Scheduling", higher: true },
-  { id: "leads", label: "Lead Conversion Rate", unit: "%", target: 75, gate: false, domain: "Scheduling", higher: true },
+  { id: "leads", label: "Lead → Appointment Conversion", unit: "%", target: 75, gate: false, domain: "Scheduling", higher: true },
+  { id: "checkin_checkout", label: "Avg. Check-In → Check-Out", unit: " min", target: 30, gate: false, domain: "Scheduling", higher: false },
+  { id: "appt_confirm", label: "Appointment Confirmation Rate", unit: "%", target: 90, gate: false, domain: "Scheduling", higher: true },
   { id: "trich", label: "Trichology Productivity", unit: "%", target: 90, gate: true, domain: "Specialty", higher: true },
   { id: "ht", label: "Hair Transplant Prod.", unit: "%", target: 90, gate: true, domain: "Specialty", higher: true },
   { id: "fp", label: "Facial Plastics Bookings", unit: "", target: 20, gate: false, domain: "Specialty", higher: true },
@@ -62,7 +64,9 @@ export const KPIs: KpiRow[] = [
   { id: "survey", label: "Patient Survey Score", unit: "", target: 4.7, gate: false, domain: "Compliance", higher: true },
   { id: "sop", label: "SOP Compliance", unit: "%", target: 100, gate: false, domain: "Compliance", higher: true },
   { id: "engage", label: "Staff Engagement", unit: "%", target: 80, gate: false, domain: "Compliance", higher: true },
-  { id: "revenue", label: "Monthly Revenue ($)", unit: "$", target: 658333, gate: false, domain: "Finance", higher: true },
+  { id: "revenue", label: "Billed Revenue (Run-Rate)", unit: "$", target: 658333, gate: false, domain: "Finance", higher: true },
+  { id: "net_margin", label: "Net Income Margin", unit: "%", target: 15, gate: false, domain: "Finance", higher: true },
+  { id: "revenue_trend", label: "Revenue Trend vs. Prev Month", unit: "%", target: 0, gate: false, domain: "Finance", higher: true },
   { id: "bp_24hr", label: "24Hr Blood Pressure", unit: "", target: 25, gate: false, domain: "Nursing", higher: true },
   { id: "ecg", label: "ECG / EKG Completed", unit: "", target: 180, gate: false, domain: "Nursing", higher: true },
   { id: "random_sugars", label: "Random Blood Sugars", unit: "", target: 200, gate: false, domain: "Nursing", higher: true },
@@ -289,6 +293,7 @@ export function formatVal(kpi: KpiRow, val: number | null): string {
   if (val === null) return "–";
   if (kpi.unit === "$") return "$" + val.toLocaleString();
   if (kpi.unit === "%") return val + "%";
+  if (kpi.unit) return val.toLocaleString() + kpi.unit;
   return val.toLocaleString();
 }
 
@@ -335,6 +340,8 @@ const SEEDS: Seed[] = [
   { id: "eod", base: 0, variance: 0, gate: false, higher: false, target: 0 },
   { id: "ph", base: 190, variance: 12, gate: false, higher: true, target: 180 },
   { id: "leads", base: 75, variance: 5, gate: false, higher: true, target: 70 },
+  { id: "checkin_checkout", base: 28, variance: 4, gate: false, higher: false, target: 30 },
+  { id: "appt_confirm", base: 91, variance: 3, gate: false, higher: true, target: 90 },
   { id: "trich", base: 92, variance: 2, gate: true, higher: true, target: 90 },
   { id: "ht", base: 92, variance: 2, gate: true, higher: true, target: 90 },
   { id: "fp", base: 23, variance: 4, gate: false, higher: true, target: 20 },
@@ -345,6 +352,8 @@ const SEEDS: Seed[] = [
   { id: "sop", base: 100, variance: 0, gate: false, higher: true, target: 100 },
   { id: "engage", base: 83, variance: 3, gate: false, higher: true, target: 80 },
   { id: "revenue", base: 675000, variance: 22000, gate: false, higher: true, target: 658333 },
+  { id: "net_margin", base: 16.2, variance: 1.5, gate: false, higher: true, target: 15 },
+  { id: "revenue_trend", base: 2.5, variance: 4, gate: false, higher: true, target: 0 },
   { id: "bp_24hr", base: 25, variance: 8, gate: false, higher: true, target: 25 },
   { id: "ecg", base: 188, variance: 10, gate: false, higher: true, target: 180 },
   { id: "random_sugars", base: 240, variance: 45, gate: false, higher: true, target: 200 },

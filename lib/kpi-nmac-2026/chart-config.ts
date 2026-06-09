@@ -346,7 +346,7 @@ export function revenueChartConfig(
       datasets: [
         {
           type: "bar",
-          label: "Monthly Revenue",
+          label: "Billed Revenue (Run-Rate)",
           data: revData,
           backgroundColor:
             highlightMonth === undefined

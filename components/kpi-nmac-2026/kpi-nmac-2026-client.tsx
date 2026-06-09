@@ -91,6 +91,15 @@ const VIEW_MONTH_STATS: Partial<Record<Nk26View, string[]>> = {
   compliance: ["satisfaction", "feedback", "survey", "engage", "sop"],
 };
 
+function sectionStatsGridClass(count: number): string {
+  const base = "nk26-tab-content-enter nk26-stats";
+  if (count >= 6) return `${base} nk26-stats-cols-6`;
+  if (count === 5) return `${base} nk26-stats-cols-5`;
+  if (count === 4) return `${base} nk26-stats-cols-4`;
+  if (count === 3) return `${base} nk26-stats-cols-3`;
+  return base;
+}
+
 export function KpiNmac2026Client({ view }: Props) {
   const v: Nk26View = isNk26View(view) ? view : "overview";
   const { resolvedTheme } = useAppTheme();
@@ -558,7 +567,7 @@ export function KpiNmac2026Client({ view }: Props) {
           </header>
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
-          <div key={selectedMonth} className="nk26-tab-content-enter nk26-stats">
+          <div key={selectedMonth} className={sectionStatsGridClass(3)}>
             {visitsStats}
           </div>
           <div className="nk26-charts">
@@ -612,7 +621,7 @@ export function KpiNmac2026Client({ view }: Props) {
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
             {sectionMonthStats ? (
-              <div key={selectedMonth} className="nk26-tab-content-enter nk26-stats">
+              <div key={selectedMonth} className={sectionStatsGridClass(VIEW_MONTH_STATS[v]!.length)}>
                 {sectionMonthStats}
               </div>
             ) : null}
@@ -697,7 +706,7 @@ export function KpiNmac2026Client({ view }: Props) {
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
             {sectionMonthStats ? (
-              <div key={selectedMonth} className="nk26-tab-content-enter nk26-stats">
+              <div key={selectedMonth} className={sectionStatsGridClass(VIEW_MONTH_STATS[v]!.length)}>
                 {sectionMonthStats}
               </div>
             ) : null}
@@ -791,7 +800,7 @@ export function KpiNmac2026Client({ view }: Props) {
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
             {sectionMonthStats ? (
-              <div key={selectedMonth} className="nk26-tab-content-enter nk26-stats">
+              <div key={selectedMonth} className={sectionStatsGridClass(VIEW_MONTH_STATS[v]!.length)}>
                 {sectionMonthStats}
               </div>
             ) : null}
@@ -849,7 +858,7 @@ export function KpiNmac2026Client({ view }: Props) {
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
             {sectionMonthStats ? (
-              <div key={selectedMonth} className="nk26-tab-content-enter nk26-stats">
+              <div key={selectedMonth} className={sectionStatsGridClass(VIEW_MONTH_STATS[v]!.length)}>
                 {sectionMonthStats}
               </div>
             ) : null}
@@ -928,7 +937,7 @@ export function KpiNmac2026Client({ view }: Props) {
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
             {sectionMonthStats ? (
-              <div key={selectedMonth} className="nk26-tab-content-enter nk26-stats">
+              <div key={selectedMonth} className={sectionStatsGridClass(VIEW_MONTH_STATS[v]!.length)}>
                 {sectionMonthStats}
               </div>
             ) : null}
@@ -1015,7 +1024,7 @@ export function KpiNmac2026Client({ view }: Props) {
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
             {sectionMonthStats ? (
-              <div key={selectedMonth} className="nk26-tab-content-enter nk26-stats">
+              <div key={selectedMonth} className={sectionStatsGridClass(VIEW_MONTH_STATS[v]!.length)}>
                 {sectionMonthStats}
               </div>
             ) : null}

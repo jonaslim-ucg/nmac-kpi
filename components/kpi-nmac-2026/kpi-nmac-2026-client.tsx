@@ -85,7 +85,7 @@ type Props = { view: string };
 const VIEW_MONTH_STATS: Partial<Record<Nk26View, string[]>> = {
   scheduling: ["util", "noshow", "leads", "appt_confirm", "checkin_checkout", "ph"],
   finance: ["revenue", "net_margin", "revenue_trend", "copay", "leakage", "shop"],
-  calls: ["call_incoming", "call_answered", "call_missed"],
+  calls: ["callrate", "callvol", "call_incoming", "call_answered", "call_missed"],
   nursing: ["bp_24hr", "ecg", "random_sugars", "spiro"],
   specialty: ["trich", "ht", "fp", "wl"],
   compliance: ["satisfaction", "feedback", "survey", "engage", "sop"],
@@ -267,7 +267,7 @@ export function KpiNmac2026Client({ view }: Props) {
           simpleBar("nk26-c-overview-feedback", "feedback");
           simpleBar("nk26-c-visits", "visits");
           simpleBar("nk26-c-noshow", "noshow");
-          simpleBar("nk26-c-calls", "call_incoming");
+          simpleLine("nk26-c-calls", "callrate");
           simpleBar("nk26-c-revenue", "revenue");
           break;
         case "visits":
@@ -291,6 +291,8 @@ export function KpiNmac2026Client({ view }: Props) {
           simpleBar("nk26-c-shop", "shop");
           break;
         case "calls":
+          simpleLine("nk26-c-callrate", "callrate");
+          simpleBar("nk26-c-callvol", "callvol");
           simpleBar("nk26-c-call-incoming", "call_incoming");
           simpleBar("nk26-c-call-answered", "call_answered");
           simpleBar("nk26-c-call-missed", "call_missed");
@@ -531,10 +533,10 @@ export function KpiNmac2026Client({ view }: Props) {
             <div className="nk26-card">
               <div className="nk26-chd">
                 <div>
-                  <div className="nk26-ctitle">Total incoming calls</div>
-                  <div className="nk26-csub">Target: ≥ 300 / month</div>
+                  <div className="nk26-ctitle">Call answer rate</div>
+                  <div className="nk26-csub">Target: ≥ 90%</div>
                 </div>
-                {badge("call_incoming")}
+                {badge("callrate")}
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-calls" />
@@ -793,7 +795,7 @@ export function KpiNmac2026Client({ view }: Props) {
           <header className="nk26-page-head">
             <div className="nk26-section-title">Call performance</div>
             <div className="nk26-section-sub">
-              Incoming calls ≥ 300 / month · answered calls ≥ 270 · missed/abandoned ≤ 30
+              Call answer rate ≥ 90% · inbound calls ≥ 300 / month · incoming ≥ 300 · answered ≥ 270 · missed/abandoned ≤ 30
               <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>
@@ -805,6 +807,30 @@ export function KpiNmac2026Client({ view }: Props) {
               </div>
             ) : null}
             <div className="nk26-charts">
+            <div className="nk26-card">
+              <div className="nk26-chd">
+                <div>
+                  <div className="nk26-ctitle">Call answer rate</div>
+                  <div className="nk26-csub">Target: ≥ 90%</div>
+                </div>
+                {badge("callrate")}
+              </div>
+              <div className="nk26-canvas">
+                <canvas id="nk26-c-callrate" />
+              </div>
+            </div>
+            <div className="nk26-card">
+              <div className="nk26-chd">
+                <div>
+                  <div className="nk26-ctitle">Inbound call volume</div>
+                  <div className="nk26-csub">Target: ≥ 300 / month</div>
+                </div>
+                {badge("callvol")}
+              </div>
+              <div className="nk26-canvas">
+                <canvas id="nk26-c-callvol" />
+              </div>
+            </div>
             <div className="nk26-card">
               <div className="nk26-chd">
                 <div>

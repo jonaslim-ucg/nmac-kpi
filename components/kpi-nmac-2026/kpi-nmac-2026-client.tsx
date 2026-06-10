@@ -85,7 +85,7 @@ type Props = { view: string };
 const VIEW_MONTH_STATS: Partial<Record<Nk26View, string[]>> = {
   scheduling: ["util", "noshow", "leads", "appt_confirm", "checkin_checkout", "ph"],
   finance: ["revenue", "net_margin", "revenue_trend", "copay", "leakage", "shop"],
-  calls: ["callrate", "callvol", "call_incoming", "call_answered", "call_missed"],
+  calls: ["callrate", "callvol", "call_answered", "call_missed"],
   nursing: ["bp_24hr", "ecg", "random_sugars", "spiro"],
   specialty: ["trich", "ht", "fp", "wl"],
   compliance: ["satisfaction", "feedback", "survey", "engage", "sop"],
@@ -293,7 +293,6 @@ export function KpiNmac2026Client({ view }: Props) {
         case "calls":
           simpleLine("nk26-c-callrate", "callrate");
           simpleBar("nk26-c-callvol", "callvol");
-          simpleBar("nk26-c-call-incoming", "call_incoming");
           simpleBar("nk26-c-call-answered", "call_answered");
           simpleBar("nk26-c-call-missed", "call_missed");
           break;
@@ -795,7 +794,7 @@ export function KpiNmac2026Client({ view }: Props) {
           <header className="nk26-page-head">
             <div className="nk26-section-title">Call performance</div>
             <div className="nk26-section-sub">
-              Call answer rate ≥ 90% · inbound calls ≥ 300 / month · incoming ≥ 300 · answered ≥ 270 · missed/abandoned ≤ 30
+              Call answer rate ≥ 90% · inbound calls ≥ 300 / month · answered ≥ 270 · missed/abandoned ≤ 30
               <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>
@@ -829,18 +828,6 @@ export function KpiNmac2026Client({ view }: Props) {
               </div>
               <div className="nk26-canvas">
                 <canvas id="nk26-c-callvol" />
-              </div>
-            </div>
-            <div className="nk26-card">
-              <div className="nk26-chd">
-                <div>
-                  <div className="nk26-ctitle">Total incoming calls</div>
-                  <div className="nk26-csub">Target: ≥ 300 / month</div>
-                </div>
-                {badge("call_incoming")}
-              </div>
-              <div className="nk26-canvas">
-                <canvas id="nk26-c-call-incoming" />
               </div>
             </div>
             <div className="nk26-card">

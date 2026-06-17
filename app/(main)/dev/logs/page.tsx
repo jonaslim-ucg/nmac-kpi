@@ -145,7 +145,7 @@ export default function DevLogsPage() {
   }
 
   return (
-    <MainShell title="Logs" subtitle="Developer notes and debug entries">
+    <MainShell title="Logs" subtitle="Automatic activity log and manual dev notes">
       <Snackbar
         message={snackbar?.text ?? null}
         variant={snackbar?.variant ?? "success"}
@@ -159,9 +159,9 @@ export default function DevLogsPage() {
               <ScrollText className="h-5 w-5" strokeWidth={1.75} aria-hidden />
             </span>
             <div className="min-w-0 pt-0.5">
-              <h2 className="text-base font-semibold tracking-tight text-foreground">Add log</h2>
+              <h2 className="text-base font-semibold tracking-tight text-foreground">Add note</h2>
               <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                Record debug notes, incidents, or things to follow up on. Visible to dev role only.
+                Sign-ins, KPI saves, and admin changes are recorded automatically. You can also add manual notes below.
               </p>
             </div>
           </div>
@@ -214,7 +214,7 @@ export default function DevLogsPage() {
         <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
           <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border bg-surface-muted/40 px-5 py-4">
             <div>
-              <h2 className="text-base font-semibold tracking-tight text-foreground">Recent logs</h2>
+              <h2 className="text-base font-semibold tracking-tight text-foreground">Activity log</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {loadingList ? "" : `${rows.length} ${rows.length === 1 ? "entry" : "entries"}`}
               </p>

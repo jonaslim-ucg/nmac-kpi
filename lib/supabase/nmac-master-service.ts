@@ -1,6 +1,22 @@
 import { emptyNmacMonthDbs, normalizeKpiPoint, type MonthDb } from "@/lib/kpi-nmac-2026/model";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
+async function postNmacMaster(body: Record<string, unknown>): Promise<{ error?: string }> {
+  try {
+    const r = await fetch("/api/kpi/nmac-master", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const j = (await r.json()) as { error?: string };
+    if (!r.ok) return { error: j.error ?? "Could not save." };
+    return {};
+  } catch {
+    return { error: "Could not save." };
+  }
+}
+
 type MonthlyRow = { month_index: number; values: Record<string, unknown> | null };
 
 function normalizeMonthValues(raw: Record<string, unknown> | null | undefined): MonthDb {
@@ -41,19 +57,5 @@ export async function upsertNmacMasterMonth(
   monthIndex: number,
   values: MonthDb,
 ): Promise<{ error?: string }> {
-  const supabase = getSupabaseBrowserClient();
-  if (!supabase) return { error: "Data connection is not available." };
-
-  const { error } = await supabase.from("nmac_master_monthly").upsert(
-    {
-      year,
-      month_index: monthIndex,
-      values,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "year,month_index" },
-  );
-
-  if (error) return { error: error.message };
-  return {};
+  return postNmacMaster({ action: "month", year, monthIndex, values });
 }

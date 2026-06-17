@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { auditRoleNmacNavUpdated } from "@/lib/dev/audit-log";
 import { getAppDashboardSettings, updateAppDashboardSettings } from "@/lib/auth/app-settings";
-import { normalizeRoleNmacNavAccess } from "@/lib/auth/role-nmac-nav";
+import { configurableRolesForNmacNav, normalizeRoleNmacNavAccess } from "@/lib/auth/role-nmac-nav";
+import type { AppRole } from "@/lib/auth/types";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { canManageUsers } from "@/lib/auth/types";
 export const dynamic = "force-dynamic";
@@ -73,9 +75,22 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "No valid fields to update." }, { status: 400 });
   }
 
+  const previousSettings = wantsRoleNav ? await getAppDashboardSettings() : null;
+
   const settings = await updateAppDashboardSettings(input);
   if (!settings) {
     return NextResponse.json({ error: "Could not save settings." }, { status: 500 });
+  }
+
+  if (input.roleNmacNav !== undefined && previousSettings) {
+    const changedRoles = configurableRolesForNmacNav().filter((role) => {
+      const before = JSON.stringify(previousSettings.roleNmacNav[role] ?? null);
+      const after = JSON.stringify(settings.roleNmacNav[role] ?? null);
+      return before !== after;
+    }) as AppRole[];
+    if (changedRoles.length > 0) {
+      auditRoleNmacNavUpdated({ email: session.email, role: session.role }, { roles: changedRoles });
+    }
   }
 
   return NextResponse.json({

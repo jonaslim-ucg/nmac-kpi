@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditAdminUserRemoved, auditAdminUserUpdated } from "@/lib/dev/audit-log";
 import { isValidEmailFormat } from "@/lib/auth/email-policy";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { normalizePersonName } from "@/lib/auth/name-normalize";
@@ -29,7 +30,11 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
   const supabase = createServiceRoleClient();
 
-  const { data: target } = await supabase.from("app_users").select("id,role").eq("id", id).maybeSingle();
+  const { data: target } = await supabase
+    .from("app_users")
+    .select("id,role,email,first_name,last_name")
+    .eq("id", id)
+    .maybeSingle();
   if (!target) {
     return NextResponse.json({ error: "User not found." }, { status: 404 });
   }
@@ -95,6 +100,18 @@ export async function PATCH(req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "Could not update user." }, { status: 500 });
   }
 
+  const changes: Record<string, unknown> = {};
+  if (updates.role !== undefined && updates.role !== target.role) changes.role = updates.role;
+  if (updates.email !== undefined && updates.email !== target.email) changes.email = updates.email;
+  if ("first_name" in updates && updates.first_name !== target.first_name) changes.first_name = updates.first_name;
+  if ("last_name" in updates && updates.last_name !== target.last_name) changes.last_name = updates.last_name;
+  if (Object.keys(changes).length > 0) {
+    auditAdminUserUpdated(
+      { email: session.email, role: session.role },
+      { email: (data.email as string) ?? (target.email as string), changes },
+    );
+  }
+
   return NextResponse.json({ user: data });
 }
 
@@ -136,6 +153,8 @@ export async function DELETE(_req: Request, ctx: Ctx) {
     console.error(error);
     return NextResponse.json({ error: "Could not remove user." }, { status: 500 });
   }
+
+  auditAdminUserRemoved({ email: session.email, role: session.role }, { email });
 
   return NextResponse.json({ ok: true });
 }

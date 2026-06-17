@@ -2,6 +2,22 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const TARGET_MONTHS_TABLE = "nmac_master_target_months";
 
+async function postNmacMaster(body: Record<string, unknown>): Promise<{ error?: string }> {
+  try {
+    const r = await fetch("/api/kpi/nmac-master", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const j = (await r.json()) as { error?: string };
+    if (!r.ok) return { error: j.error ?? "Could not save." };
+    return {};
+  } catch {
+    return { error: "Could not save." };
+  }
+}
+
 function missingTargetMonthsTableMessage(): string {
   return `Table public.${TARGET_MONTHS_TABLE} is missing. Run supabase/nmac-master-target-months.sql in the Supabase SQL Editor, then reload.`;
 }
@@ -63,20 +79,7 @@ export async function upsertNmacTargets(
   year: number,
   values: Record<string, number>,
 ): Promise<{ error?: string }> {
-  const supabase = getSupabaseBrowserClient();
-  if (!supabase) return { error: "Data connection is not available." };
-
-  const { error } = await supabase.from("nmac_master_targets").upsert(
-    {
-      year,
-      values,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "year" },
-  );
-
-  if (error) return { error: error.message };
-  return {};
+  return postNmacMaster({ action: "targets", year, values });
 }
 
 export async function upsertNmacTargetMonth(
@@ -84,37 +87,9 @@ export async function upsertNmacTargetMonth(
   monthIndex: number,
   values: Record<string, number>,
 ): Promise<{ error?: string }> {
-  const supabase = getSupabaseBrowserClient();
-  if (!supabase) return { error: "Data connection is not available." };
-
-  const { error } = await supabase.from(TARGET_MONTHS_TABLE).upsert(
-    {
-      year,
-      month_index: monthIndex,
-      values,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "year,month_index" },
-  );
-
-  if (error) {
-    return {
-      error: isMissingTargetMonthsTableError(error.message) ? missingTargetMonthsTableMessage() : error.message,
-    };
-  }
-  return {};
+  return postNmacMaster({ action: "target_month", year, monthIndex, values });
 }
 
 export async function deleteNmacTargetMonth(year: number, monthIndex: number): Promise<{ error?: string }> {
-  const supabase = getSupabaseBrowserClient();
-  if (!supabase) return { error: "Data connection is not available." };
-
-  const { error } = await supabase.from(TARGET_MONTHS_TABLE).delete().eq("year", year).eq("month_index", monthIndex);
-
-  if (error) {
-    return {
-      error: isMissingTargetMonthsTableError(error.message) ? missingTargetMonthsTableMessage() : error.message,
-    };
-  }
-  return {};
+  return postNmacMaster({ action: "delete_target_month", year, monthIndex });
 }

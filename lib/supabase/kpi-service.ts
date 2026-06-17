@@ -2,6 +2,8 @@ import type { KpiDefinition, KpiUnit, WeeklyRow } from "@/lib/kpi/types";
 import { formatWeekLabel } from "@/lib/kpi/week-label";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
+export { upsertWeeklyRows } from "@/lib/supabase/kpi-service-write";
+
 type KpiDefinitionRow = {
   id: string | number;
   slug: string;
@@ -73,26 +75,3 @@ export async function fetchWeeklyRows(
   return { data: mapped };
 }
 
-export async function upsertWeeklyRows(
-  kpiSlug: string,
-  year: number,
-  rows: WeeklyRow[],
-): Promise<{ error?: string }> {
-  const supabase = getSupabaseBrowserClient();
-  if (!supabase) return { error: "Data connection is not available." };
-
-  const payload = rows.map((row) => ({
-    kpi_slug: kpiSlug,
-    year,
-    week_index: row.weekIndex,
-    this_year: row.thisYear,
-    last_year: row.lastYear,
-  }));
-
-  const { error } = await supabase
-    .from("kpi_weekly_values")
-    .upsert(payload, { onConflict: "kpi_slug,year,week_index" });
-
-  if (error) return { error: error.message };
-  return {};
-}

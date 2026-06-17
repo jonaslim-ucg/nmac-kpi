@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditAuthSignedIn } from "@/lib/dev/audit-log";
 import { establishSessionForEmail } from "@/lib/auth/establish-session";
 import { verifyOtp } from "@/lib/auth/otp";
 import { applySessionCookie } from "@/lib/auth/session-cookie";
@@ -72,5 +73,6 @@ export async function POST(req: Request) {
     user: { email: session.user.email, role: session.user.role },
   });
   applySessionCookie(res, session.token);
+  auditAuthSignedIn({ email: session.user.email, role: session.user.role }, "email_otp");
   return res;
 }

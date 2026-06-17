@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditAdminUserAdded } from "@/lib/dev/audit-log";
 import { isValidEmailFormat } from "@/lib/auth/email-policy";
 import { normalizePersonName } from "@/lib/auth/name-normalize";
 import { getSessionFromCookies } from "@/lib/auth/session";
@@ -61,6 +62,11 @@ export async function POST(req: Request) {
     console.error(error);
     return NextResponse.json({ error: "Could not save user." }, { status: 500 });
   }
+
+  auditAdminUserAdded(
+    { email: session.email, role: session.role },
+    { email: data.email as string, role: data.role as AppRole },
+  );
 
   return NextResponse.json({ user: data });
 }

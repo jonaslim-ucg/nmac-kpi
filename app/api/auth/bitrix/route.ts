@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditAuthSignedIn } from "@/lib/dev/audit-log";
 import { establishSessionForEmails } from "@/lib/auth/establish-session";
 import { applySessionCookie } from "@/lib/auth/session-cookie";
 import { fetchBitrixUserCurrent } from "@/lib/bitrix/integration-rest";
@@ -89,5 +90,10 @@ export async function POST(req: Request) {
     displayName: bx.user.displayName,
   });
   applySessionCookie(res, session.token, embedded);
+  auditAuthSignedIn(
+    { email: session.user.email, role: session.user.role },
+    "bitrix",
+    { portal: domain, displayName: bx.user.displayName },
+  );
   return res;
 }

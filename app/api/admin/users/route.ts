@@ -3,7 +3,7 @@ import { isValidEmailFormat } from "@/lib/auth/email-policy";
 import { normalizePersonName } from "@/lib/auth/name-normalize";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import type { AppRole } from "@/lib/auth/types";
-import { canManageUsers } from "@/lib/auth/types";
+import { canManageUsers, isAppRole } from "@/lib/auth/types";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export async function GET() {
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
   if (!isValidEmailFormat(emailRaw)) {
     return NextResponse.json({ error: "Invalid email." }, { status: 400 });
   }
-  if (role !== "viewer" && role !== "editor" && role !== "admin") {
+  if (!isAppRole(role)) {
     return NextResponse.json({ error: "Invalid role." }, { status: 400 });
   }
 

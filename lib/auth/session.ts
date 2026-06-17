@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { AppRole } from "@/lib/auth/types";
+import { isAppRole } from "@/lib/auth/types";
 
 export const SESSION_COOKIE_NAME = "nmac_session";
 
@@ -37,7 +38,7 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
     const email = typeof payload.email === "string" ? payload.email : null;
     const role = payload.role as AppRole | undefined;
     if (!sub || !email || !role) return null;
-    if (role !== "viewer" && role !== "editor" && role !== "admin") return null;
+    if (!isAppRole(role)) return null;
     return { sub, email, role };
   } catch {
     return null;
@@ -57,7 +58,7 @@ export async function verifySessionTokenEdge(
     const email = typeof payload.email === "string" ? payload.email : null;
     const role = payload.role as AppRole | undefined;
     if (!sub || !email || !role) return null;
-    if (role !== "viewer" && role !== "editor" && role !== "admin") return null;
+    if (!isAppRole(role)) return null;
     return { sub, email, role };
   } catch {
     return null;

@@ -6,7 +6,7 @@ import { AppBrand } from "@/components/dashboard/app-logo";
 import { SIDEBAR_SECTIONS } from "@/components/dashboard/nmac-2026-nav";
 import { useSession } from "@/components/auth/session-provider";
 import { formatDisplayName } from "@/lib/auth/display-name";
-import { canEditKpiData, canManageUsers } from "@/lib/auth/types";
+import { canAccessDev, canEditKpiData, canManageUsers } from "@/lib/auth/types";
 import { useDashboardPreferences } from "@/components/auth/dashboard-preferences-provider";
 import { isNmacNavHrefAllowed } from "@/lib/auth/role-nmac-nav";
 
@@ -16,6 +16,7 @@ function linkActive(pathname: string, href: string): boolean {
   }
   if (href === "/admin") return pathname === "/admin";
   if (href.startsWith("/admin/")) return pathname === href || pathname.startsWith(href + "/");
+  if (href.startsWith("/dev/")) return pathname === href || pathname.startsWith(href + "/");
   if (href.startsWith("/nmac-2026")) {
     if (href === "/nmac-2026") return pathname === "/nmac-2026" || pathname === "/nmac-2026/";
     return pathname === href;
@@ -41,6 +42,9 @@ export function AppSidebar() {
         }
         if ("requireDataEntry" in item && item.requireDataEntry) {
           return !loading && canEditKpiData(user?.role);
+        }
+        if ("requireDev" in item && item.requireDev) {
+          return !loading && canAccessDev(user?.role);
         }
         if ("requireAdmin" in item && item.requireAdmin) {
           return !loading && canManageUsers(user?.role);

@@ -52,7 +52,7 @@ create table if not exists public.app_users (
   email text unique not null,
   first_name text,
   last_name text,
-  role text not null check (role in ('viewer', 'editor', 'admin')),
+  role text not null check (role in ('viewer', 'editor', 'admin', 'dev')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

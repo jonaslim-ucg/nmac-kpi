@@ -3,7 +3,7 @@ import { isValidEmailFormat } from "@/lib/auth/email-policy";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { normalizePersonName } from "@/lib/auth/name-normalize";
 import type { AppRole } from "@/lib/auth/types";
-import { canManageUsers } from "@/lib/auth/types";
+import { canManageUsers, isAppRole } from "@/lib/auth/types";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -40,7 +40,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
   if (body.role !== undefined) {
     const role = body.role as AppRole;
-    if (role !== "viewer" && role !== "editor" && role !== "admin") {
+    if (!isAppRole(role)) {
       return NextResponse.json({ error: "Invalid role." }, { status: 400 });
     }
     if (session.sub === id && target.role === "admin" && role !== "admin") {

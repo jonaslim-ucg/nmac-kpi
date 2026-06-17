@@ -68,7 +68,8 @@ export async function middleware(request: NextRequest) {
     }
 
     const denyUsers = pathname.startsWith("/admin/users") && session.role !== "admin";
-    const res = denyUsers
+    const denyDev = pathname.startsWith("/dev") && session.role !== "dev";
+    const res = denyUsers || denyDev
       ? NextResponse.redirect(new URL("/nmac-2026", request.url))
       : NextResponse.next();
 

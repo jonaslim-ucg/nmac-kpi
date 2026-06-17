@@ -8,6 +8,7 @@ import {
   HeartPulse,
   LayoutDashboard,
   Phone,
+  ScrollText,
   Settings,
   Share2,
   Stethoscope,
@@ -22,6 +23,7 @@ export type SidebarLink = {
   icon: LucideIcon;
   requireDataEntry?: boolean;
   requireAdmin?: boolean;
+  requireDev?: boolean;
   /** Weekly KPIs / legacy admin entry — hidden when “Hide legacy navigation” is on in Settings. */
   legacy?: boolean;
 };
@@ -70,5 +72,9 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
       { href: "/admin/users", label: "Users", icon: Users, requireAdmin: true },
       { href: "/settings", label: "Settings", icon: Settings },
     ],
+  },
+  {
+    title: "Dev",
+    items: [{ href: "/dev/logs", label: "Logs", icon: ScrollText, requireDev: true }],
   },
 ];

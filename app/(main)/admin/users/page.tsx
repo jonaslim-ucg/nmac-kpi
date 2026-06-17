@@ -19,7 +19,7 @@ type Row = {
   updated_at: string;
 };
 
-const ROLES: AppRole[] = ["viewer", "editor", "admin"];
+const ROLES: AppRole[] = ["viewer", "editor", "admin", "dev"];
 
 const inputClass =
   "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground transition placeholder:text-muted-foreground/60 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent disabled:opacity-50";

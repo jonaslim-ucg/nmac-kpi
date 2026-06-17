@@ -16,6 +16,7 @@ function linkActive(pathname: string, href: string): boolean {
   }
   if (href === "/admin") return pathname === "/admin";
   if (href.startsWith("/admin/")) return pathname === href || pathname.startsWith(href + "/");
+  if (href === "/dev") return pathname === "/dev";
   if (href.startsWith("/dev/")) return pathname === href || pathname.startsWith(href + "/");
   if (href.startsWith("/nmac-2026")) {
     if (href === "/nmac-2026") return pathname === "/nmac-2026" || pathname === "/nmac-2026/";

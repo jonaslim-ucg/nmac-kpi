@@ -8,6 +8,7 @@ export type AppDashboardSettings = {
   useNmacTestData: boolean;
   nmacMonthCacheRevision: number;
   roleNmacNav: RoleNmacNavAccess;
+  maintenanceMode: boolean;
 };
 
 type SettingsRow = {
@@ -15,6 +16,7 @@ type SettingsRow = {
   use_nmac_test_data: boolean;
   nmac_month_cache_revision: number | string;
   role_nmac_nav?: unknown;
+  maintenance_mode?: boolean;
 };
 
 function rowToSettings(row: SettingsRow): AppDashboardSettings {
@@ -23,6 +25,7 @@ function rowToSettings(row: SettingsRow): AppDashboardSettings {
     useNmacTestData: row.use_nmac_test_data !== false,
     nmacMonthCacheRevision: Number(row.nmac_month_cache_revision) || 0,
     roleNmacNav: normalizeRoleNmacNavAccess(row.role_nmac_nav),
+    maintenanceMode: row.maintenance_mode === true,
   };
 }
 
@@ -30,7 +33,7 @@ export async function getAppDashboardSettings(): Promise<AppDashboardSettings | 
   const supabase = createServiceRoleClient();
   const { data, error } = await supabase
     .from("app_settings")
-    .select("hide_legacy_nav,use_nmac_test_data,nmac_month_cache_revision,role_nmac_nav")
+    .select("hide_legacy_nav,use_nmac_test_data,nmac_month_cache_revision,role_nmac_nav,maintenance_mode")
     .eq("id", APP_SETTINGS_ID)
     .maybeSingle();
 
@@ -43,6 +46,7 @@ export type UpdateAppDashboardSettingsInput = {
   useNmacTestData?: boolean;
   bumpNmacMonthCacheRevision?: boolean;
   roleNmacNav?: RoleNmacNavAccess;
+  maintenanceMode?: boolean;
 };
 
 export async function updateAppDashboardSettings(
@@ -63,12 +67,15 @@ export async function updateAppDashboardSettings(
   if (input.roleNmacNav !== undefined) {
     patch.role_nmac_nav = input.roleNmacNav;
   }
+  if (input.maintenanceMode !== undefined) {
+    patch.maintenance_mode = input.maintenanceMode;
+  }
 
   const { data, error } = await supabase
     .from("app_settings")
     .update(patch)
     .eq("id", APP_SETTINGS_ID)
-    .select("hide_legacy_nav,use_nmac_test_data,nmac_month_cache_revision,role_nmac_nav")
+    .select("hide_legacy_nav,use_nmac_test_data,nmac_month_cache_revision,role_nmac_nav,maintenance_mode")
     .single();
 
   if (error || !data) return null;

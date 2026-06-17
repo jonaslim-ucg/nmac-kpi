@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { lookupAppUserByEmail, NO_APP_ACCESS_MESSAGE } from "@/lib/auth/app-user-access";
 import { isEmailDomainAllowed, isValidEmailFormat } from "@/lib/auth/email-policy";
+import { getMaintenanceBlockForRole } from "@/lib/auth/maintenance-mode";
 import { generateOtpCode, hashOtpForStorage } from "@/lib/auth/otp";
 import { sendMailViaGraph } from "@/lib/graph/send-mail";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
@@ -20,6 +21,11 @@ export async function POST(req: Request) {
     const registered = await lookupAppUserByEmail(email);
     if (!registered) {
       return NextResponse.json({ ok: false, message: NO_APP_ACCESS_MESSAGE }, { status: 403 });
+    }
+
+    const maintenance = await getMaintenanceBlockForRole(registered.role);
+    if (maintenance.blocked) {
+      return NextResponse.json({ ok: false, message: maintenance.message, maintenance: true }, { status: 503 });
     }
 
     const secret = process.env.AUTH_SECRET;

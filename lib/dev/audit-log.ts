@@ -194,3 +194,13 @@ export function auditRoleNmacNavUpdated(actor: AuditActor, input: { roles: AppRo
     context: { role: actor.role, updatedRoles: input.roles },
   });
 }
+
+export function auditMaintenanceModeUpdated(actor: AuditActor, input: { enabled: boolean }) {
+  fire({
+    level: input.enabled ? "warn" : "info",
+    source: "admin.access",
+    message: input.enabled ? "Enabled maintenance mode" : "Disabled maintenance mode",
+    createdByEmail: actor.email,
+    context: { role: actor.role, maintenanceMode: input.enabled },
+  });
+}

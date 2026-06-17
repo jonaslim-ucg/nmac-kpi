@@ -12,6 +12,7 @@ type Step = "email" | "code";
 export default function LoginPage() {
   const router = useRouter();
   const [accessDenied, setAccessDenied] = useState(false);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [showOtpForm, setShowOtpForm] = useState(false);
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
@@ -25,9 +26,12 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    const denied = new URLSearchParams(window.location.search).get("access") === "denied";
+    const params = new URLSearchParams(window.location.search);
+    const denied = params.get("access") === "denied";
+    const maintenance = params.get("maintenance") === "1";
     setAccessDenied(denied);
-    if (denied) {
+    setMaintenanceMode(maintenance);
+    if (denied || maintenance) {
       setShowOtpForm(false);
       return;
     }
@@ -94,12 +98,19 @@ export default function LoginPage() {
         </div>
 
         {!showOtpForm ? (
-          <BitrixAutoSignIn onFallback={onBitrixFallback} allowOtpFallback={!accessDenied} />
+          <BitrixAutoSignIn onFallback={onBitrixFallback} allowOtpFallback={!accessDenied && !maintenanceMode} />
         ) : accessDenied ? (
           <div className="py-2">
             <p className="text-lg font-semibold tracking-tight text-foreground">Access not available</p>
             <p className="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">
               {NO_APP_ACCESS_MESSAGE}
+            </p>
+          </div>
+        ) : maintenanceMode ? (
+          <div className="py-2">
+            <p className="text-lg font-semibold tracking-tight text-foreground">Under maintenance</p>
+            <p className="mt-3 text-sm text-muted-foreground">
+              NMAC KPI is temporarily unavailable. Only administrators and developers can sign in right now.
             </p>
           </div>
         ) : (

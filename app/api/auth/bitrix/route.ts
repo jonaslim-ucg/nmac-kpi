@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auditAuthSignedIn } from "@/lib/dev/audit-log";
 import { establishSessionForEmails } from "@/lib/auth/establish-session";
+import { getMaintenanceBlockForRole } from "@/lib/auth/maintenance-mode";
 import { applySessionCookie } from "@/lib/auth/session-cookie";
 import { fetchBitrixUserCurrent } from "@/lib/bitrix/integration-rest";
 import { isPortalAllowedByEnv, isValidBitrixPortalDomain, normalizePortalDomain } from "@/lib/bitrix/portal";
@@ -82,6 +83,11 @@ export async function POST(req: Request) {
   const session = await establishSessionForEmails(bx.user.emails);
   if (!session.ok) {
     return NextResponse.json({ ok: false, message: session.message }, { status: session.status });
+  }
+
+  const maintenance = await getMaintenanceBlockForRole(session.user.role);
+  if (maintenance.blocked) {
+    return NextResponse.json({ ok: false, message: maintenance.message, maintenance: true }, { status: 503 });
   }
 
   const res = NextResponse.json({

@@ -15,6 +15,7 @@ import {
   UserCog,
   Users,
   Wallet,
+  Wrench,
 } from "lucide-react";
 
 export type SidebarLink = {
@@ -75,6 +76,9 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
   },
   {
     title: "Dev",
-    items: [{ href: "/dev/logs", label: "Activity", icon: ScrollText, requireDev: true }],
+    items: [
+      { href: "/dev", label: "Maintenance", icon: Wrench, requireDev: true },
+      { href: "/dev/logs", label: "Activity", icon: ScrollText, requireDev: true },
+    ],
   },
 ];

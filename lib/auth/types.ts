@@ -16,3 +16,7 @@ export function canManageUsers(role: AppRole | null | undefined): boolean {
 export function canAccessDev(role: AppRole | null | undefined): boolean {
   return role === "dev";
 }
+
+export function canBypassMaintenance(role: AppRole | null | undefined): boolean {
+  return role === "admin" || role === "dev";
+}

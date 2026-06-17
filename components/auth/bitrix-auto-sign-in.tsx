@@ -54,10 +54,15 @@ export function BitrixAutoSignIn({
             embedded: true,
           }),
         });
-        const j = (await res.json()) as { ok?: boolean; message?: string };
+        const j = (await res.json()) as { ok?: boolean; message?: string; maintenance?: boolean };
         if (cancelled) return;
 
         if (!res.ok || !j.ok) {
+          if (res.status === 503 && j.maintenance && j.message) {
+            setDeniedMessage(j.message);
+            setPhase("denied");
+            return;
+          }
           if (res.status === 403 && j.message) {
             setDeniedMessage(j.message);
             setPhase("denied");

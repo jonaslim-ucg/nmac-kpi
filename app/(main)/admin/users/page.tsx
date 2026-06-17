@@ -3,6 +3,7 @@
 import { Loader2, MoreVertical, UserPlus, Users } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent, type MouseEvent } from "react";
 import { MainShell } from "@/components/dashboard/main-shell";
+import { RoleNmacNavEditor } from "@/components/admin/role-nmac-nav-editor";
 import { useSession } from "@/components/auth/session-provider";
 import { Snackbar, type SnackbarVariant } from "@/components/ui/snackbar";
 import type { AppRole } from "@/lib/auth/types";
@@ -582,6 +583,10 @@ export default function AdminUsersPage() {
               </table>
             </div>
           )}
+        </section>
+
+        <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
+          <RoleNmacNavEditor onSaved={(text) => show(text, "success")} onError={(text) => show(text, "error")} />
         </section>
       </div>
 

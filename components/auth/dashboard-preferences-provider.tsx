@@ -11,6 +11,8 @@ import {
 import { useSession } from "@/components/auth/session-provider";
 import { canManageUsers } from "@/lib/auth/types";
 import type { AppDashboardSettings } from "@/lib/auth/app-settings";
+import type { AppRole } from "@/lib/auth/types";
+import type { NmacNavViewId, RoleNmacNavAccess } from "@/lib/auth/role-nmac-nav";
 import {
   applySyncedDashboardPrefs,
   clearNmacMonthlyLocalCacheOnly,
@@ -29,8 +31,10 @@ type Ctx = {
   canClearCache: boolean;
   hideLegacyNav: boolean;
   useNmacTestData: boolean;
+  roleNmacNav: RoleNmacNavAccess;
   setHideLegacyNav: (next: boolean) => Promise<void>;
   setUseNmacTestData: (next: boolean) => Promise<void>;
+  setRoleNmacNavForRole: (role: AppRole, viewIds: NmacNavViewId[] | null) => Promise<void>;
   clearNmacMonthCache: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -76,6 +80,7 @@ export function DashboardPreferencesProvider({ children }: { children: React.Rea
   const [canClearCache, setCanClearCache] = useState(false);
   const [hideLegacyNav, setHideLegacyNavState] = useState(false);
   const [useNmacTestData, setUseNmacTestDataState] = useState(true);
+  const [roleNmacNav, setRoleNmacNavState] = useState<RoleNmacNavAccess>({});
 
   const applyServerPrefs = useCallback((prefs: AppDashboardSettings) => {
     applySyncedDashboardPrefs(prefs);
@@ -83,6 +88,7 @@ export function DashboardPreferencesProvider({ children }: { children: React.Rea
     writeLegacyLocalPrefs(prefs.hideLegacyNav, prefs.useNmacTestData);
     setHideLegacyNavState(prefs.hideLegacyNav);
     setUseNmacTestDataState(prefs.useNmacTestData);
+    setRoleNmacNavState(prefs.roleNmacNav);
     dispatchPrefs();
   }, []);
 
@@ -175,6 +181,21 @@ export function DashboardPreferencesProvider({ children }: { children: React.Rea
     [canEdit, persist],
   );
 
+  const setRoleNmacNavForRole = useCallback(
+    async (role: AppRole, viewIds: NmacNavViewId[] | null) => {
+      if (!canEdit) return;
+      const next: RoleNmacNavAccess = { ...roleNmacNav };
+      if (!viewIds || viewIds.length === 0) {
+        delete next[role];
+      } else {
+        next[role] = viewIds;
+      }
+      setRoleNmacNavState(next);
+      await persist({ role_nmac_nav: next });
+    },
+    [canEdit, persist, roleNmacNav],
+  );
+
   const clearNmacMonthCache = useCallback(async () => {
     if (!canClearCache) return;
     const res = await patchPreferences({ clear_nmac_month_cache: true });
@@ -196,8 +217,10 @@ export function DashboardPreferencesProvider({ children }: { children: React.Rea
       canClearCache,
       hideLegacyNav,
       useNmacTestData,
+      roleNmacNav,
       setHideLegacyNav,
       setUseNmacTestData,
+      setRoleNmacNavForRole,
       clearNmacMonthCache,
       refresh,
     }),
@@ -207,8 +230,10 @@ export function DashboardPreferencesProvider({ children }: { children: React.Rea
       canClearCache,
       hideLegacyNav,
       useNmacTestData,
+      roleNmacNav,
       setHideLegacyNav,
       setUseNmacTestData,
+      setRoleNmacNavForRole,
       clearNmacMonthCache,
       refresh,
     ],

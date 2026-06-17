@@ -8,6 +8,7 @@ import { useSession } from "@/components/auth/session-provider";
 import { formatDisplayName } from "@/lib/auth/display-name";
 import { canEditKpiData, canManageUsers } from "@/lib/auth/types";
 import { useDashboardPreferences } from "@/components/auth/dashboard-preferences-provider";
+import { isNmacNavHrefAllowed } from "@/lib/auth/role-nmac-nav";
 
 function linkActive(pathname: string, href: string): boolean {
   if (href === "/practice/weekly") {
@@ -25,7 +26,7 @@ function linkActive(pathname: string, href: string): boolean {
 export function AppSidebar() {
   const pathname = usePathname();
   const { user, loading } = useSession();
-  const { hideLegacyNav } = useDashboardPreferences();
+  const { hideLegacyNav, ready: prefsReady, roleNmacNav } = useDashboardPreferences();
 
   const sections = SIDEBAR_SECTIONS.map((section) => {
     if (hideLegacyNav && section.legacySection) {
@@ -35,6 +36,9 @@ export function AppSidebar() {
       ...section,
       items: section.items.filter((item) => {
         if (hideLegacyNav && item.legacy) return false;
+        if (item.href.startsWith("/nmac-2026") && prefsReady) {
+          return isNmacNavHrefAllowed(user?.role, item.href, roleNmacNav);
+        }
         if ("requireDataEntry" in item && item.requireDataEntry) {
           return !loading && canEditKpiData(user?.role);
         }

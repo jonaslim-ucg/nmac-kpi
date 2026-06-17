@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAppDashboardSettings, updateAppDashboardSettings } from "@/lib/auth/app-settings";
+import { normalizeRoleNmacNavAccess } from "@/lib/auth/role-nmac-nav";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { canManageUsers } from "@/lib/auth/types";
 export const dynamic = "force-dynamic";
@@ -39,29 +40,34 @@ export async function PATCH(req: Request) {
     hide_legacy_nav?: unknown;
     use_nmac_test_data?: unknown;
     clear_nmac_month_cache?: unknown;
+    role_nmac_nav?: unknown;
   };
 
   const input: {
     hideLegacyNav?: boolean;
     useNmacTestData?: boolean;
     bumpNmacMonthCacheRevision?: boolean;
+    roleNmacNav?: ReturnType<typeof normalizeRoleNmacNavAccess>;
   } = {};
 
   const wantsOrgToggle =
     typeof body.hide_legacy_nav === "boolean" || typeof body.use_nmac_test_data === "boolean";
+  const wantsRoleNav = body.role_nmac_nav !== undefined;
   const wantsCacheClear = body.clear_nmac_month_cache === true;
 
-  if (wantsOrgToggle && !isAdmin) {
+  if ((wantsOrgToggle || wantsRoleNav) && !isAdmin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   if (typeof body.hide_legacy_nav === "boolean") input.hideLegacyNav = body.hide_legacy_nav;
   if (typeof body.use_nmac_test_data === "boolean") input.useNmacTestData = body.use_nmac_test_data;
+  if (wantsRoleNav) input.roleNmacNav = normalizeRoleNmacNavAccess(body.role_nmac_nav);
   if (wantsCacheClear) input.bumpNmacMonthCacheRevision = true;
 
   if (
     input.hideLegacyNav === undefined &&
     input.useNmacTestData === undefined &&
+    input.roleNmacNav === undefined &&
     !input.bumpNmacMonthCacheRevision
   ) {
     return NextResponse.json({ error: "No valid fields to update." }, { status: 400 });

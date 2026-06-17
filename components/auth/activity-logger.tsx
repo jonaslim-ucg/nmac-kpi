@@ -1,40 +1,71 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useSession } from "@/components/auth/session-provider";
 import { isLikelyBitrixEmbed } from "@/lib/bitrix/embedded-client";
 
-const CLIENT_DEDUPE_MS = 5 * 60 * 1000;
+/** Prevents duplicate POSTs within the same activation (React Strict Mode). Resets on re-open. */
+let loggedThisActivation = false;
+let hiddenSince: number | null = null;
 
-/**
- * Records "Opened app" when a signed-in user loads the dashboard.
- * Bitrix users usually skip /login (session cookie), so sign-in audit never runs without this.
- */
-export function ActivityLogger() {
-  const { user, loading } = useSession();
-  const started = useRef(false);
+async function postAppOpen() {
+  if (loggedThisActivation) return;
+  loggedThisActivation = true;
 
-  useEffect(() => {
-    if (loading || !user || started.current) return;
-
-    const storageKey = `nmac:activity:${user.email}`;
-    const lastRaw = sessionStorage.getItem(storageKey);
-    if (lastRaw) {
-      const last = Number(lastRaw);
-      if (Number.isFinite(last) && Date.now() - last < CLIENT_DEDUPE_MS) return;
-    }
-
-    started.current = true;
-    const via = isLikelyBitrixEmbed() ? "bitrix" : "browser";
-
-    void fetch("/api/auth/activity", {
+  const via = isLikelyBitrixEmbed() ? "bitrix" : "browser";
+  try {
+    await fetch("/api/auth/activity", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ via }),
-    }).then(() => {
-      sessionStorage.setItem(storageKey, String(Date.now()));
     });
+  } catch {
+    loggedThisActivation = false;
+  }
+}
+
+function onVisibilityChange() {
+  if (document.visibilityState === "hidden") {
+    hiddenSince = Date.now();
+    return;
+  }
+
+  const hiddenMs = hiddenSince != null ? Date.now() - hiddenSince : 0;
+  hiddenSince = null;
+
+  // Bitrix keeps the iframe alive when switching apps; treat re-show as a fresh open.
+  if (isLikelyBitrixEmbed() && hiddenMs >= 1000) {
+    loggedThisActivation = false;
+    void postAppOpen();
+  }
+}
+
+/**
+ * Records "Opened app via Bitrix24" on every app open.
+ * Bitrix users keep their session cookie, so sign-in does not run again — this is the login audit trail.
+ */
+export function ActivityLogger() {
+  const { user, loading } = useSession();
+
+  useEffect(() => {
+    if (loading || !user) return;
+
+    void postAppOpen();
+
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      loggedThisActivation = false;
+      void postAppOpen();
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pageshow", onPageShow);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pageshow", onPageShow);
+    };
   }, [user, loading]);
 
   return null;

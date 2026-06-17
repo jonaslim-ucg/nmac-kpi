@@ -42,6 +42,17 @@ export function auditAuthSignedOut(actor: AuditActor) {
   });
 }
 
+export function auditAppOpened(actor: AuditActor, via: "bitrix" | "browser") {
+  const viaLabel = via === "bitrix" ? "Bitrix24" : "browser";
+  fire({
+    level: "info",
+    source: "auth",
+    message: `Opened app via ${viaLabel}`,
+    createdByEmail: actor.email,
+    context: { role: actor.role, method: via },
+  });
+}
+
 export function auditWeeklyKpiSaved(
   actor: AuditActor,
   input: { kpiSlug: string; year: number; rowCount: number; weekIndices: number[] },

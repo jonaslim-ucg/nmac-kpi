@@ -31,7 +31,13 @@ function activityType(row: DevLogEntry): ActivityFilter {
 
 function typeLabel(row: DevLogEntry): string {
   const source = row.source?.trim() ?? "";
-  if (source === "auth") return "Login";
+  const msg = row.message.toLowerCase();
+  if (source === "auth") {
+    if (msg.includes("opened app")) return "App open";
+    if (msg.includes("signed in")) return "Sign in";
+    if (msg.includes("signed out")) return "Sign out";
+    return "Login";
+  }
   if (source === "kpi.weekly") return "Weekly KPI";
   if (source === "kpi.nmac") return "NMAC master";
   if (source === "admin.users") return "Users";

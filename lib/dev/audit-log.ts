@@ -8,7 +8,13 @@ type AuditActor = {
 };
 
 function fire(input: Parameters<typeof appendDevLog>[0]) {
-  void appendDevLog(input);
+  void appendDevLog(input).then((result) => {
+    if (result.setupRequired) {
+      console.error("[audit-log] app_dev_logs table missing — run supabase/add-dev-logs.sql");
+    } else if (result.error) {
+      console.error("[audit-log]", result.error);
+    }
+  });
 }
 
 export function auditAuthSignedIn(

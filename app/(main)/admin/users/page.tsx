@@ -299,7 +299,7 @@ export default function AdminUsersPage() {
   if (!canManageUsers(user?.role)) {
     return (
       <MainShell title="Users" subtitle="Restricted">
-        <p className="text-sm text-muted-foreground">You need the Admin role to manage users.</p>
+        <p className="text-sm text-muted-foreground">You need the Admin or Dev role to manage users.</p>
       </MainShell>
     );
   }

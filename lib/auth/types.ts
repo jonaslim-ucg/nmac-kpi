@@ -6,11 +6,11 @@ export function isAppRole(value: unknown): value is AppRole {
 }
 
 export function canEditKpiData(role: AppRole | null | undefined): boolean {
-  return role === "editor" || role === "admin";
+  return role === "editor" || role === "admin" || role === "dev";
 }
 
 export function canManageUsers(role: AppRole | null | undefined): boolean {
-  return role === "admin";
+  return role === "admin" || role === "dev";
 }
 
 export function canAccessDev(role: AppRole | null | undefined): boolean {

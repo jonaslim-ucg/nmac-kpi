@@ -130,7 +130,7 @@ export function RoleNmacNavEditor({ onSaved, onError }: Props) {
         <div className="min-w-0 pt-0.5">
           <h2 className="text-base font-semibold tracking-tight text-foreground">Master KPI access by role</h2>
           <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-            Choose which NMAC master KPI pages each role can open in the sidebar. Admins always see everything.
+            Choose which NMAC master KPI pages each role can open in the sidebar. Admin and Dev roles always see everything.
           </p>
         </div>
       </div>

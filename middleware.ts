@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { resolveSessionWithDatabase } from "@/lib/auth/sync-session";
+import { canAccessDev, canManageUsers } from "@/lib/auth/types";
 import { buildSessionCookieOptions, clearSessionCookieOnResponse } from "@/lib/auth/session-cookie";
 import { SESSION_COOKIE_NAME, verifySessionTokenEdge } from "@/lib/auth/session";
 
@@ -67,8 +68,8 @@ export async function middleware(request: NextRequest) {
       return res;
     }
 
-    const denyUsers = pathname.startsWith("/admin/users") && session.role !== "admin";
-    const denyDev = pathname.startsWith("/dev") && session.role !== "dev";
+    const denyUsers = pathname.startsWith("/admin/users") && !canManageUsers(session.role);
+    const denyDev = pathname.startsWith("/dev") && !canAccessDev(session.role);
     const res = denyUsers || denyDev
       ? NextResponse.redirect(new URL("/nmac-2026", request.url))
       : NextResponse.next();

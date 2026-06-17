@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MainShell } from "@/components/dashboard/main-shell";
 import { useSession } from "@/components/auth/session-provider";
 import type { DevLogEntry } from "@/lib/dev/logs";
@@ -70,16 +70,19 @@ const FILTERS: { id: ActivityFilter; label: string }[] = [
 export default function DevLogsPage() {
   const { user, loading } = useSession();
   const [rows, setRows] = useState<DevLogEntry[]>([]);
-  const [loadingList, setLoadingList] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [setupRequired, setSetupRequired] = useState(false);
   const [setupSql, setSetupSql] = useState<string | null>(null);
   const [filter, setFilter] = useState<ActivityFilter>("all");
+  const loadedRef = useRef(false);
 
-  const refresh = useCallback(async () => {
-    setLoadingList(true);
+  const refresh = useCallback(async (silent = false) => {
+    if (silent) setRefreshing(true);
+    else setInitialLoading(true);
     setLoadError(null);
-    setSetupRequired(false);
+    if (!silent) setSetupRequired(false);
     try {
       const r = await fetch("/api/dev/logs?limit=200", { credentials: "include", cache: "no-store" });
       const j = (await r.json()) as LogsResponse;
@@ -92,27 +95,25 @@ export default function DevLogsPage() {
       }
       if (!r.ok) {
         setLoadError(j.error ?? "Could not load activity.");
-        setRows([]);
+        if (!silent) setRows([]);
         return;
       }
+      setSetupRequired(false);
       setRows((j.logs ?? []).filter(isActivityEntry));
     } catch {
       setLoadError("Could not load activity.");
-      setRows([]);
+      if (!silent) setRows([]);
     } finally {
-      setLoadingList(false);
+      setInitialLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    if (!loading && canAccessDev(user?.role)) void refresh();
-  }, [user?.role, loading, refresh]);
-
-  useEffect(() => {
-    if (!canAccessDev(user?.role) || setupRequired) return;
-    const id = window.setInterval(() => void refresh(), 30_000);
-    return () => window.clearInterval(id);
-  }, [user?.role, setupRequired, refresh]);
+    if (loading || !canAccessDev(user?.role) || loadedRef.current) return;
+    loadedRef.current = true;
+    void refresh(false);
+  }, [loading, user?.role, refresh]);
 
   const filteredRows = useMemo(() => {
     if (filter === "all") return rows;
@@ -173,11 +174,11 @@ export default function DevLogsPage() {
             </div>
             <button
               type="button"
-              onClick={() => void refresh()}
-              disabled={loadingList}
+              onClick={() => void refresh(true)}
+              disabled={refreshing || initialLoading}
               className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition hover:bg-surface-muted/80 disabled:pointer-events-none disabled:opacity-50"
             >
-              {loadingList ? (
+              {refreshing ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
               ) : (
                 <RefreshCw className="h-3.5 w-3.5" aria-hidden />
@@ -188,7 +189,7 @@ export default function DevLogsPage() {
 
           {loadError && !setupRequired ? (
             <p className="px-5 py-6 text-sm text-red-600 dark:text-red-400">{loadError}</p>
-          ) : loadingList ? (
+          ) : initialLoading ? (
             <div className="space-y-0 px-5 py-4" aria-busy="true">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="flex gap-4 border-b border-border/60 py-3 last:border-0">

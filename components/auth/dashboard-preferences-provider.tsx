@@ -73,14 +73,26 @@ function applyCacheRevisionFromServer(serverRevision: number) {
   }
 }
 
-export function DashboardPreferencesProvider({ children }: { children: React.ReactNode }) {
+export function DashboardPreferencesProvider({
+  children,
+  initialPreferences = null,
+}: {
+  children: React.ReactNode;
+  initialPreferences?: AppDashboardSettings | null;
+}) {
   const { user, loading: sessionLoading } = useSession();
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(Boolean(initialPreferences));
   const [canEdit, setCanEdit] = useState(false);
   const [canClearCache, setCanClearCache] = useState(false);
-  const [hideLegacyNav, setHideLegacyNavState] = useState(false);
-  const [useNmacTestData, setUseNmacTestDataState] = useState(true);
-  const [roleNmacNav, setRoleNmacNavState] = useState<RoleNmacNavAccess>({});
+  const [hideLegacyNav, setHideLegacyNavState] = useState(initialPreferences?.hideLegacyNav ?? false);
+  const [useNmacTestData, setUseNmacTestDataState] = useState(initialPreferences?.useNmacTestData ?? true);
+  const [roleNmacNav, setRoleNmacNavState] = useState<RoleNmacNavAccess>(initialPreferences?.roleNmacNav ?? {});
+
+  useEffect(() => {
+    if (initialPreferences) {
+      applySyncedDashboardPrefs(initialPreferences);
+    }
+  }, [initialPreferences]);
 
   const applyServerPrefs = useCallback((prefs: AppDashboardSettings) => {
     applySyncedDashboardPrefs(prefs);
@@ -116,7 +128,11 @@ export function DashboardPreferencesProvider({ children }: { children: React.Rea
     }
 
     let cancelled = false;
-    setReady(false);
+    const hasInitialPrefs = Boolean(initialPreferences);
+
+    if (!hasInitialPrefs) {
+      setReady(false);
+    }
 
     void (async () => {
       const ok = await loadFromServer();
@@ -135,7 +151,7 @@ export function DashboardPreferencesProvider({ children }: { children: React.Rea
     return () => {
       cancelled = true;
     };
-  }, [user, sessionLoading, loadFromServer]);
+  }, [user, sessionLoading, loadFromServer, initialPreferences]);
 
   useEffect(() => {
     if (!user) return;

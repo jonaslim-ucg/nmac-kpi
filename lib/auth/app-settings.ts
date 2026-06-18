@@ -1,3 +1,4 @@
+import { normalizeCustomRoles, type CustomRole } from "@/lib/auth/custom-roles";
 import { normalizeRoleNmacNavAccess, type RoleNmacNavAccess } from "@/lib/auth/role-nmac-nav";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
@@ -8,6 +9,7 @@ export type AppDashboardSettings = {
   useNmacTestData: boolean;
   nmacMonthCacheRevision: number;
   roleNmacNav: RoleNmacNavAccess;
+  customRoles: CustomRole[];
   maintenanceMode: boolean;
 };
 
@@ -16,15 +18,18 @@ type SettingsRow = {
   use_nmac_test_data: boolean;
   nmac_month_cache_revision: number | string;
   role_nmac_nav?: unknown;
+  custom_roles?: unknown;
   maintenance_mode?: boolean;
 };
 
 function rowToSettings(row: SettingsRow): AppDashboardSettings {
+  const customRoles = normalizeCustomRoles(row.custom_roles);
   return {
     hideLegacyNav: Boolean(row.hide_legacy_nav),
     useNmacTestData: row.use_nmac_test_data !== false,
     nmacMonthCacheRevision: Number(row.nmac_month_cache_revision) || 0,
-    roleNmacNav: normalizeRoleNmacNavAccess(row.role_nmac_nav),
+    roleNmacNav: normalizeRoleNmacNavAccess(row.role_nmac_nav, customRoles),
+    customRoles,
     maintenanceMode: row.maintenance_mode === true,
   };
 }
@@ -33,7 +38,7 @@ export async function getAppDashboardSettings(): Promise<AppDashboardSettings | 
   const supabase = createServiceRoleClient();
   const { data, error } = await supabase
     .from("app_settings")
-    .select("hide_legacy_nav,use_nmac_test_data,nmac_month_cache_revision,role_nmac_nav,maintenance_mode")
+    .select("hide_legacy_nav,use_nmac_test_data,nmac_month_cache_revision,role_nmac_nav,custom_roles,maintenance_mode")
     .eq("id", APP_SETTINGS_ID)
     .maybeSingle();
 
@@ -46,6 +51,7 @@ export type UpdateAppDashboardSettingsInput = {
   useNmacTestData?: boolean;
   bumpNmacMonthCacheRevision?: boolean;
   roleNmacNav?: RoleNmacNavAccess;
+  customRoles?: CustomRole[];
   maintenanceMode?: boolean;
 };
 
@@ -67,6 +73,9 @@ export async function updateAppDashboardSettings(
   if (input.roleNmacNav !== undefined) {
     patch.role_nmac_nav = input.roleNmacNav;
   }
+  if (input.customRoles !== undefined) {
+    patch.custom_roles = input.customRoles;
+  }
   if (input.maintenanceMode !== undefined) {
     patch.maintenance_mode = input.maintenanceMode;
   }
@@ -75,7 +84,7 @@ export async function updateAppDashboardSettings(
     .from("app_settings")
     .update(patch)
     .eq("id", APP_SETTINGS_ID)
-    .select("hide_legacy_nav,use_nmac_test_data,nmac_month_cache_revision,role_nmac_nav,maintenance_mode")
+    .select("hide_legacy_nav,use_nmac_test_data,nmac_month_cache_revision,role_nmac_nav,custom_roles,maintenance_mode")
     .single();
 
   if (error || !data) return null;

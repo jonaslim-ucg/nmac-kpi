@@ -6,7 +6,7 @@ import { AppBrand } from "@/components/dashboard/app-logo";
 import { SIDEBAR_SECTIONS, type SidebarLink, type SidebarSection } from "@/components/dashboard/nmac-2026-nav";
 import { useSession } from "@/components/auth/session-provider";
 import { formatDisplayName } from "@/lib/auth/display-name";
-import { canAccessDev, canEditKpiData, canManageUsers, type AppRole } from "@/lib/auth/types";
+import { canAccessDev, canEditKpiData, canManageUsers, formatRoleLabel } from "@/lib/auth/types";
 import { useDashboardPreferences } from "@/components/auth/dashboard-preferences-provider";
 import { isNmacNavHrefAllowed } from "@/lib/auth/role-nmac-nav";
 
@@ -29,8 +29,9 @@ function isNavItemVisible(
   item: SidebarLink,
   navReady: boolean,
   hideLegacyNav: boolean,
-  userRole: AppRole | null | undefined,
+  userRole: string | null | undefined,
   roleNmacNav: Parameters<typeof isNmacNavHrefAllowed>[2],
+  customRoles: Parameters<typeof canEditKpiData>[1],
 ): boolean {
   if (!navReady) {
     return item.href === "/settings";
@@ -41,7 +42,7 @@ function isNavItemVisible(
     return isNmacNavHrefAllowed(userRole, item.href, roleNmacNav);
   }
   if ("requireDataEntry" in item && item.requireDataEntry) {
-    return canEditKpiData(userRole);
+    return canEditKpiData(userRole, customRoles);
   }
   if ("requireDev" in item && item.requireDev) {
     return canAccessDev(userRole);
@@ -55,8 +56,9 @@ function isNavItemVisible(
 function buildSections(
   navReady: boolean,
   hideLegacyNav: boolean,
-  userRole: AppRole | null | undefined,
+  userRole: string | null | undefined,
   roleNmacNav: Parameters<typeof isNmacNavHrefAllowed>[2],
+  customRoles: Parameters<typeof canEditKpiData>[1],
 ): SidebarSection[] {
   return SIDEBAR_SECTIONS.map((section) => {
     if (!navReady && section.legacySection) {
@@ -67,7 +69,9 @@ function buildSections(
     }
     return {
       ...section,
-      items: section.items.filter((item) => isNavItemVisible(item, navReady, hideLegacyNav, userRole, roleNmacNav)),
+      items: section.items.filter((item) =>
+        isNavItemVisible(item, navReady, hideLegacyNav, userRole, roleNmacNav, customRoles),
+      ),
     };
   }).filter((section) => section.items.length > 0);
 }
@@ -75,10 +79,10 @@ function buildSections(
 export function AppSidebar() {
   const pathname = usePathname();
   const { user, loading } = useSession();
-  const { hideLegacyNav, ready: prefsReady, roleNmacNav } = useDashboardPreferences();
+  const { hideLegacyNav, ready: prefsReady, roleNmacNav, customRoles } = useDashboardPreferences();
 
   const navReady = !loading && prefsReady;
-  const sections = buildSections(navReady, hideLegacyNav, user?.role ?? null, roleNmacNav);
+  const sections = buildSections(navReady, hideLegacyNav, user?.role ?? null, roleNmacNav, customRoles);
 
   return (
     <aside className="flex w-[220px] shrink-0 flex-col border-r border-border bg-sidebar">
@@ -139,8 +143,8 @@ export function AppSidebar() {
             {loading ? "…" : formatDisplayName(user)}
           </p>
           <p className="truncate text-xs text-muted-foreground">{loading ? "" : (user?.email ?? "")}</p>
-          <p className="truncate text-xs capitalize text-muted-foreground">
-            {loading ? "" : user?.role ?? ""}
+          <p className="truncate text-xs text-muted-foreground">
+            {loading ? "" : formatRoleLabel(user?.role, customRoles)}
           </p>
         </div>
       </div>

@@ -1,11 +1,13 @@
 "use client";
 
-import { Loader2, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, ChevronRight, Loader2, RefreshCw } from "lucide-react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MainShell } from "@/components/dashboard/main-shell";
 import { useSession } from "@/components/auth/session-provider";
+import { getActivityDetails, hasActivityDetails } from "@/lib/dev/activity-details";
 import type { DevLogEntry } from "@/lib/dev/logs";
 import { canAccessDev } from "@/lib/auth/types";
+import { useDashboardPreferences } from "@/components/auth/dashboard-preferences-provider";
 
 type ActivityFilter = "all" | "login" | "kpi" | "admin";
 
@@ -69,6 +71,7 @@ const FILTERS: { id: ActivityFilter; label: string }[] = [
 
 export default function DevLogsPage() {
   const { user, loading } = useSession();
+  const { customRoles } = useDashboardPreferences();
   const [rows, setRows] = useState<DevLogEntry[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -76,6 +79,7 @@ export default function DevLogsPage() {
   const [setupRequired, setSetupRequired] = useState(false);
   const [setupSql, setSetupSql] = useState<string | null>(null);
   const [filter, setFilter] = useState<ActivityFilter>("all");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const loadedRef = useRef(false);
 
   const refresh = useCallback(async (silent = false) => {
@@ -131,13 +135,13 @@ export default function DevLogsPage() {
   if (!canAccessDev(user?.role)) {
     return (
       <MainShell title="Activity" subtitle="Restricted">
-        <p className="text-sm text-muted-foreground">You need the Dev role to view activity.</p>
+        <p className="text-sm text-muted-foreground">You need the Developer role to view activity.</p>
       </MainShell>
     );
   }
 
   return (
-    <MainShell title="Activity" subtitle="Logins, KPI saves, and admin changes">
+    <MainShell title="Activity" subtitle="Logins, KPI saves, and admin changes — click a row for details">
       <div className="mx-auto flex max-w-6xl flex-col gap-4">
         {setupRequired ? (
           <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-4 sm:px-5">
@@ -231,23 +235,69 @@ export default function DevLogsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredRows.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="border-b border-border/70 transition-colors hover:bg-surface-muted/25"
-                    >
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
-                        {formatWhen(row.created_at)}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-foreground">
-                        {typeLabel(row)}
-                      </td>
-                      <td className="max-w-[min(36rem,50vw)] px-4 py-3 text-foreground">{row.message}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
-                        {row.created_by_email ?? "—"}
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredRows.map((row) => {
+                    const details = getActivityDetails(row, customRoles);
+                    const expandable = hasActivityDetails(row, customRoles);
+                    const expanded = expandedId === row.id;
+
+                    return (
+                      <Fragment key={row.id}>
+                        <tr
+                          className={
+                            "border-b border-border/70 transition-colors " +
+                            (expandable
+                              ? "cursor-pointer hover:bg-surface-muted/25"
+                              : "hover:bg-surface-muted/25")
+                          }
+                          onClick={() => {
+                            if (!expandable) return;
+                            setExpandedId(expanded ? null : row.id);
+                          }}
+                        >
+                          <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
+                            <span className="inline-flex items-center gap-1.5">
+                              {expandable ? (
+                                expanded ? (
+                                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                                ) : (
+                                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                                )
+                              ) : (
+                                <span className="inline-block w-3.5 shrink-0" aria-hidden />
+                              )}
+                              {formatWhen(row.created_at)}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-foreground">
+                            {typeLabel(row)}
+                          </td>
+                          <td className="max-w-[min(36rem,50vw)] px-4 py-3 text-foreground">{row.message}</td>
+                          <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
+                            {row.created_by_email ?? "—"}
+                          </td>
+                        </tr>
+                        {expanded && details.length > 0 ? (
+                          <tr key={`${row.id}-details`} className="border-b border-border/70 bg-surface-muted/20">
+                            <td colSpan={4} className="px-4 py-3 sm:px-8">
+                              <div className="rounded-lg border border-border/80 bg-background/60 px-4 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                  Details
+                                </p>
+                                <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+                                  {details.map((item) => (
+                                    <div key={`${row.id}-${item.label}`} className="min-w-0">
+                                      <dt className="text-xs text-muted-foreground">{item.label}</dt>
+                                      <dd className="mt-0.5 text-sm text-foreground">{item.value}</dd>
+                                    </div>
+                                  ))}
+                                </dl>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

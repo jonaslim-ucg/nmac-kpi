@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { auditRoleNmacNavUpdated } from "@/lib/dev/audit-log";
 import { getAppDashboardSettings, updateAppDashboardSettings } from "@/lib/auth/app-settings";
 import { configurableRolesForNmacNav, normalizeRoleNmacNavAccess } from "@/lib/auth/role-nmac-nav";
-import type { AppRole } from "@/lib/auth/types";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { canManageUsers } from "@/lib/auth/types";
 export const dynamic = "force-dynamic";
@@ -45,13 +44,6 @@ export async function PATCH(req: Request) {
     role_nmac_nav?: unknown;
   };
 
-  const input: {
-    hideLegacyNav?: boolean;
-    useNmacTestData?: boolean;
-    bumpNmacMonthCacheRevision?: boolean;
-    roleNmacNav?: ReturnType<typeof normalizeRoleNmacNavAccess>;
-  } = {};
-
   const wantsOrgToggle =
     typeof body.hide_legacy_nav === "boolean" || typeof body.use_nmac_test_data === "boolean";
   const wantsRoleNav = body.role_nmac_nav !== undefined;
@@ -61,9 +53,23 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const currentSettings = wantsRoleNav ? await getAppDashboardSettings() : null;
+
+  const input: {
+    hideLegacyNav?: boolean;
+    useNmacTestData?: boolean;
+    bumpNmacMonthCacheRevision?: boolean;
+    roleNmacNav?: ReturnType<typeof normalizeRoleNmacNavAccess>;
+  } = {};
+
   if (typeof body.hide_legacy_nav === "boolean") input.hideLegacyNav = body.hide_legacy_nav;
   if (typeof body.use_nmac_test_data === "boolean") input.useNmacTestData = body.use_nmac_test_data;
-  if (wantsRoleNav) input.roleNmacNav = normalizeRoleNmacNavAccess(body.role_nmac_nav);
+  if (wantsRoleNav) {
+    input.roleNmacNav = normalizeRoleNmacNavAccess(
+      body.role_nmac_nav,
+      currentSettings?.customRoles ?? [],
+    );
+  }
   if (wantsCacheClear) input.bumpNmacMonthCacheRevision = true;
 
   if (
@@ -75,7 +81,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "No valid fields to update." }, { status: 400 });
   }
 
-  const previousSettings = wantsRoleNav ? await getAppDashboardSettings() : null;
+  const previousSettings = currentSettings;
 
   const settings = await updateAppDashboardSettings(input);
   if (!settings) {
@@ -83,11 +89,11 @@ export async function PATCH(req: Request) {
   }
 
   if (input.roleNmacNav !== undefined && previousSettings) {
-    const changedRoles = configurableRolesForNmacNav().filter((role) => {
+    const changedRoles = configurableRolesForNmacNav(previousSettings.customRoles).filter((role) => {
       const before = JSON.stringify(previousSettings.roleNmacNav[role] ?? null);
       const after = JSON.stringify(settings.roleNmacNav[role] ?? null);
       return before !== after;
-    }) as AppRole[];
+    });
     if (changedRoles.length > 0) {
       auditRoleNmacNavUpdated({ email: session.email, role: session.role }, { roles: changedRoles });
     }

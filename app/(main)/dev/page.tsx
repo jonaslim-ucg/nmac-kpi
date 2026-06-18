@@ -10,7 +10,7 @@ export default function DevPage() {
 
   if (loading) {
     return (
-      <MainShell title="Dev" subtitle="Loading">
+      <MainShell title="Developer" subtitle="Loading">
         <p className="text-sm text-muted-foreground">Loading…</p>
       </MainShell>
     );
@@ -18,14 +18,14 @@ export default function DevPage() {
 
   if (!canAccessDev(user?.role)) {
     return (
-      <MainShell title="Dev" subtitle="Restricted">
-        <p className="text-sm text-muted-foreground">You need the Dev role to access this page.</p>
+      <MainShell title="Developer" subtitle="Restricted">
+        <p className="text-sm text-muted-foreground">You need the Developer role to access this page.</p>
       </MainShell>
     );
   }
 
   return (
-    <MainShell title="Dev" subtitle="Tools for developers">
+    <MainShell title="Developer" subtitle="Tools for developers">
       <div className="mx-auto flex max-w-3xl flex-col gap-4">
         <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
           <div className="border-b border-border bg-surface-muted/40 px-4 py-3 sm:px-5">

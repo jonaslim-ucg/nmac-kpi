@@ -18,7 +18,7 @@ import { MainShell } from "@/components/dashboard/main-shell";
 import { useDashboardPreferences } from "@/components/auth/dashboard-preferences-provider";
 import { useSession } from "@/components/auth/session-provider";
 import { formatDisplayName } from "@/lib/auth/display-name";
-import { canManageUsers } from "@/lib/auth/types";
+import { canManageUsers, formatRoleLabel } from "@/lib/auth/types";
 
 function initialsFromDisplayName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -87,6 +87,7 @@ export default function SettingsPage() {
     canClearCache,
     hideLegacyNav,
     useNmacTestData,
+    customRoles,
     setHideLegacyNav,
     setUseNmacTestData,
     clearNmacMonthCache,
@@ -302,8 +303,8 @@ export default function SettingsPage() {
                     <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
                     <p className="mt-2">
                       <span className="sr-only">Your role: </span>
-                      <span className="inline-flex rounded-md border border-border bg-background/80 px-2 py-0.5 text-xs font-medium capitalize text-foreground">
-                        {user?.role}
+                      <span className="inline-flex rounded-md border border-border bg-background/80 px-2 py-0.5 text-xs font-medium text-foreground">
+                        {formatRoleLabel(user?.role, customRoles)}
                       </span>
                     </p>
                   </div>

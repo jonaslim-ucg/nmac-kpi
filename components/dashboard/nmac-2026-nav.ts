@@ -75,7 +75,7 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
     ],
   },
   {
-    title: "Dev",
+    title: "Developer",
     items: [
       { href: "/dev", label: "Maintenance", icon: Wrench, requireDev: true },
       { href: "/dev/logs", label: "Activity", icon: ScrollText, requireDev: true },

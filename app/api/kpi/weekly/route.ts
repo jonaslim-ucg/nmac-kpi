@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   auditWeeklyKpiSaved,
 } from "@/lib/dev/audit-log";
+import { getAppDashboardSettings } from "@/lib/auth/app-settings";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { canEditKpiData } from "@/lib/auth/types";
 import type { WeeklyRow } from "@/lib/kpi/types";
@@ -15,7 +16,8 @@ function unauthorized() {
 
 export async function POST(req: Request) {
   const session = await getSessionFromCookies();
-  if (!session || !canEditKpiData(session.role)) return unauthorized();
+  const settings = await getAppDashboardSettings();
+  if (!session || !canEditKpiData(session.role, settings?.customRoles)) return unauthorized();
 
   const body = (await req.json()) as {
     kpiSlug?: unknown;

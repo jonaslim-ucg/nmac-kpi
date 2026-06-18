@@ -1,10 +1,8 @@
 import { appendDevLog } from "@/lib/dev/logs";
-import type { AppRole } from "@/lib/auth/types";
 import { MONTHS } from "@/lib/kpi-nmac-2026/model";
-
 type AuditActor = {
   email: string;
-  role: AppRole;
+  role: string;
 };
 
 function fire(input: Parameters<typeof appendDevLog>[0]) {
@@ -150,7 +148,7 @@ export function auditNmacTargetMonthCleared(actor: AuditActor, input: { year: nu
 
 export function auditAdminUserAdded(
   actor: AuditActor,
-  input: { email: string; role: AppRole },
+  input: { email: string; role: string },
 ) {
   fire({
     level: "info",
@@ -185,13 +183,39 @@ export function auditAdminUserRemoved(actor: AuditActor, input: { email: string 
   });
 }
 
-export function auditRoleNmacNavUpdated(actor: AuditActor, input: { roles: AppRole[] }) {
+export function auditRoleNmacNavUpdated(actor: AuditActor, input: { roles: string[] }) {
   fire({
     level: "info",
     source: "admin.access",
     message: `Updated Master KPI access for ${input.roles.join(", ")}`,
     createdByEmail: actor.email,
     context: { role: actor.role, updatedRoles: input.roles },
+  });
+}
+
+export function auditCustomRoleCreated(
+  actor: AuditActor,
+  input: { roleId: string; label: string },
+) {
+  fire({
+    level: "info",
+    source: "admin.roles",
+    message: `Created role “${input.label}”`,
+    createdByEmail: actor.email,
+    context: { role: actor.role, roleId: input.roleId, label: input.label },
+  });
+}
+
+export function auditCustomRoleRemoved(
+  actor: AuditActor,
+  input: { roleId: string; label: string },
+) {
+  fire({
+    level: "warn",
+    source: "admin.roles",
+    message: `Removed role “${input.label}”`,
+    createdByEmail: actor.email,
+    context: { role: actor.role, roleId: input.roleId, label: input.label },
   });
 }
 

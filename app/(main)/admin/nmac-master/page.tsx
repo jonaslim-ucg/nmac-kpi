@@ -7,6 +7,7 @@ import { MainShell } from "@/components/dashboard/main-shell";
 import { NmacMasterEntryPanel, type NmacMasterDb } from "@/components/kpi-nmac-2026/nmac-master-entry-panel";
 import { NmacMasterSheetPanel } from "@/components/kpi-nmac-2026/nmac-master-sheet-panel";
 import { NmacTargetsForm } from "@/components/kpi-nmac-2026/nmac-targets-form";
+import { useDashboardPreferences } from "@/components/auth/dashboard-preferences-provider";
 import { canEditKpiData } from "@/lib/auth/types";
 import {
   buildKpisPerMonth,
@@ -36,6 +37,7 @@ type TargetScope = "fy" | number;
 
 export default function AdminNmacMasterPage() {
   const { user, loading: sessionLoading } = useSession();
+  const { customRoles } = useDashboardPreferences();
   const [tab, setTab] = useState<Tab>("targets");
   const [year, setYear] = useState(DEFAULT_KPI_YEAR);
   const [db, setDb] = useState<NmacMasterDb>(() => emptyNmacMonthDbs());
@@ -283,7 +285,7 @@ export default function AdminNmacMasterPage() {
     );
   }
 
-  if (!canEditKpiData(user?.role)) {
+  if (!canEditKpiData(user?.role, customRoles)) {
     return (
       <MainShell title="NMAC master" subtitle="Restricted">
         <div className="mx-auto max-w-md rounded-xl border border-border bg-card p-8 text-center shadow-sm">

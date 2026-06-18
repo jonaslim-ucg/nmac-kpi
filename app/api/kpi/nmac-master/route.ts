@@ -5,6 +5,7 @@ import {
   auditNmacTargetMonthSaved,
   auditNmacTargetsSaved,
 } from "@/lib/dev/audit-log";
+import { getAppDashboardSettings } from "@/lib/auth/app-settings";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { canEditKpiData } from "@/lib/auth/types";
 import type { MonthDb } from "@/lib/kpi-nmac-2026/model";
@@ -47,7 +48,8 @@ function parseNumberRecord(value: unknown): Record<string, number> | null {
 
 export async function POST(req: Request) {
   const session = await getSessionFromCookies();
-  if (!session || !canEditKpiData(session.role)) return unauthorized();
+  const settings = await getAppDashboardSettings();
+  if (!session || !canEditKpiData(session.role, settings?.customRoles)) return unauthorized();
 
   const body = (await req.json()) as {
     action?: unknown;

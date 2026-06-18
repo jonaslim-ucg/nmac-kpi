@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { auditAdminUserRemoved, auditAdminUserUpdated } from "@/lib/dev/audit-log";
 import { isValidEmailFormat } from "@/lib/auth/email-policy";
+import { getAppDashboardSettings } from "@/lib/auth/app-settings";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { normalizePersonName } from "@/lib/auth/name-normalize";
-import type { AppRole } from "@/lib/auth/types";
-import { canManageUsers, isAppRole } from "@/lib/auth/types";
+import { canManageUsers, devRoleChangeError, isValidUserRole } from "@/lib/auth/types";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -29,6 +29,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
   };
 
   const supabase = createServiceRoleClient();
+  const settings = await getAppDashboardSettings();
+  const customRoles = settings?.customRoles ?? [];
 
   const { data: target } = await supabase
     .from("app_users")
@@ -44,9 +46,13 @@ export async function PATCH(req: Request, ctx: Ctx) {
   };
 
   if (body.role !== undefined) {
-    const role = body.role as AppRole;
-    if (!isAppRole(role)) {
+    const role = typeof body.role === "string" ? body.role.trim() : "";
+    if (!isValidUserRole(role, customRoles)) {
       return NextResponse.json({ error: "Invalid role." }, { status: 400 });
+    }
+    const roleError = devRoleChangeError(session.role, target.role as string, role);
+    if (roleError) {
+      return NextResponse.json({ error: roleError }, { status: 403 });
     }
     if (session.sub === id && target.role === "admin" && role !== "admin") {
       if ((await countAdmins(supabase)) <= 1) {
@@ -101,10 +107,18 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
 
   const changes: Record<string, unknown> = {};
-  if (updates.role !== undefined && updates.role !== target.role) changes.role = updates.role;
-  if (updates.email !== undefined && updates.email !== target.email) changes.email = updates.email;
-  if ("first_name" in updates && updates.first_name !== target.first_name) changes.first_name = updates.first_name;
-  if ("last_name" in updates && updates.last_name !== target.last_name) changes.last_name = updates.last_name;
+  if (updates.role !== undefined && updates.role !== target.role) {
+    changes.role = { from: target.role, to: updates.role };
+  }
+  if (updates.email !== undefined && updates.email !== target.email) {
+    changes.email = { from: target.email, to: updates.email };
+  }
+  if ("first_name" in updates && updates.first_name !== target.first_name) {
+    changes.first_name = { from: target.first_name, to: updates.first_name };
+  }
+  if ("last_name" in updates && updates.last_name !== target.last_name) {
+    changes.last_name = { from: target.last_name, to: updates.last_name };
+  }
   if (Object.keys(changes).length > 0) {
     auditAdminUserUpdated(
       { email: session.email, role: session.role },

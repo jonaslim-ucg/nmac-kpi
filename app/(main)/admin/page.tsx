@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "@/components/auth/session-provider";
 import { MainShell } from "@/components/dashboard/main-shell";
+import { useDashboardPreferences } from "@/components/auth/dashboard-preferences-provider";
 import { canEditKpiData } from "@/lib/auth/types";
 import {
   formatKpiValue,
@@ -24,6 +25,7 @@ function nextWeekIndex(rows: WeeklyRow[]): number {
 
 export default function AdminPage() {
   const { user, loading: sessionLoading } = useSession();
+  const { customRoles } = useDashboardPreferences();
   const [kpis, setKpis] = useState<KpiDefinition[]>([]);
   const [slug, setSlug] = useState("");
   const [year, setYear] = useState(DEFAULT_KPI_YEAR);
@@ -96,7 +98,7 @@ export default function AdminPage() {
     );
   }
 
-  if (!canEditKpiData(user?.role)) {
+  if (!canEditKpiData(user?.role, customRoles)) {
     return (
       <MainShell title="Data entry" subtitle="Restricted">
         <div className="mx-auto max-w-md rounded-xl border border-border bg-card p-8 text-center">

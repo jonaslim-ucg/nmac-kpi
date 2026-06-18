@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { auditAdminUserAdded } from "@/lib/dev/audit-log";
 import { isValidEmailFormat } from "@/lib/auth/email-policy";
 import { normalizePersonName } from "@/lib/auth/name-normalize";
+import { getAppDashboardSettings } from "@/lib/auth/app-settings";
 import { getSessionFromCookies } from "@/lib/auth/session";
-import type { AppRole } from "@/lib/auth/types";
-import { canManageUsers, isAppRole } from "@/lib/auth/types";
+import { canManageUsers, devRoleChangeError, isValidUserRole } from "@/lib/auth/types";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export async function GET() {
@@ -35,15 +35,22 @@ export async function POST(req: Request) {
 
   const body = (await req.json()) as { email?: string; role?: string; first_name?: unknown; last_name?: unknown };
   const emailRaw = typeof body.email === "string" ? body.email.trim() : "";
-  const role = body.role as AppRole | undefined;
+  const role = typeof body.role === "string" ? body.role.trim() : "";
   const first_name = normalizePersonName(body.first_name);
   const last_name = normalizePersonName(body.last_name);
 
   if (!isValidEmailFormat(emailRaw)) {
     return NextResponse.json({ error: "Invalid email." }, { status: 400 });
   }
-  if (!isAppRole(role)) {
+
+  const settings = await getAppDashboardSettings();
+  const customRoles = settings?.customRoles ?? [];
+  if (!isValidUserRole(role, customRoles)) {
     return NextResponse.json({ error: "Invalid role." }, { status: 400 });
+  }
+  const roleError = devRoleChangeError(session.role, "viewer", role);
+  if (roleError) {
+    return NextResponse.json({ error: roleError }, { status: 403 });
   }
 
   const email = emailRaw.toLowerCase();
@@ -65,7 +72,7 @@ export async function POST(req: Request) {
 
   auditAdminUserAdded(
     { email: session.email, role: session.role },
-    { email: data.email as string, role: data.role as AppRole },
+    { email: data.email as string, role },
   );
 
   return NextResponse.json({ user: data });

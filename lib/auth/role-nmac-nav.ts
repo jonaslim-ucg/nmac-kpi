@@ -1,12 +1,17 @@
 import type { AppRole } from "@/lib/auth/types";
 import { canManageUsers } from "@/lib/auth/types";
+import {
+  configurableNavRoleIds,
+  isSystemRoleId,
+  type CustomRole,
+} from "@/lib/auth/custom-roles";
 import { NK26_VIEWS, type Nk26View } from "@/lib/kpi-nmac-2026/views-meta";
 
 export type NmacNavViewId = Nk26View;
 
 export const NMAC_NAV_VIEW_IDS: readonly NmacNavViewId[] = NK26_VIEWS;
 
-export type RoleNmacNavAccess = Partial<Record<AppRole, NmacNavViewId[]>>;
+export type RoleNmacNavAccess = Record<string, NmacNavViewId[]>;
 
 export const NMAC_NAV_ITEMS: { id: NmacNavViewId; label: string; href: string }[] = [
   { id: "overview", label: "Performance overview", href: "/nmac-2026" },
@@ -20,8 +25,6 @@ export const NMAC_NAV_ITEMS: { id: NmacNavViewId; label: string; href: string }[
   { id: "referrals", label: "Referral KPI", href: "/nmac-2026/referrals" },
 ];
 
-const CONFIGURABLE_ROLES: AppRole[] = ["viewer", "editor"];
-
 export function nmacNavHrefToViewId(href: string): NmacNavViewId | null {
   if (href === "/nmac-2026" || href === "/nmac-2026/") return "overview";
   const match = href.match(/^\/nmac-2026\/([^/]+)$/);
@@ -34,23 +37,24 @@ export function nmacNavViewIdToHref(id: NmacNavViewId): string {
   return id === "overview" ? "/nmac-2026" : `/nmac-2026/${id}`;
 }
 
-export function normalizeRoleNmacNavAccess(raw: unknown): RoleNmacNavAccess {
+export function normalizeRoleNmacNavAccess(raw: unknown, customRoles: CustomRole[] = []): RoleNmacNavAccess {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const allowedRoleIds = new Set(configurableNavRoleIds(customRoles));
   const out: RoleNmacNavAccess = {};
-  for (const role of CONFIGURABLE_ROLES) {
-    const value = (raw as Record<string, unknown>)[role];
+  for (const roleId of allowedRoleIds) {
+    const value = (raw as Record<string, unknown>)[roleId];
     if (!Array.isArray(value)) continue;
     const ids = value.filter(
       (id): id is NmacNavViewId => typeof id === "string" && NMAC_NAV_VIEW_IDS.includes(id as NmacNavViewId),
     );
-    if (ids.length > 0) out[role] = [...new Set(ids)];
+    if (ids.length > 0) out[roleId] = [...new Set(ids)];
   }
   return out;
 }
 
 /** Returns allowed view ids, or null when the role has full access (no restriction configured). */
 export function getRoleNmacNavAllowList(
-  role: AppRole | null | undefined,
+  role: string | null | undefined,
   access: RoleNmacNavAccess,
 ): NmacNavViewId[] | null {
   if (!role || canManageUsers(role)) return null;
@@ -60,7 +64,7 @@ export function getRoleNmacNavAllowList(
 }
 
 export function isNmacNavViewAllowed(
-  role: AppRole | null | undefined,
+  role: string | null | undefined,
   viewId: NmacNavViewId,
   access: RoleNmacNavAccess,
 ): boolean {
@@ -70,7 +74,7 @@ export function isNmacNavViewAllowed(
 }
 
 export function isNmacNavHrefAllowed(
-  role: AppRole | null | undefined,
+  role: string | null | undefined,
   href: string,
   access: RoleNmacNavAccess,
 ): boolean {
@@ -80,7 +84,7 @@ export function isNmacNavHrefAllowed(
 }
 
 export function firstAllowedNmacNavHref(
-  role: AppRole | null | undefined,
+  role: string | null | undefined,
   access: RoleNmacNavAccess,
 ): string {
   const allowList = getRoleNmacNavAllowList(role, access);
@@ -91,6 +95,16 @@ export function firstAllowedNmacNavHref(
   return "/settings";
 }
 
-export function configurableRolesForNmacNav(): AppRole[] {
-  return CONFIGURABLE_ROLES;
+export function configurableRolesForNmacNav(customRoles: CustomRole[] = []): string[] {
+  return configurableNavRoleIds(customRoles);
 }
+
+export function isConfigurableNavRole(roleId: string, customRoles: CustomRole[] = []): boolean {
+  return configurableNavRoleIds(customRoles).includes(roleId);
+}
+
+export function isCustomNavRole(roleId: string, customRoles: CustomRole[] = []): boolean {
+  return !isSystemRoleId(roleId) && customRoles.some((role) => role.id === roleId);
+}
+
+export type { AppRole };

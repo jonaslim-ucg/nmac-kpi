@@ -5,40 +5,47 @@ import { useCallback, useEffect, useState, type FormEvent, type MouseEvent } fro
 import { MainShell } from "@/components/dashboard/main-shell";
 import { RoleNmacNavEditor } from "@/components/admin/role-nmac-nav-editor";
 import { useSession } from "@/components/auth/session-provider";
+import { useDashboardPreferences } from "@/components/auth/dashboard-preferences-provider";
 import { Snackbar, type SnackbarVariant } from "@/components/ui/snackbar";
-import type { AppRole } from "@/lib/auth/types";
-import { canManageUsers } from "@/lib/auth/types";
+import { assignableRoles, canManageDevRole, canManageUsers, formatRoleLabel } from "@/lib/auth/types";
 
 type Row = {
   id: string;
   email: string;
   first_name: string | null;
   last_name: string | null;
-  role: AppRole;
+  role: string;
   created_at: string;
   updated_at: string;
 };
 
-const ROLES: AppRole[] = ["viewer", "editor", "admin", "dev"];
+function roleSelectDisabled(
+  actorRole: string | undefined,
+  targetRole: string,
+  saving: boolean,
+): boolean {
+  return saving || (targetRole === "dev" && !canManageDevRole(actorRole));
+}
 
 const inputClass =
   "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground transition placeholder:text-muted-foreground/60 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent disabled:opacity-50";
 
 const selectClass =
-  "h-10 w-full min-w-[7.5rem] max-w-[220px] cursor-pointer rounded-lg border border-border bg-background px-3 text-sm capitalize text-foreground transition focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
+  "h-10 w-full min-w-[7.5rem] max-w-[220px] cursor-pointer rounded-lg border border-border bg-background px-3 text-sm text-foreground transition focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
 
 const selectClassTable =
-  "h-10 min-w-[7.5rem] max-w-[11rem] cursor-pointer rounded-lg border border-border bg-background px-3 text-sm capitalize text-foreground transition focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
+  "h-10 min-w-[7.5rem] max-w-[11rem] cursor-pointer rounded-lg border border-border bg-background px-3 text-sm text-foreground transition focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
 
 export default function AdminUsersPage() {
   const { user, loading } = useSession();
+  const { customRoles } = useDashboardPreferences();
   const [rows, setRows] = useState<Row[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingList, setLoadingList] = useState(true);
   const [newEmail, setNewEmail] = useState("");
   const [newFirst, setNewFirst] = useState("");
   const [newLast, setNewLast] = useState("");
-  const [newRole, setNewRole] = useState<AppRole>("viewer");
+  const [newRole, setNewRole] = useState("viewer");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{ text: string; variant: SnackbarVariant } | null>(null);
   const [nameEditor, setNameEditor] = useState<null | { id: string; field: "first" | "last" }>(null);
@@ -48,7 +55,7 @@ export default function AdminUsersPage() {
   const [editEmail, setEditEmail] = useState("");
   const [editFirst, setEditFirst] = useState("");
   const [editLast, setEditLast] = useState("");
-  const [editRole, setEditRole] = useState<AppRole>("viewer");
+  const [editRole, setEditRole] = useState("viewer");
   const [openMenu, setOpenMenu] = useState<null | { rowId: string; top: number; left: number }>(null);
 
   const show = useCallback((text: string, variant: SnackbarVariant) => {
@@ -164,7 +171,7 @@ export default function AdminUsersPage() {
     }
   }
 
-  async function updateRole(id: string, role: AppRole) {
+  async function updateRole(id: string, role: string) {
     setSnackbar(null);
     setSavingId(id);
     try {
@@ -299,7 +306,7 @@ export default function AdminUsersPage() {
   if (!canManageUsers(user?.role)) {
     return (
       <MainShell title="Users" subtitle="Restricted">
-        <p className="text-sm text-muted-foreground">You need the Admin or Dev role to manage users.</p>
+        <p className="text-sm text-muted-foreground">You need the Admin or Developer role to manage users.</p>
       </MainShell>
     );
   }
@@ -389,15 +396,20 @@ export default function AdminUsersPage() {
                   <select
                     className={selectClass}
                     value={newRole}
-                    onChange={(e) => setNewRole(e.target.value as AppRole)}
+                    onChange={(e) => setNewRole(e.target.value)}
                   >
-                    {ROLES.map((r) => (
+                    {assignableRoles(user?.role, customRoles).map((r) => (
                       <option key={r} value={r}>
-                        {r}
+                        {formatRoleLabel(r, customRoles)}
                       </option>
                     ))}
                   </select>
                 </label>
+                {!canManageDevRole(user?.role) ? (
+                  <p className="text-xs text-muted-foreground sm:max-w-[220px]">
+                    Only a Developer can assign the Developer role.
+                  </p>
+                ) : null}
                 <button
                   type="submit"
                   disabled={savingId === "__new__"}
@@ -549,13 +561,18 @@ export default function AdminUsersPage() {
                           <select
                             className={selectClassTable}
                             value={row.role}
-                            disabled={savingId === row.id}
-                            onChange={(e) => void updateRole(row.id, e.target.value as AppRole)}
+                            disabled={roleSelectDisabled(user?.role, row.role, savingId === row.id)}
+                            onChange={(e) => void updateRole(row.id, e.target.value)}
                             aria-label={`Role for ${row.email}`}
+                            title={
+                              row.role === "dev" && !canManageDevRole(user?.role)
+                                ? "Only a Developer can change this role"
+                                : undefined
+                            }
                           >
-                            {ROLES.map((r) => (
+                            {assignableRoles(user?.role, customRoles, row.role).map((r) => (
                               <option key={r} value={r}>
-                                {r}
+                                {formatRoleLabel(r, customRoles)}
                               </option>
                             ))}
                           </select>
@@ -728,15 +745,26 @@ export default function AdminUsersPage() {
                   <select
                     className={selectClass}
                     value={editRole}
-                    onChange={(e) => setEditRole(e.target.value as AppRole)}
+                    disabled={editUser ? roleSelectDisabled(user?.role, editUser.role, savingId === editUser.id) : false}
+                    onChange={(e) => setEditRole(e.target.value)}
+                    title={
+                      editUser?.role === "dev" && !canManageDevRole(user?.role)
+                        ? "Only a Developer can change this role"
+                        : undefined
+                    }
                   >
-                    {ROLES.map((r) => (
+                    {assignableRoles(user?.role, customRoles, editUser?.role).map((r) => (
                       <option key={r} value={r}>
-                        {r}
+                        {formatRoleLabel(r, customRoles)}
                       </option>
                     ))}
                   </select>
                 </label>
+                {!canManageDevRole(user?.role) ? (
+                  <p className="text-xs text-muted-foreground">
+                    Only a Developer can assign or change the Developer role.
+                  </p>
+                ) : null}
               </div>
               <div className="flex flex-wrap justify-end gap-2 border-t border-border px-5 py-4">
                 <button

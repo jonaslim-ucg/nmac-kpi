@@ -11,7 +11,7 @@ import {
 import { useSession } from "@/components/auth/session-provider";
 import { canManageUsers } from "@/lib/auth/types";
 import type { AppDashboardSettings } from "@/lib/auth/app-settings";
-import type { AppRole } from "@/lib/auth/types";
+import type { CustomRole } from "@/lib/auth/custom-roles";
 import type { NmacNavViewId, RoleNmacNavAccess } from "@/lib/auth/role-nmac-nav";
 import {
   applySyncedDashboardPrefs,
@@ -32,9 +32,12 @@ type Ctx = {
   hideLegacyNav: boolean;
   useNmacTestData: boolean;
   roleNmacNav: RoleNmacNavAccess;
+  customRoles: CustomRole[];
   setHideLegacyNav: (next: boolean) => Promise<void>;
   setUseNmacTestData: (next: boolean) => Promise<void>;
-  setRoleNmacNavForRole: (role: AppRole, viewIds: NmacNavViewId[] | null) => Promise<void>;
+  setRoleNmacNavForRole: (roleId: string, viewIds: NmacNavViewId[] | null) => Promise<void>;
+  createCustomRole: (input: { label: string; canEditKpiData: boolean }) => Promise<CustomRole | null>;
+  deleteCustomRole: (roleId: string) => Promise<boolean>;
   clearNmacMonthCache: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -87,6 +90,7 @@ export function DashboardPreferencesProvider({
   const [hideLegacyNav, setHideLegacyNavState] = useState(initialPreferences?.hideLegacyNav ?? false);
   const [useNmacTestData, setUseNmacTestDataState] = useState(initialPreferences?.useNmacTestData ?? true);
   const [roleNmacNav, setRoleNmacNavState] = useState<RoleNmacNavAccess>(initialPreferences?.roleNmacNav ?? {});
+  const [customRoles, setCustomRolesState] = useState<CustomRole[]>(initialPreferences?.customRoles ?? []);
 
   useEffect(() => {
     if (initialPreferences) {
@@ -101,6 +105,7 @@ export function DashboardPreferencesProvider({
     setHideLegacyNavState(prefs.hideLegacyNav);
     setUseNmacTestDataState(prefs.useNmacTestData);
     setRoleNmacNavState(prefs.roleNmacNav);
+    setCustomRolesState(prefs.customRoles);
     dispatchPrefs();
   }, []);
 
@@ -198,18 +203,52 @@ export function DashboardPreferencesProvider({
   );
 
   const setRoleNmacNavForRole = useCallback(
-    async (role: AppRole, viewIds: NmacNavViewId[] | null) => {
+    async (roleId: string, viewIds: NmacNavViewId[] | null) => {
       if (!canEdit) return;
       const next: RoleNmacNavAccess = { ...roleNmacNav };
       if (!viewIds || viewIds.length === 0) {
-        delete next[role];
+        delete next[roleId];
       } else {
-        next[role] = viewIds;
+        next[roleId] = viewIds;
       }
       setRoleNmacNavState(next);
       await persist({ role_nmac_nav: next });
     },
     [canEdit, persist, roleNmacNav],
+  );
+
+  const createCustomRole = useCallback(
+    async (input: { label: string; canEditKpiData: boolean }) => {
+      if (!canEdit) return null;
+      const r = await fetch("/api/admin/roles", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const j = (await r.json()) as { role?: CustomRole; customRoles?: CustomRole[]; error?: string };
+      if (!r.ok || !j.role || !j.customRoles) return null;
+      setCustomRolesState(j.customRoles);
+      await loadFromServer();
+      return j.role;
+    },
+    [canEdit, loadFromServer],
+  );
+
+  const deleteCustomRole = useCallback(
+    async (roleId: string) => {
+      if (!canEdit) return false;
+      const r = await fetch(`/api/admin/roles?id=${encodeURIComponent(roleId)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const j = (await r.json()) as { customRoles?: CustomRole[] };
+      if (!r.ok || !j.customRoles) return false;
+      setCustomRolesState(j.customRoles);
+      await loadFromServer();
+      return true;
+    },
+    [canEdit, loadFromServer],
   );
 
   const clearNmacMonthCache = useCallback(async () => {
@@ -234,9 +273,12 @@ export function DashboardPreferencesProvider({
       hideLegacyNav,
       useNmacTestData,
       roleNmacNav,
+      customRoles,
       setHideLegacyNav,
       setUseNmacTestData,
       setRoleNmacNavForRole,
+      createCustomRole,
+      deleteCustomRole,
       clearNmacMonthCache,
       refresh,
     }),
@@ -247,9 +289,12 @@ export function DashboardPreferencesProvider({
       hideLegacyNav,
       useNmacTestData,
       roleNmacNav,
+      customRoles,
       setHideLegacyNav,
       setUseNmacTestData,
       setRoleNmacNavForRole,
+      createCustomRole,
+      deleteCustomRole,
       clearNmacMonthCache,
       refresh,
     ],

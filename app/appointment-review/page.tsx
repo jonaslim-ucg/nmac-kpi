@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function AppointmentReviewPage() {
   return (
-    <div className="min-h-screen overflow-y-auto bg-background py-8 sm:py-12">
+    <div className="min-h-full py-8 sm:py-12">
       <div className="mx-auto w-full max-w-xl px-4">
         <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
           <div className="mb-6 border-b border-border pb-6">

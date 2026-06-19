@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildAppointmentReviewStats } from "@/lib/appointment-review/analytics";
+import { toAppointmentReviewDetail } from "@/lib/appointment-review/display";
 import { APPOINTMENT_REVIEWS_SETUP_SQL, listAppointmentReviews } from "@/lib/appointment-review/store";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { canEditKpiData } from "@/lib/auth/types";
@@ -48,7 +49,11 @@ export async function GET(req: Request) {
   }
 
   return NextResponse.json(
-    { stats: buildAppointmentReviewStats(rows), ready: true },
+    {
+      stats: buildAppointmentReviewStats(rows),
+      reviews: rows.map(toAppointmentReviewDetail),
+      ready: true,
+    },
     { headers: { "Cache-Control": "private, no-store, max-age=0" } },
   );
 }

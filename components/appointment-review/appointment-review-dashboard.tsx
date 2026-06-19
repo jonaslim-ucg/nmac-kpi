@@ -5,6 +5,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   Legend,
   Line,
   LineChart,
@@ -27,6 +28,18 @@ const CHART_COLORS = [
 ];
 
 const YES_NO_COLORS = ["var(--chart-this-year)", "#64748b"];
+
+const TOOLTIP_STYLE = {
+  contentStyle: {
+    borderRadius: 10,
+    border: "1px solid var(--border)",
+    background: "var(--card)",
+    color: "var(--foreground)",
+    boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+  },
+  labelStyle: { color: "var(--foreground)", fontWeight: 600 },
+  itemStyle: { color: "var(--foreground)" },
+} as const;
 
 function ChartCard({ title, subtitle, children, tall }: { title: string; subtitle?: string; children: React.ReactNode; tall?: boolean }) {
   return (
@@ -78,12 +91,7 @@ function YesNoPie({ title, data }: { title: string; data: AppointmentReviewStats
               ))}
             </Pie>
             <Tooltip
-              contentStyle={{
-                borderRadius: 10,
-                border: "1px solid var(--border)",
-                background: "var(--card)",
-                color: "var(--foreground)",
-              }}
+              {...TOOLTIP_STYLE}
               formatter={(value, _name, item) => {
                 const pct = (item.payload as { pct?: number }).pct;
                 return [`${value} (${pct ?? 0}%)`, String(item.payload.label)];
@@ -97,9 +105,9 @@ function YesNoPie({ title, data }: { title: string; data: AppointmentReviewStats
   );
 }
 
-type Props = { stats: AppointmentReviewStats };
+type Props = { stats: AppointmentReviewStats; onViewReview?: (id: string) => void };
 
-export function AppointmentReviewDashboard({ stats }: Props) {
+export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
   const empty = stats.total === 0;
 
   return (
@@ -143,29 +151,31 @@ export function AppointmentReviewDashboard({ stats }: Props) {
           <div className="grid gap-4 xl:grid-cols-2">
             <ChartCard title="Average ratings" subtitle="Scale 1 (worst) to 10 (best)" tall>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.ratingScores} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" horizontal={false} />
-                  <XAxis type="number" domain={[0, 10]} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
-                  <YAxis
-                    type="category"
+                <BarChart data={stats.ratingScores} margin={{ top: 20, right: 8, left: 0, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+                  <XAxis
                     dataKey="metric"
-                    width={108}
-                    tick={{ fontSize: 11, fill: "var(--muted)" }}
+                    tick={{ fontSize: 11, fill: "var(--foreground)" }}
                     stroke="var(--border)"
+                    interval={0}
+                    angle={-18}
+                    textAnchor="end"
+                    height={56}
                   />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: 10,
-                      border: "1px solid var(--border)",
-                      background: "var(--card)",
-                      color: "var(--foreground)",
-                    }}
-                    formatter={(value) => [`${value}/10`, "Average"]}
-                  />
-                  <Bar dataKey="score" radius={[0, 4, 4, 0]}>
+                  <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
+                  <Tooltip {...TOOLTIP_STYLE} formatter={(value) => [`${value}/10`, "Average"]} />
+                  <Bar dataKey="score" radius={[4, 4, 0, 0]}>
                     {stats.ratingScores.map((_, i) => (
                       <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                     ))}
+                    <LabelList
+                      dataKey="score"
+                      position="top"
+                      formatter={(v) => `${v}/10`}
+                      fill="var(--foreground)"
+                      fontSize={12}
+                      fontWeight={600}
+                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -183,12 +193,7 @@ export function AppointmentReviewDashboard({ stats }: Props) {
                   />
                   <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
                   <Tooltip
-                    contentStyle={{
-                      borderRadius: 10,
-                      border: "1px solid var(--border)",
-                      background: "var(--card)",
-                      color: "var(--foreground)",
-                    }}
+                    {...TOOLTIP_STYLE}
                     labelFormatter={(label) => formatDay(String(label ?? ""))}
                     formatter={(value, name) => [`${value}/10`, String(name)]}
                   />
@@ -221,15 +226,10 @@ export function AppointmentReviewDashboard({ stats }: Props) {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={stats.waitTime} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--muted)" }} stroke="var(--border)" interval={0} angle={-12} textAnchor="end" height={52} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--foreground)" }} stroke="var(--border)" interval={0} angle={-12} textAnchor="end" height={52} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
                   <Tooltip
-                    contentStyle={{
-                      borderRadius: 10,
-                      border: "1px solid var(--border)",
-                      background: "var(--card)",
-                      color: "var(--foreground)",
-                    }}
+                    {...TOOLTIP_STYLE}
                     formatter={(value, _name, item) => {
                       const pct = (item.payload as { pct?: number }).pct;
                       return [`${value} (${pct ?? 0}%)`, "Responses"];
@@ -244,15 +244,10 @@ export function AppointmentReviewDashboard({ stats }: Props) {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={stats.patientDuration} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--muted)" }} stroke="var(--border)" interval={0} angle={-12} textAnchor="end" height={52} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--foreground)" }} stroke="var(--border)" interval={0} angle={-12} textAnchor="end" height={52} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
                   <Tooltip
-                    contentStyle={{
-                      borderRadius: 10,
-                      border: "1px solid var(--border)",
-                      background: "var(--card)",
-                      color: "var(--foreground)",
-                    }}
+                    {...TOOLTIP_STYLE}
                     formatter={(value, _name, item) => {
                       const pct = (item.payload as { pct?: number }).pct;
                       return [`${value} (${pct ?? 0}%)`, "Responses"];
@@ -274,17 +269,37 @@ export function AppointmentReviewDashboard({ stats }: Props) {
             <div className="dashboard-card p-4 sm:p-5">
               <span className="dashboard-card-accent" aria-hidden />
               <p className="text-sm font-semibold text-foreground">Recent patient comments</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Optional free-text responses from the survey</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {onViewReview ? "Click a comment to open the full review" : "Optional free-text responses from the survey"}
+              </p>
               <ul className="mt-4 divide-y divide-border">
                 {stats.recentComments.map((c) => (
                   <li key={`${c.id}-${c.kind}`} className="py-3 first:pt-0 last:pb-0">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="rounded-md bg-accent-muted px-2 py-0.5 text-[11px] font-medium text-nav-active-fg">
-                        {c.kind}
-                      </span>
-                      <span className="text-xs text-muted-foreground">{formatWhen(c.createdAt)}</span>
-                    </div>
-                    <p className="mt-2 text-sm leading-relaxed text-foreground">{c.text}</p>
+                    {onViewReview ? (
+                      <button
+                        type="button"
+                        onClick={() => onViewReview(c.id)}
+                        className="w-full rounded-lg text-left transition hover:bg-surface-muted/40"
+                      >
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="rounded-md bg-accent-muted px-2 py-0.5 text-[11px] font-medium text-nav-active-fg">
+                            {c.kind}
+                          </span>
+                          <span className="text-xs text-muted-foreground">{formatWhen(c.createdAt)}</span>
+                        </div>
+                        <p className="mt-2 text-sm leading-relaxed text-foreground">{c.text}</p>
+                      </button>
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="rounded-md bg-accent-muted px-2 py-0.5 text-[11px] font-medium text-nav-active-fg">
+                            {c.kind}
+                          </span>
+                          <span className="text-xs text-muted-foreground">{formatWhen(c.createdAt)}</span>
+                        </div>
+                        <p className="mt-2 text-sm leading-relaxed text-foreground">{c.text}</p>
+                      </>
+                    )}
                   </li>
                 ))}
               </ul>

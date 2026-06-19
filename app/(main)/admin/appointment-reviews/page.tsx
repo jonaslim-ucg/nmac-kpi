@@ -1,19 +1,24 @@
 "use client";
 
 import { Loader2, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppointmentReviewDashboard } from "@/components/appointment-review/appointment-review-dashboard";
+import { AppointmentReviewDetailModal } from "@/components/appointment-review/appointment-review-detail-modal";
+import { AppointmentReviewList } from "@/components/appointment-review/appointment-review-list";
 import { MainShell } from "@/components/dashboard/main-shell";
 import { useDashboardPreferences } from "@/components/auth/dashboard-preferences-provider";
 import { useSession } from "@/components/auth/session-provider";
 import type { AppointmentReviewStats } from "@/lib/appointment-review/analytics";
+import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
 import { APPOINTMENT_REVIEWS_SETUP_SQL } from "@/lib/appointment-review/store";
 import { canEditKpiData } from "@/lib/auth/types";
 
 type FilterDays = "all" | "30" | "90";
+type Tab = "overview" | "reviews";
 
 type ApiResponse = {
   stats?: AppointmentReviewStats;
+  reviews?: AppointmentReviewDetail[];
   error?: string;
   setupRequired?: boolean;
   setupSql?: string;
@@ -23,13 +28,22 @@ export default function AdminAppointmentReviewsPage() {
   const { user, loading } = useSession();
   const { customRoles } = useDashboardPreferences();
   const [stats, setStats] = useState<AppointmentReviewStats | null>(null);
+  const [reviews, setReviews] = useState<AppointmentReviewDetail[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [setupRequired, setSetupRequired] = useState(false);
   const [days, setDays] = useState<FilterDays>("all");
+  const [tab, setTab] = useState<Tab>("overview");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const allowed = canEditKpiData(user?.role, customRoles);
+
+  const selectedIndex = useMemo(
+    () => (selectedId ? reviews.findIndex((r) => r.id === selectedId) : -1),
+    [reviews, selectedId],
+  );
+  const selectedReview = selectedIndex >= 0 ? reviews[selectedIndex] : null;
 
   const load = useCallback(async (filter: FilterDays, silent = false) => {
     if (!silent) setInitialLoading(true);
@@ -49,12 +63,15 @@ export default function AdminAppointmentReviewsPage() {
           setLoadError(j.error ?? "Could not load results.");
         }
         setStats(null);
+        setReviews([]);
         return;
       }
       setStats(j.stats ?? null);
+      setReviews(j.reviews ?? []);
     } catch {
       setLoadError("Could not load results.");
       setStats(null);
+      setReviews([]);
     } finally {
       setInitialLoading(false);
       setRefreshing(false);
@@ -65,6 +82,10 @@ export default function AdminAppointmentReviewsPage() {
     if (loading || !allowed) return;
     void load(days);
   }, [allowed, days, load, loading]);
+
+  const viewReview = useCallback((id: string) => {
+    setSelectedId(id);
+  }, []);
 
   if (loading || initialLoading) {
     return (
@@ -91,7 +112,28 @@ export default function AdminAppointmentReviewsPage() {
       subtitle="Patient questionnaire results from /appointment-review"
     >
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {(
+            [
+              { id: "overview", label: "Overview" },
+              { id: "reviews", label: "All reviews" },
+            ] as const
+          ).map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              className={
+                "rounded-lg border px-3 py-1.5 text-sm font-medium transition " +
+                (tab === id
+                  ? "border-accent bg-nav-active-bg text-nav-active-fg"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground")
+              }
+            >
+              {label}
+            </button>
+          ))}
+          <span className="mx-1 hidden h-5 w-px bg-border sm:inline" aria-hidden />
           {(
             [
               { id: "all", label: "All time" },
@@ -102,7 +144,10 @@ export default function AdminAppointmentReviewsPage() {
             <button
               key={id}
               type="button"
-              onClick={() => setDays(id)}
+              onClick={() => {
+                setDays(id);
+                setSelectedId(null);
+              }}
               className={
                 "rounded-lg border px-3 py-1.5 text-sm font-medium transition " +
                 (days === id
@@ -137,7 +182,28 @@ export default function AdminAppointmentReviewsPage() {
         </div>
       ) : null}
 
-      {stats ? <AppointmentReviewDashboard stats={stats} /> : null}
+      {tab === "overview" && stats ? (
+        <AppointmentReviewDashboard stats={stats} onViewReview={viewReview} />
+      ) : null}
+
+      {tab === "reviews" ? <AppointmentReviewList reviews={reviews} onViewReview={viewReview} /> : null}
+
+      {selectedReview ? (
+        <AppointmentReviewDetailModal
+          review={selectedReview}
+          onClose={() => setSelectedId(null)}
+          hasPrev={selectedIndex > 0}
+          hasNext={selectedIndex < reviews.length - 1}
+          onPrev={() => {
+            const prev = reviews[selectedIndex - 1];
+            if (prev) setSelectedId(prev.id);
+          }}
+          onNext={() => {
+            const next = reviews[selectedIndex + 1];
+            if (next) setSelectedId(next.id);
+          }}
+        />
+      ) : null}
     </MainShell>
   );
 }

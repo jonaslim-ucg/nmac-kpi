@@ -4,6 +4,7 @@ import {
   BarChart3,
   Calendar,
   ClipboardList,
+  ClipboardPenLine,
   Database,
   HeartPulse,
   LayoutDashboard,
@@ -57,6 +58,17 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
     items: [
       { href: "/practice/weekly", label: "Weekly KPIs", icon: LayoutDashboard },
       { href: "/doctors", label: "Doctors", icon: Stethoscope },
+    ],
+  },
+  {
+    title: "Patient feedback",
+    items: [
+      {
+        href: "/admin/appointment-reviews",
+        label: "Appointment reviews",
+        icon: ClipboardPenLine,
+        requireDataEntry: true,
+      },
     ],
   },
   {

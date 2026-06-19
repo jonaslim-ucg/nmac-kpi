@@ -1,10 +1,20 @@
+import {
+  diffMonthDb,
+  diffNumberRecord,
+  diffWeeklyRows,
+  formatStoredAuditChanges,
+  isStoredAuditChanges,
+  removedNumberRecord,
+} from "@/lib/dev/kpi-audit-diff";
 import type { CustomRole } from "@/lib/auth/custom-roles";
 import type { DevLogEntry } from "@/lib/dev/logs";
 import { formatRoleLabel } from "@/lib/auth/types";
 
 export type ActivityDetail = {
   label: string;
-  value: string;
+  value?: string;
+  lines?: string[];
+  truncated?: number;
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -54,6 +64,12 @@ function pushDetail(details: ActivityDetail[], label: string, value: unknown) {
   details.push({ label, value: String(value) });
 }
 
+function pushKpiChangeDetails(details: ActivityDetail[], ctx: Record<string, unknown>) {
+  const changes = ctx.changes;
+  if (!isStoredAuditChanges(changes)) return;
+  details.push(...formatStoredAuditChanges(changes));
+}
+
 export function getActivityDetails(row: DevLogEntry, customRoles: CustomRole[] = []): ActivityDetail[] {
   const ctx = row.context;
   if (!ctx || typeof ctx !== "object") return [];
@@ -83,6 +99,7 @@ export function getActivityDetails(row: DevLogEntry, customRoles: CustomRole[] =
     pushDetail(details, "KPI", ctx.kpiSlug);
     pushDetail(details, "Year", ctx.year);
     pushDetail(details, "Weeks updated", ctx.weeks ?? ctx.rowCount);
+    pushKpiChangeDetails(details, ctx as Record<string, unknown>);
     return details;
   }
 
@@ -91,6 +108,7 @@ export function getActivityDetails(row: DevLogEntry, customRoles: CustomRole[] =
     if (ctx.month) pushDetail(details, "Month", ctx.month);
     if (ctx.kpiCount != null) pushDetail(details, "KPIs saved", ctx.kpiCount);
     if (ctx.targetCount != null) pushDetail(details, "Targets saved", ctx.targetCount);
+    pushKpiChangeDetails(details, ctx as Record<string, unknown>);
     return details;
   }
 

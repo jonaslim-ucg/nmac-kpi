@@ -28,10 +28,15 @@ function isAuthAttemptApi(pathname: string): boolean {
   );
 }
 
+function isPublicPage(pathname: string): boolean {
+  return pathname === "/login" || pathname === "/maintenance" || pathname === "/appointment-review";
+}
+
 function isMaintenanceExemptApi(pathname: string): boolean {
   return (
     pathname === "/api/auth/logout" ||
     pathname === "/api/auth/session" ||
+    pathname === "/api/appointment-review" ||
     pathname.startsWith("/api/dev/maintenance") ||
     isAuthAttemptApi(pathname)
   );
@@ -97,7 +102,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next();
     }
 
-    if (!session && pathname !== "/login" && pathname !== "/maintenance") {
+    if (!session && !isPublicPage(pathname)) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("maintenance", "1");
       return NextResponse.redirect(loginUrl);
@@ -135,7 +140,7 @@ export async function middleware(request: NextRequest) {
     return res;
   }
 
-  if (pathname === "/login" || pathname === "/maintenance") {
+  if (isPublicPage(pathname)) {
     return NextResponse.next();
   }
 

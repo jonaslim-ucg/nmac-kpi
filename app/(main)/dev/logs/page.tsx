@@ -283,11 +283,31 @@ export default function DevLogsPage() {
                                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                   Details
                                 </p>
-                                <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+                                <dl className="mt-2 grid gap-3 sm:grid-cols-2">
                                   {details.map((item) => (
-                                    <div key={`${row.id}-${item.label}`} className="min-w-0">
+                                    <div
+                                      key={`${row.id}-${item.label}`}
+                                      className={item.lines?.length ? "min-w-0 sm:col-span-2" : "min-w-0"}
+                                    >
                                       <dt className="text-xs text-muted-foreground">{item.label}</dt>
-                                      <dd className="mt-0.5 text-sm text-foreground">{item.value}</dd>
+                                      {item.lines?.length ? (
+                                        <dd className="mt-1">
+                                          <ul className="space-y-1 text-sm text-foreground">
+                                            {item.lines.map((line) => (
+                                              <li key={`${row.id}-${item.label}-${line}`} className="leading-snug">
+                                                {line}
+                                              </li>
+                                            ))}
+                                          </ul>
+                                          {item.truncated ? (
+                                            <p className="mt-1 text-xs text-muted-foreground">
+                                              …and {item.truncated} more
+                                            </p>
+                                          ) : null}
+                                        </dd>
+                                      ) : (
+                                        <dd className="mt-0.5 text-sm text-foreground">{item.value}</dd>
+                                      )}
                                     </div>
                                   ))}
                                 </dl>

@@ -1,0 +1,9 @@
+version,app_slug,release_summary,release_details,change_type,change_title
+v1.4.0,nmac-kpi,"Role-based Master KPI access, custom roles, maintenance mode, and activity logging","Admins can control which Master KPI pages each role sees and create custom roles with their own access. Developers get a private tools area with maintenance mode and a full activity log that records sign-ins, KPI saves, and admin changes — including what was added, changed, or removed. Only Developers can assign the Developer role.",new,"Master KPI access by role — choose which pages Viewer, Editor, and custom roles can open"
+v1.4.0,nmac-kpi,,,new,"Custom roles — create roles with their own Master KPI page access and optional KPI edit permission"
+v1.4.0,nmac-kpi,,,new,"Maintenance mode — block Viewers and Editors while Admins and Developers keep access"
+v1.4.0,nmac-kpi,,,new,"Activity log — automatic tracking of sign-ins, KPI saves, and admin changes (Developer → Activity)"
+v1.4.0,nmac-kpi,,,new,"Detailed data entry logs — expand a row to see what KPI values were added, changed, or removed"
+v1.4.0,nmac-kpi,,,improved,"Developer role has full admin access and a private Developer section in the sidebar"
+v1.4.0,nmac-kpi,,,improved,"Only Developers can assign or change the Developer role — Admins cannot"
+v1.4.0,nmac-kpi,,,improved,"Renamed Dev to Developer across the app for clearer role labels"

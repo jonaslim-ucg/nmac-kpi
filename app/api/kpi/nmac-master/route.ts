@@ -8,11 +8,20 @@ import {
 import { getAppDashboardSettings } from "@/lib/auth/app-settings";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { canEditKpiData } from "@/lib/auth/types";
+import {
+  diffMonthDb,
+  diffNumberRecord,
+  packAuditChanges,
+  removedNumberRecord,
+} from "@/lib/dev/kpi-audit-diff";
 import type { MonthDb } from "@/lib/kpi-nmac-2026/model";
 import {
   countMonthDbKpis,
   countTargetValues,
   deleteNmacTargetMonthRow,
+  readNmacMasterMonth,
+  readNmacTargetMonth,
+  readNmacTargets,
   writeNmacMasterMonth,
   writeNmacTargetMonth,
   writeNmacTargets,
@@ -72,18 +81,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid month." }, { status: 400 });
     }
     const values = (body.values ?? {}) as MonthDb;
+    const before = await readNmacMasterMonth(year, monthIndex);
     const result = await writeNmacMasterMonth(year, monthIndex, values);
     if (result.error) return NextResponse.json({ error: result.error }, { status: 500 });
-    auditNmacMasterMonthSaved(actor, { year, monthIndex, kpiCount: countMonthDbKpis(values) });
+    auditNmacMasterMonthSaved(actor, {
+      year,
+      monthIndex,
+      kpiCount: countMonthDbKpis(values),
+      changes: packAuditChanges(diffMonthDb(before.data, values)),
+    });
     return NextResponse.json({ ok: true });
   }
 
   if (action === "targets") {
     const values = parseNumberRecord(body.values);
     if (!values) return NextResponse.json({ error: "Invalid targets." }, { status: 400 });
+    const before = await readNmacTargets(year);
     const result = await writeNmacTargets(year, values);
     if (result.error) return NextResponse.json({ error: result.error }, { status: 500 });
-    auditNmacTargetsSaved(actor, { year, targetCount: countTargetValues(values) });
+    auditNmacTargetsSaved(actor, {
+      year,
+      targetCount: countTargetValues(values),
+      changes: packAuditChanges(diffNumberRecord(before.data, values)),
+    });
     return NextResponse.json({ ok: true });
   }
 
@@ -94,9 +114,15 @@ export async function POST(req: Request) {
     }
     const values = parseNumberRecord(body.values);
     if (!values) return NextResponse.json({ error: "Invalid targets." }, { status: 400 });
+    const before = await readNmacTargetMonth(year, monthIndex);
     const result = await writeNmacTargetMonth(year, monthIndex, values);
     if (result.error) return NextResponse.json({ error: result.error }, { status: 500 });
-    auditNmacTargetMonthSaved(actor, { year, monthIndex, targetCount: countTargetValues(values) });
+    auditNmacTargetMonthSaved(actor, {
+      year,
+      monthIndex,
+      targetCount: countTargetValues(values),
+      changes: packAuditChanges(diffNumberRecord(before.data, values)),
+    });
     return NextResponse.json({ ok: true });
   }
 
@@ -105,9 +131,14 @@ export async function POST(req: Request) {
     if (monthIndex === null) {
       return NextResponse.json({ error: "Invalid month." }, { status: 400 });
     }
+    const before = await readNmacTargetMonth(year, monthIndex);
     const result = await deleteNmacTargetMonthRow(year, monthIndex);
     if (result.error) return NextResponse.json({ error: result.error }, { status: 500 });
-    auditNmacTargetMonthCleared(actor, { year, monthIndex });
+    auditNmacTargetMonthCleared(actor, {
+      year,
+      monthIndex,
+      changes: packAuditChanges(removedNumberRecord(before.data)),
+    });
     return NextResponse.json({ ok: true });
   }
 

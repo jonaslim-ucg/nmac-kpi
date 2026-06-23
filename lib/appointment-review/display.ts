@@ -1,5 +1,5 @@
 import type { AppointmentReviewRow } from "@/lib/appointment-review/analytics";
-import { PATIENT_DURATION_OPTIONS, WAIT_TIME_OPTIONS } from "@/lib/appointment-review/types";
+import { APPOINTMENT_REVIEW_MAX_SCORE, PATIENT_DURATION_OPTIONS, WAIT_TIME_OPTIONS } from "@/lib/appointment-review/types";
 
 export type AppointmentReviewDetail = {
   id: string;
@@ -84,5 +84,5 @@ export function formatYesNo(value: boolean): string {
 }
 
 export function formatRating(value: number): string {
-  return `${value}/10`;
+  return `${value}/${APPOINTMENT_REVIEW_MAX_SCORE}`;
 }

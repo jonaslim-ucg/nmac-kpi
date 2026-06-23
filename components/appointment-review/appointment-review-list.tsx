@@ -3,7 +3,7 @@
 import { MessageSquareText } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
-import { formatReviewWhen } from "@/lib/appointment-review/display";
+import { formatRating, formatReviewWhen } from "@/lib/appointment-review/display";
 
 type Props = {
   reviews: AppointmentReviewDetail[];
@@ -84,8 +84,8 @@ export function AppointmentReviewList({ reviews, onViewReview }: Props) {
                   onClick={() => onViewReview(review.id)}
                 >
                   <td className="px-5 py-3 text-foreground">{formatReviewWhen(review.createdAt)}</td>
-                  <td className="px-3 py-3 font-mono text-foreground">{review.recommendLikelihood}/10</td>
-                  <td className="px-3 py-3 font-mono text-foreground">{review.visitRating}/10</td>
+                  <td className="px-3 py-3 font-mono text-foreground">{formatRating(review.recommendLikelihood)}</td>
+                  <td className="px-3 py-3 font-mono text-foreground">{formatRating(review.visitRating)}</td>
                   <td className="px-3 py-3 text-muted-foreground">{review.waitTimeLabel}</td>
                   <td className="max-w-[220px] px-3 py-3">
                     {review.hasComments ? (

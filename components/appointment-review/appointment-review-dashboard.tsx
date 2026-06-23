@@ -17,6 +17,7 @@ import {
   YAxis,
 } from "recharts";
 import type { AppointmentReviewStats } from "@/lib/appointment-review/analytics";
+import { APPOINTMENT_REVIEW_MAX_SCORE } from "@/lib/appointment-review/types";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 
 const CHART_COLORS = [
@@ -121,17 +122,17 @@ export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
           },
           {
             label: "Avg. recommend score",
-            value: empty ? "—" : `${stats.averages.recommendLikelihood}/10`,
+            value: empty ? "—" : `${stats.averages.recommendLikelihood}/${APPOINTMENT_REVIEW_MAX_SCORE}`,
             hint: "How likely patients are to recommend",
           },
           {
-            label: "Promoters (9–10)",
+            label: `Top recommend scores (${APPOINTMENT_REVIEW_MAX_SCORE})`,
             value: empty ? "—" : `${stats.promotersPct}%`,
             hint: "Share giving top recommend scores",
           },
           {
             label: "Avg. visit rating",
-            value: empty ? "—" : `${stats.averages.visitRating}/10`,
+            value: empty ? "—" : `${stats.averages.visitRating}/${APPOINTMENT_REVIEW_MAX_SCORE}`,
             hint: "Overall visit experience",
           },
         ]}
@@ -149,7 +150,7 @@ export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
       ) : (
         <>
           <div className="grid gap-4 xl:grid-cols-2">
-            <ChartCard title="Average ratings" subtitle="Scale 1 (worst) to 10 (best)" tall>
+            <ChartCard title="Average ratings" subtitle={`Scale 1 (worst) to ${APPOINTMENT_REVIEW_MAX_SCORE} (best)`} tall>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={stats.ratingScores} margin={{ top: 20, right: 8, left: 0, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
@@ -162,8 +163,8 @@ export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
                     textAnchor="end"
                     height={56}
                   />
-                  <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
-                  <Tooltip {...TOOLTIP_STYLE} formatter={(value) => [`${value}/10`, "Average"]} />
+                  <YAxis domain={[0, APPOINTMENT_REVIEW_MAX_SCORE]} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
+                  <Tooltip {...TOOLTIP_STYLE} formatter={(value) => [`${value}/${APPOINTMENT_REVIEW_MAX_SCORE}`, "Average"]} />
                   <Bar dataKey="score" radius={[4, 4, 0, 0]}>
                     {stats.ratingScores.map((_, i) => (
                       <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
@@ -171,7 +172,7 @@ export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
                     <LabelList
                       dataKey="score"
                       position="top"
-                      formatter={(v) => `${v}/10`}
+                      formatter={(v) => `${v}/${APPOINTMENT_REVIEW_MAX_SCORE}`}
                       fill="var(--foreground)"
                       fontSize={12}
                       fontWeight={600}
@@ -191,11 +192,11 @@ export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
                     tick={{ fontSize: 11, fill: "var(--muted)" }}
                     stroke="var(--border)"
                   />
-                  <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
+                  <YAxis domain={[0, APPOINTMENT_REVIEW_MAX_SCORE]} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
                   <Tooltip
                     {...TOOLTIP_STYLE}
                     labelFormatter={(label) => formatDay(String(label ?? ""))}
-                    formatter={(value, name) => [`${value}/10`, String(name)]}
+                    formatter={(value, name) => [`${value}/${APPOINTMENT_REVIEW_MAX_SCORE}`, String(name)]}
                   />
                   <Legend wrapperStyle={{ color: "var(--foreground)", fontSize: 12 }} />
                   <Line

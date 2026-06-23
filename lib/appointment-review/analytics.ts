@@ -1,4 +1,5 @@
 import {
+  APPOINTMENT_REVIEW_MAX_SCORE,
   PATIENT_DURATION_OPTIONS,
   WAIT_TIME_OPTIONS,
   type PatientDurationValue,
@@ -101,7 +102,7 @@ function groupByDay(rows: AppointmentReviewRow[]): AppointmentReviewStats["ratin
 
 export function buildAppointmentReviewStats(rows: AppointmentReviewRow[]): AppointmentReviewStats {
   const total = rows.length;
-  const promoters = rows.filter((r) => r.recommend_likelihood >= 9).length;
+  const promoters = rows.filter((r) => r.recommend_likelihood >= APPOINTMENT_REVIEW_MAX_SCORE).length;
 
   const averages = {
     appointmentEase: Math.round(avg(rows.map((r) => r.appointment_ease)) * 10) / 10,

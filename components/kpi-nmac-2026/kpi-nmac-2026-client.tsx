@@ -2,6 +2,7 @@
 
 import { useAppTheme, type AppThemeName } from "@/components/app-theme-provider";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ChartJs from "chart.js/auto";
 import type { Chart, ChartConfiguration } from "chart.js";
 import "./nk26.css";
 import {
@@ -49,12 +50,6 @@ import { fetchNmacMasterMonthly } from "@/lib/supabase/nmac-master-service";
 import { fetchNmacTargetMonths, fetchNmacTargets } from "@/lib/supabase/nmac-targets-service";
 import { MonthTabs } from "./nmac-master-entry-panel";
 import { ReferralKpiPanel } from "./referral-kpi-panel";
-
-let chartJsModule: Promise<typeof import("chart.js/auto")> | null = null;
-function loadChartJs() {
-  chartJsModule ??= import("chart.js/auto");
-  return chartJsModule;
-}
 
 type Db = Record<number, MonthDb>;
 
@@ -109,10 +104,9 @@ export function KpiNmac2026Client({ view }: Props) {
   }, [resolvedTheme]);
   const [selectedYear, setSelectedYear] = useState(DEFAULT_KPI_YEAR);
   const [selectedMonth, setSelectedMonth] = useState(defaultCompletedMonthIndex);
-  const [db, setDb] = useState<Db>(() => readBrowserNmacDb(DEFAULT_KPI_YEAR));
-  const initialPack = loadTargetPack(DEFAULT_KPI_YEAR);
-  const [fyTargets, setFyTargets] = useState<Record<string, number>>(() => initialPack.fy);
-  const [targetsByMonth, setTargetsByMonth] = useState<Partial<Record<number, Record<string, number>>>>(() => initialPack.byMonth);
+  const [db, setDb] = useState<Db>(() => emptyNmacMonthDbs());
+  const [fyTargets, setFyTargets] = useState<Record<string, number>>({});
+  const [targetsByMonth, setTargetsByMonth] = useState<Partial<Record<number, Record<string, number>>>>({});
   const chartsRef = useRef<Chart[]>([]);
   const pullGen = useRef(0);
   const chartFxGen = useRef(0);
@@ -174,6 +168,16 @@ export function KpiNmac2026Client({ view }: Props) {
   }, [selectedYear]);
 
   useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDb(readBrowserNmacDb(selectedYear));
+      const pack = loadTargetPack(selectedYear);
+      setFyTargets(pack.fy);
+      setTargetsByMonth(pack.byMonth);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [selectedYear]);
+
+  useEffect(() => {
     const onPrefs = (ev: Event) => {
       hydrateLocalDb();
       const detail = (ev as CustomEvent<DashboardPrefsDetail>).detail;
@@ -198,14 +202,12 @@ export function KpiNmac2026Client({ view }: Props) {
     chartsRef.current.forEach((c) => c.destroy());
     chartsRef.current = [];
 
-    loadChartJs().then(({ default: ChartCtor }) => {
+    requestAnimationFrame(() => {
       if (gen !== chartFxGen.current) return;
-      requestAnimationFrame(() => {
-        if (gen !== chartFxGen.current) return;
       const mount = (id: string, cfg: ChartConfiguration) => {
         const canvas = document.getElementById(id) as HTMLCanvasElement | null;
         if (!canvas) return;
-        chartsRef.current.push(new ChartCtor(canvas, cfg));
+        chartsRef.current.push(new ChartJs(canvas, cfg));
       };
 
       const highlight = selectedMonth;
@@ -318,7 +320,6 @@ export function KpiNmac2026Client({ view }: Props) {
         default:
           break;
       }
-      });
     });
 
     return () => {

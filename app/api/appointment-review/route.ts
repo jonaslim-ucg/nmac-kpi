@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  APPOINTMENT_REVIEW_MAX_SCORE,
   PATIENT_DURATION_OPTIONS,
   WAIT_TIME_OPTIONS,
   type AppointmentReviewPayload,
@@ -13,7 +14,7 @@ const DURATION_VALUES = new Set(PATIENT_DURATION_OPTIONS.map((o) => o.value));
 
 function scale(n: unknown): number | null {
   const v = Number(n);
-  if (!Number.isInteger(v) || v < 1 || v > 10) return null;
+  if (!Number.isInteger(v) || v < 1 || v > APPOINTMENT_REVIEW_MAX_SCORE) return null;
   return v;
 }
 

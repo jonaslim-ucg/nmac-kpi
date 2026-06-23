@@ -1,3 +1,5 @@
+export const APPOINTMENT_REVIEW_MAX_SCORE = 5;
+
 export const WAIT_TIME_OPTIONS = [
   { value: "0-5", label: "0–5 minutes" },
   { value: "10-15", label: "10–15 minutes" },

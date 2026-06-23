@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import {
+  APPOINTMENT_REVIEW_MAX_SCORE,
   EMPTY_APPOINTMENT_REVIEW_FORM,
   PATIENT_DURATION_OPTIONS,
   WAIT_TIME_OPTIONS,
@@ -27,7 +28,7 @@ function ScaleInput({
   return (
     <div>
       <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={name}>
-        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+        {Array.from({ length: APPOINTMENT_REVIEW_MAX_SCORE }, (_, i) => i + 1).map((n) => {
           const selected = value === n;
           return (
             <label
@@ -54,7 +55,9 @@ function ScaleInput({
       </div>
       <div className="mt-2 flex justify-between text-xs text-muted-foreground">
         <span>1 — {minLabel}</span>
-        <span>10 — {maxLabel}</span>
+        <span>
+          {APPOINTMENT_REVIEW_MAX_SCORE} — {maxLabel}
+        </span>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Search } from "lucide-react";
 import {
   defaultCompletedMonthIndex,
@@ -86,12 +86,12 @@ export function NmacMasterEntryPanel({
   const [toast, setToast] = useState(false);
   const [formEpoch, setFormEpoch] = useState(0);
 
-  const onInputTy = (id: string, raw: string) => {
+  const onInputTy = useCallback((id: string, raw: string) => {
     const k = kpis.find((x) => x.id === id)!;
     if (raw === "") return "";
     const vnum = Number(raw);
     return meetsTarget(k, vnum) ? "nk26-ok" : "nk26-warn";
-  };
+  }, [kpis]);
 
   const saveMonth = async () => {
     const m = selectedMonth;
@@ -197,7 +197,7 @@ export function NmacMasterEntryPanel({
       });
     });
     return nodes;
-  }, [db, selectedMonth, inputIdPrefix, formEpoch, kpis, query]);
+  }, [db, selectedMonth, inputIdPrefix, kpis, onInputTy, query]);
 
   const visibleCount = useMemo(() => kpis.filter((k) => matchesQuery(k, query)).length, [kpis, query]);
 

@@ -24,6 +24,7 @@ import {
   formatVal,
   getLastYearVal,
   getVal,
+  isNmacKpiVisible,
   KPIs,
   loadData,
   loadTargetPack,
@@ -213,6 +214,7 @@ export function KpiNmac2026Client({ view }: Props) {
       const highlight = selectedMonth;
 
       const simpleBar = (id: string, kpiId: string) => {
+        if (!isNmacKpiVisible(kpiId)) return;
         const row0 = findKpi(kpiId, kpisPerMonth[0] ?? KPIs);
         const targetsArr = MONTHS.map((_, i) => findKpi(kpiId, kpisPerMonth[i] ?? KPIs).target);
         const barColors = colorBar(db, kpiId, targetsArr, row0.higher);
@@ -235,6 +237,7 @@ export function KpiNmac2026Client({ view }: Props) {
       };
 
       const simpleLine = (id: string, kpiId: string) => {
+        if (!isNmacKpiVisible(kpiId)) return;
         const row0 = findKpi(kpiId, kpisPerMonth[0] ?? KPIs);
         const targetsArr = MONTHS.map((_, i) => findKpi(kpiId, kpisPerMonth[i] ?? KPIs).target);
         const lineStyle = nk26ThisYearLineStyle(0.2);
@@ -285,7 +288,9 @@ export function KpiNmac2026Client({ view }: Props) {
           simpleBar("nk26-c-ph", "ph");
           break;
         case "finance":
-          mount("nk26-c-rev2", revenueChartConfig(db, colorBar, kpisPerMonth, highlight));
+          if (isNmacKpiVisible("revenue")) {
+            mount("nk26-c-rev2", revenueChartConfig(db, colorBar, kpisPerMonth, highlight));
+          }
           simpleLine("nk26-c-net-margin", "net_margin");
           simpleLine("nk26-c-revenue-trend", "revenue_trend");
           simpleBar("nk26-c-copay", "copay");
@@ -330,6 +335,7 @@ export function KpiNmac2026Client({ view }: Props) {
   }, [v, db, kpisPerMonth, chartThemeKey, selectedMonth]);
 
   const badge = (kpiId: string) => {
+    if (!isNmacKpiVisible(kpiId)) return null;
     const k = findKpi(kpiId, kpisForSelected);
     const val = getVal(db, selectedMonth, kpiId);
     const sc = statusColor(k, val);
@@ -371,7 +377,7 @@ export function KpiNmac2026Client({ view }: Props) {
   });
 
   const monthKpiStats = (ids: string[]) =>
-    ids.map((id) => {
+    ids.filter(isNmacKpiVisible).map((id) => {
       const k = findKpi(id, kpisForSelected);
       const val = getVal(db, selectedMonth, id);
       const ly = getLastYearVal(db, selectedMonth, id);
@@ -406,7 +412,8 @@ export function KpiNmac2026Client({ view }: Props) {
 
   const visitsStats = monthKpiStats(["visits", "annuals", "exec"]);
 
-  const sectionMonthStats = VIEW_MONTH_STATS[v] ? monthKpiStats(VIEW_MONTH_STATS[v]!) : null;
+  const sectionStatIds = VIEW_MONTH_STATS[v]?.filter(isNmacKpiVisible) ?? null;
+  const sectionMonthStats = sectionStatIds ? monthKpiStats(sectionStatIds) : null;
 
   return (
     <div className="nk26-root nk26-shell">
@@ -542,18 +549,20 @@ export function KpiNmac2026Client({ view }: Props) {
                 <canvas id="nk26-c-calls" />
               </div>
             </div>
-            <div className="nk26-card">
-              <div className="nk26-chd">
-                <div>
-                  <div className="nk26-ctitle">Billed revenue (run-rate)</div>
-                  <div className="nk26-csub">Monthly run-rate vs $7.9M target</div>
+            {isNmacKpiVisible("revenue") ? (
+              <div className="nk26-card">
+                <div className="nk26-chd">
+                  <div>
+                    <div className="nk26-ctitle">Billed revenue (run-rate)</div>
+                    <div className="nk26-csub">Monthly run-rate vs $7.9M target</div>
+                  </div>
+                  {badge("revenue")}
                 </div>
-                {badge("revenue")}
+                <div className="nk26-canvas">
+                  <canvas id="nk26-c-revenue" />
+                </div>
               </div>
-              <div className="nk26-canvas">
-                <canvas id="nk26-c-revenue" />
-              </div>
-            </div>
+            ) : null}
           </div>
           </div>
         </>
@@ -616,14 +625,14 @@ export function KpiNmac2026Client({ view }: Props) {
           <header className="nk26-page-head">
             <div className="nk26-section-title">Scheduling & utilization</div>
             <div className="nk26-section-sub">
-              Doctor utilisation ≥ 90% · no-show ≤ 7% · lead → appointment conversion ≥ 75% · confirmation rate ≥ 90%
+              Doctor utilisation ≥ 90% · no-show ≤ 7% · lead → appointment conversion ≥ 75% · PH-generated visits
               <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
             {sectionMonthStats ? (
-              <div key={selectedMonth} className={sectionStatsGridClass(VIEW_MONTH_STATS[v]!.length)}>
+              <div key={selectedMonth} className={sectionStatsGridClass(sectionStatIds?.length ?? 0)}>
                 {sectionMonthStats}
               </div>
             ) : null}
@@ -655,30 +664,34 @@ export function KpiNmac2026Client({ view }: Props) {
                 <canvas id="nk26-c-leads" />
               </div>
             </div>
-            <div className="nk26-card">
-              <div className="nk26-chd">
-                <div>
-                  <div className="nk26-ctitle">Appointment confirmation rate</div>
-                  <div className="nk26-csub">Target: ≥ 90%</div>
+            {isNmacKpiVisible("appt_confirm") ? (
+              <div className="nk26-card">
+                <div className="nk26-chd">
+                  <div>
+                    <div className="nk26-ctitle">Appointment confirmation rate</div>
+                    <div className="nk26-csub">Target: ≥ 90%</div>
+                  </div>
+                  {badge("appt_confirm")}
                 </div>
-                {badge("appt_confirm")}
-              </div>
-              <div className="nk26-canvas">
-                <canvas id="nk26-c-appt-confirm" />
-              </div>
-            </div>
-            <div className="nk26-card">
-              <div className="nk26-chd">
-                <div>
-                  <div className="nk26-ctitle">Avg. check-in → check-out</div>
-                  <div className="nk26-csub">Target: ≤ 30 min</div>
+                <div className="nk26-canvas">
+                  <canvas id="nk26-c-appt-confirm" />
                 </div>
-                {badge("checkin_checkout")}
               </div>
-              <div className="nk26-canvas">
-                <canvas id="nk26-c-checkin-checkout" />
+            ) : null}
+            {isNmacKpiVisible("checkin_checkout") ? (
+              <div className="nk26-card">
+                <div className="nk26-chd">
+                  <div>
+                    <div className="nk26-ctitle">Avg. check-in → check-out</div>
+                    <div className="nk26-csub">Target: ≤ 30 min</div>
+                  </div>
+                  {badge("checkin_checkout")}
+                </div>
+                <div className="nk26-canvas">
+                  <canvas id="nk26-c-checkin-checkout" />
+                </div>
               </div>
-            </div>
+            ) : null}
             <div className="nk26-card">
               <div className="nk26-chd">
                 <div>
@@ -701,54 +714,60 @@ export function KpiNmac2026Client({ view }: Props) {
           <header className="nk26-page-head">
             <div className="nk26-section-title">Finance & revenue</div>
             <div className="nk26-section-sub">
-              Billed revenue run-rate · net margin ≥ 15% · copay collection ≥ 95% · unbilled &lt; 10%
+              Copay collection ≥ 95% · revenue leakage &lt; 10% · ShopNMAC retail sales
               <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
             {sectionMonthStats ? (
-              <div key={selectedMonth} className={sectionStatsGridClass(VIEW_MONTH_STATS[v]!.length)}>
+              <div key={selectedMonth} className={sectionStatsGridClass(sectionStatIds?.length ?? 0)}>
                 {sectionMonthStats}
               </div>
             ) : null}
             <div className="nk26-charts">
-            <div className="nk26-card nk26-card-full">
-              <div className="nk26-chd">
-                <div>
-                  <div className="nk26-ctitle">Billed revenue (run-rate) vs $7.9M target</div>
-                  <div className="nk26-csub">Monthly actuals with YTD cumulative</div>
+            {isNmacKpiVisible("revenue") ? (
+              <div className="nk26-card nk26-card-full">
+                <div className="nk26-chd">
+                  <div>
+                    <div className="nk26-ctitle">Billed revenue (run-rate) vs $7.9M target</div>
+                    <div className="nk26-csub">Monthly actuals with YTD cumulative</div>
+                  </div>
+                  {badge("revenue")}
                 </div>
-                {badge("revenue")}
-              </div>
-              <div className="nk26-canvas" style={{ height: 220 }}>
-                <canvas id="nk26-c-rev2" />
-              </div>
-            </div>
-            <div className="nk26-card">
-              <div className="nk26-chd">
-                <div>
-                  <div className="nk26-ctitle">Net income margin</div>
-                  <div className="nk26-csub">Target: ≥ 15%</div>
+                <div className="nk26-canvas" style={{ height: 220 }}>
+                  <canvas id="nk26-c-rev2" />
                 </div>
-                {badge("net_margin")}
               </div>
-              <div className="nk26-canvas">
-                <canvas id="nk26-c-net-margin" />
-              </div>
-            </div>
-            <div className="nk26-card">
-              <div className="nk26-chd">
-                <div>
-                  <div className="nk26-ctitle">Revenue trend vs. prev month</div>
-                  <div className="nk26-csub">Month-over-month % change</div>
+            ) : null}
+            {isNmacKpiVisible("net_margin") ? (
+              <div className="nk26-card">
+                <div className="nk26-chd">
+                  <div>
+                    <div className="nk26-ctitle">Net income margin</div>
+                    <div className="nk26-csub">Target: ≥ 15%</div>
+                  </div>
+                  {badge("net_margin")}
                 </div>
-                {badge("revenue_trend")}
+                <div className="nk26-canvas">
+                  <canvas id="nk26-c-net-margin" />
+                </div>
               </div>
-              <div className="nk26-canvas">
-                <canvas id="nk26-c-revenue-trend" />
+            ) : null}
+            {isNmacKpiVisible("revenue_trend") ? (
+              <div className="nk26-card">
+                <div className="nk26-chd">
+                  <div>
+                    <div className="nk26-ctitle">Revenue trend vs. prev month</div>
+                    <div className="nk26-csub">Month-over-month % change</div>
+                  </div>
+                  {badge("revenue_trend")}
+                </div>
+                <div className="nk26-canvas">
+                  <canvas id="nk26-c-revenue-trend" />
+                </div>
               </div>
-            </div>
+            ) : null}
             <div className="nk26-card">
               <div className="nk26-chd">
                 <div>
@@ -795,14 +814,14 @@ export function KpiNmac2026Client({ view }: Props) {
           <header className="nk26-page-head">
             <div className="nk26-section-title">Call performance</div>
             <div className="nk26-section-sub">
-              Call answer rate ≥ 90% · inbound calls ≥ 300 / month · answered ≥ 270 · missed/abandoned ≤ 30
+              Call answer rate ≥ 90% · inbound calls ≥ 300 / month
               <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
             {sectionMonthStats ? (
-              <div key={selectedMonth} className={sectionStatsGridClass(VIEW_MONTH_STATS[v]!.length)}>
+              <div key={selectedMonth} className={sectionStatsGridClass(sectionStatIds?.length ?? 0)}>
                 {sectionMonthStats}
               </div>
             ) : null}
@@ -831,30 +850,34 @@ export function KpiNmac2026Client({ view }: Props) {
                 <canvas id="nk26-c-callvol" />
               </div>
             </div>
-            <div className="nk26-card">
-              <div className="nk26-chd">
-                <div>
-                  <div className="nk26-ctitle">Total answered calls</div>
-                  <div className="nk26-csub">Target: ≥ 270 / month</div>
+            {isNmacKpiVisible("call_answered") ? (
+              <div className="nk26-card">
+                <div className="nk26-chd">
+                  <div>
+                    <div className="nk26-ctitle">Total answered calls</div>
+                    <div className="nk26-csub">Target: ≥ 270 / month</div>
+                  </div>
+                  {badge("call_answered")}
                 </div>
-                {badge("call_answered")}
-              </div>
-              <div className="nk26-canvas">
-                <canvas id="nk26-c-call-answered" />
-              </div>
-            </div>
-            <div className="nk26-card">
-              <div className="nk26-chd">
-                <div>
-                  <div className="nk26-ctitle">Total missed/abandoned calls</div>
-                  <div className="nk26-csub">Target: ≤ 30 / month</div>
+                <div className="nk26-canvas">
+                  <canvas id="nk26-c-call-answered" />
                 </div>
-                {badge("call_missed")}
               </div>
-              <div className="nk26-canvas">
-                <canvas id="nk26-c-call-missed" />
+            ) : null}
+            {isNmacKpiVisible("call_missed") ? (
+              <div className="nk26-card">
+                <div className="nk26-chd">
+                  <div>
+                    <div className="nk26-ctitle">Total missed/abandoned calls</div>
+                    <div className="nk26-csub">Target: ≤ 30 / month</div>
+                  </div>
+                  {badge("call_missed")}
+                </div>
+                <div className="nk26-canvas">
+                  <canvas id="nk26-c-call-missed" />
+                </div>
               </div>
-            </div>
+            ) : null}
           </div>
           </div>
         </>
@@ -872,7 +895,7 @@ export function KpiNmac2026Client({ view }: Props) {
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
             {sectionMonthStats ? (
-              <div key={selectedMonth} className={sectionStatsGridClass(VIEW_MONTH_STATS[v]!.length)}>
+              <div key={selectedMonth} className={sectionStatsGridClass(sectionStatIds?.length ?? 0)}>
                 {sectionMonthStats}
               </div>
             ) : null}
@@ -951,7 +974,7 @@ export function KpiNmac2026Client({ view }: Props) {
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
             {sectionMonthStats ? (
-              <div key={selectedMonth} className={sectionStatsGridClass(VIEW_MONTH_STATS[v]!.length)}>
+              <div key={selectedMonth} className={sectionStatsGridClass(sectionStatIds?.length ?? 0)}>
                 {sectionMonthStats}
               </div>
             ) : null}
@@ -1031,14 +1054,14 @@ export function KpiNmac2026Client({ view }: Props) {
           <header className="nk26-page-head">
             <div className="nk26-section-title">Compliance & patient experience</div>
             <div className="nk26-section-sub">
-              SOPs 100% current · survey score ≥ 4.7/5 · overall clinic productivity ≥ 90% · staff engagement ≥ 80%
+              Survey score ≥ 4.7/5 · overall clinic productivity ≥ 90%
               <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>
           <div key={`${v}-content`} className="nk26-route-enter">
             <MonthTabs selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
             {sectionMonthStats ? (
-              <div key={selectedMonth} className={sectionStatsGridClass(VIEW_MONTH_STATS[v]!.length)}>
+              <div key={selectedMonth} className={sectionStatsGridClass(sectionStatIds?.length ?? 0)}>
                 {sectionMonthStats}
               </div>
             ) : null}
@@ -1067,30 +1090,34 @@ export function KpiNmac2026Client({ view }: Props) {
                 <canvas id="nk26-c-exp" />
               </div>
             </div>
-            <div className="nk26-card">
-              <div className="nk26-chd">
-                <div>
-                  <div className="nk26-ctitle">Staff engagement index</div>
-                  <div className="nk26-csub">Target: ≥ 80%</div>
+            {isNmacKpiVisible("engage") ? (
+              <div className="nk26-card">
+                <div className="nk26-chd">
+                  <div>
+                    <div className="nk26-ctitle">Staff engagement index</div>
+                    <div className="nk26-csub">Target: ≥ 80%</div>
+                  </div>
+                  {badge("engage")}
                 </div>
-                {badge("engage")}
-              </div>
-              <div className="nk26-canvas">
-                <canvas id="nk26-c-engage" />
-              </div>
-            </div>
-            <div className="nk26-card">
-              <div className="nk26-chd">
-                <div>
-                  <div className="nk26-ctitle">SOP compliance</div>
-                  <div className="nk26-csub">Target: 100%</div>
+                <div className="nk26-canvas">
+                  <canvas id="nk26-c-engage" />
                 </div>
-                {badge("sop")}
               </div>
-              <div className="nk26-canvas">
-                <canvas id="nk26-c-sop" />
+            ) : null}
+            {isNmacKpiVisible("sop") ? (
+              <div className="nk26-card">
+                <div className="nk26-chd">
+                  <div>
+                    <div className="nk26-ctitle">SOP compliance</div>
+                    <div className="nk26-csub">Target: 100%</div>
+                  </div>
+                  {badge("sop")}
+                </div>
+                <div className="nk26-canvas">
+                  <canvas id="nk26-c-sop" />
+                </div>
               </div>
-            </div>
+            ) : null}
           </div>
           </div>
         </>

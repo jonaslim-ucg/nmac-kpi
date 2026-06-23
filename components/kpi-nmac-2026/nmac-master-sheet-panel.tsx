@@ -7,6 +7,7 @@ import {
   getVal,
   KPIs,
   MONTHS,
+  VISIBLE_KPIS,
   type KpiRow,
   type MonthDb,
 } from "@/lib/kpi-nmac-2026/model";
@@ -28,6 +29,7 @@ type Props = {
   targets: Record<string, number>;
   year: number;
   supportedYears: readonly number[];
+  kpis?: readonly KpiRow[];
   onYearChange: (year: number) => void;
   onSave: (payload: SavePayload) => Promise<boolean | void> | boolean | void;
   saving?: boolean;
@@ -59,6 +61,7 @@ export function NmacMasterSheetPanel({
   targets,
   year,
   supportedYears,
+  kpis = VISIBLE_KPIS,
   onYearChange,
   onSave,
   saving = false,
@@ -70,7 +73,7 @@ export function NmacMasterSheetPanel({
   const [targetDrafts, setTargetDrafts] = useState<Record<string, string>>({});
   const [toast, setToast] = useState(false);
 
-  const rows = useMemo(() => KPIs.filter((k) => matchesQuery(k, query)), [query]);
+  const rows = useMemo(() => kpis.filter((k) => matchesQuery(k, query)), [kpis, query]);
   const dirtyCellCount = Object.keys(cellDrafts).length;
   const dirtyTargetCount = Object.keys(targetDrafts).length;
   const dirty = dirtyCellCount + dirtyTargetCount > 0;
@@ -127,7 +130,7 @@ export function NmacMasterSheetPanel({
 
     const nextTargets = { ...targets };
     for (const [id, raw] of Object.entries(targetDrafts)) {
-      const fallback = KPIs.find((k) => k.id === id)?.target ?? 0;
+      const fallback = kpis.find((k) => k.id === id)?.target ?? KPIs.find((k) => k.id === id)?.target ?? 0;
       nextTargets[id] = parseCell(raw) ?? fallback;
     }
 

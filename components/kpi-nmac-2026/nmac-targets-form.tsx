@@ -2,12 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import { DOMAINS_ORDER, KPIs, type KpiRow } from "@/lib/kpi-nmac-2026/model";
+import { DOMAINS_ORDER, KPIs, VISIBLE_KPIS, type KpiRow } from "@/lib/kpi-nmac-2026/model";
 
 type Props = {
   targets: Record<string, number>;
   onChange: (next: Record<string, number>) => void;
   disabled?: boolean;
+  kpis?: readonly KpiRow[];
   /** Values to compare against for “Edited” styling (e.g. FY effective when editing a single month). */
   baselineTargets?: Record<string, number>;
   /** Label for the baseline line under each KPI. */
@@ -21,15 +22,15 @@ function matchesQuery(k: KpiRow, q: string): boolean {
 }
 
 /** Grouped editors for NMAC master target overrides (full map including defaults). */
-export function NmacTargetsForm({ targets, onChange, disabled, baselineTargets, baselineLabel }: Props) {
+export function NmacTargetsForm({ targets, onChange, disabled, kpis = VISIBLE_KPIS, baselineTargets, baselineLabel }: Props) {
   const [query, setQuery] = useState("");
   /** Lets users clear the field while typing; default is restored on blur when still empty. */
   const [editing, setEditing] = useState<Record<string, string>>({});
 
   const baseline = useMemo(() => {
     if (baselineTargets) return baselineTargets;
-    return Object.fromEntries(KPIs.map((k) => [k.id, k.target])) as Record<string, number>;
-  }, [baselineTargets]);
+    return Object.fromEntries(kpis.map((k) => [k.id, k.target])) as Record<string, number>;
+  }, [baselineTargets, kpis]);
 
   const blLabel = baselineLabel ?? "App default";
 
@@ -38,11 +39,11 @@ export function NmacTargetsForm({ targets, onChange, disabled, baselineTargets, 
     DOMAINS_ORDER.forEach((d) => {
       m[d] = [];
     });
-    KPIs.forEach((k) => {
+    kpis.forEach((k) => {
       if (m[k.domain]) m[k.domain].push(k);
     });
     return m;
-  }, []);
+  }, [kpis]);
 
   function commitTarget(id: string, raw: string) {
     const v = raw.trim();
@@ -106,7 +107,7 @@ export function NmacTargetsForm({ targets, onChange, disabled, baselineTargets, 
 
       {totalVisible === 0 ? (
         <p className="rounded-lg border border-dashed border-border bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground">
-          No KPIs match your filter. Clear the search box to see all {KPIs.length} metrics.
+          No KPIs match your filter. Clear the search box to see all {kpis.length} metrics.
         </p>
       ) : (
         <div className="flex flex-col gap-3">

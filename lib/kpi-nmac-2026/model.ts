@@ -75,6 +75,34 @@ export const KPIs: KpiRow[] = [
   { id: "rn_visits", label: "RN Visits (CPT 99211)", unit: "", target: 58, gate: false, domain: "Nursing", higher: true },
 ];
 
+/**
+ * Developer-controlled KPI visibility.
+ * Remove an id from this list to unhide it without deleting its Supabase data.
+ */
+export const DEVELOPER_HIDDEN_KPI_IDS = [
+  "call_answered",
+  "call_missed",
+  "checkin_checkout",
+  "appt_confirm",
+  "sop",
+  "engage",
+  "revenue",
+  "net_margin",
+  "revenue_trend",
+] as const;
+
+const DEVELOPER_HIDDEN_KPI_ID_SET = new Set<string>(DEVELOPER_HIDDEN_KPI_IDS);
+
+export function isNmacKpiVisible(id: string): boolean {
+  return !DEVELOPER_HIDDEN_KPI_ID_SET.has(id);
+}
+
+export function visibleKpis(kpis: readonly KpiRow[] = KPIs): KpiRow[] {
+  return kpis.filter((kpi) => isNmacKpiVisible(kpi.id));
+}
+
+export const VISIBLE_KPIS = visibleKpis();
+
 function normalizeTargetMap(raw: unknown): Record<string, number> {
   const out: Record<string, number> = {};
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
@@ -153,7 +181,7 @@ export function buildKpisPerMonth(
   byMonth: Partial<Record<number, Record<string, number>>>,
 ): KpiRow[][] {
   return MONTHS.map((_, m) =>
-    resolveKpisWithTargets(mergeDefaultTargets({ ...fyPartial, ...byMonth[m] })),
+    visibleKpis(resolveKpisWithTargets(mergeDefaultTargets({ ...fyPartial, ...byMonth[m] }))),
   );
 }
 

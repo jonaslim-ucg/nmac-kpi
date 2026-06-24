@@ -2,6 +2,7 @@
 
 import { useSession } from "@/components/auth/session-provider";
 import { MaintenanceModePanel } from "@/components/dev/maintenance-mode-panel";
+import { NmacKpiVisibilityPanel } from "@/components/dev/nmac-kpi-visibility-panel";
 import { MainShell } from "@/components/dashboard/main-shell";
 import { canAccessDev } from "@/lib/auth/types";
 
@@ -36,6 +37,18 @@ export default function DevPage() {
           </div>
           <div className="px-4 py-4 sm:px-5">
             <MaintenanceModePanel />
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
+          <div className="border-b border-border bg-surface-muted/40 px-4 py-3 sm:px-5">
+            <h2 className="text-sm font-semibold text-foreground">NMAC KPI visibility</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Hide or show KPI rows without changing code.
+            </p>
+          </div>
+          <div className="px-4 py-4 sm:px-5">
+            <NmacKpiVisibilityPanel />
           </div>
         </section>
       </div>

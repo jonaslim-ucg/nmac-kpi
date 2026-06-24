@@ -3,7 +3,8 @@ import { auditRoleNmacNavUpdated } from "@/lib/dev/audit-log";
 import { getAppDashboardSettings, updateAppDashboardSettings } from "@/lib/auth/app-settings";
 import { configurableRolesForNmacNav, normalizeRoleNmacNavAccess } from "@/lib/auth/role-nmac-nav";
 import { getSessionFromCookies } from "@/lib/auth/session";
-import { canManageUsers } from "@/lib/auth/types";
+import { canAccessDev, canManageUsers } from "@/lib/auth/types";
+import { normalizeHiddenNmacKpiIds } from "@/lib/kpi-nmac-2026/model";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
@@ -42,14 +43,19 @@ export async function PATCH(req: Request) {
     use_nmac_test_data?: unknown;
     clear_nmac_month_cache?: unknown;
     role_nmac_nav?: unknown;
+    hidden_nmac_kpi_ids?: unknown;
   };
 
   const wantsOrgToggle =
     typeof body.hide_legacy_nav === "boolean" || typeof body.use_nmac_test_data === "boolean";
   const wantsRoleNav = body.role_nmac_nav !== undefined;
   const wantsCacheClear = body.clear_nmac_month_cache === true;
+  const wantsKpiVisibility = body.hidden_nmac_kpi_ids !== undefined;
 
   if ((wantsOrgToggle || wantsRoleNav) && !isAdmin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (wantsKpiVisibility && !canAccessDev(session.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -60,6 +66,7 @@ export async function PATCH(req: Request) {
     useNmacTestData?: boolean;
     bumpNmacMonthCacheRevision?: boolean;
     roleNmacNav?: ReturnType<typeof normalizeRoleNmacNavAccess>;
+    hiddenNmacKpiIds?: string[];
   } = {};
 
   if (typeof body.hide_legacy_nav === "boolean") input.hideLegacyNav = body.hide_legacy_nav;
@@ -70,12 +77,16 @@ export async function PATCH(req: Request) {
       currentSettings?.customRoles ?? [],
     );
   }
+  if (wantsKpiVisibility) {
+    input.hiddenNmacKpiIds = normalizeHiddenNmacKpiIds(body.hidden_nmac_kpi_ids);
+  }
   if (wantsCacheClear) input.bumpNmacMonthCacheRevision = true;
 
   if (
     input.hideLegacyNav === undefined &&
     input.useNmacTestData === undefined &&
     input.roleNmacNav === undefined &&
+    input.hiddenNmacKpiIds === undefined &&
     !input.bumpNmacMonthCacheRevision
   ) {
     return NextResponse.json({ error: "No valid fields to update." }, { status: 400 });

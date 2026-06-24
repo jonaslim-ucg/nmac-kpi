@@ -19,6 +19,7 @@ import {
   MONTHS,
   saveTargetOverrides,
   saveTargetPack,
+  visibleKpis,
 } from "@/lib/kpi-nmac-2026/model";
 import { DEFAULT_KPI_YEAR, SUPPORTED_KPI_YEARS } from "@/lib/kpi/years";
 import { fetchNmacMasterMonthly, upsertNmacMasterMonth } from "@/lib/supabase/nmac-master-service";
@@ -37,7 +38,7 @@ type TargetScope = "fy" | number;
 
 export default function AdminNmacMasterPage() {
   const { user, loading: sessionLoading } = useSession();
-  const { customRoles } = useDashboardPreferences();
+  const { customRoles, hiddenNmacKpiIds } = useDashboardPreferences();
   const [tab, setTab] = useState<Tab>("targets");
   const [year, setYear] = useState(DEFAULT_KPI_YEAR);
   const [db, setDb] = useState<NmacMasterDb>(() => emptyNmacMonthDbs());
@@ -54,13 +55,17 @@ export default function AdminNmacMasterPage() {
   const [snackbar, setSnackbar] = useState<{ text: string; variant: SnackbarVariant } | null>(null);
 
   const kpisForEntry = useMemo(
-    () => buildKpisPerMonth(fyPartial, monthPartials)[entryMonth] ?? buildKpisPerMonth(fyPartial, monthPartials)[0]!,
-    [fyPartial, monthPartials, entryMonth],
+    () =>
+      buildKpisPerMonth(fyPartial, monthPartials, hiddenNmacKpiIds)[entryMonth] ??
+      buildKpisPerMonth(fyPartial, monthPartials, hiddenNmacKpiIds)[0]!,
+    [fyPartial, hiddenNmacKpiIds, monthPartials, entryMonth],
   );
 
+  const visibleKpiRows = useMemo(() => visibleKpis(KPIs, hiddenNmacKpiIds), [hiddenNmacKpiIds]);
+
   const targetsDirty = useMemo(
-    () => KPIs.some((k) => targetsFull[k.id] !== savedTargets[k.id]),
-    [targetsFull, savedTargets],
+    () => visibleKpiRows.some((k) => targetsFull[k.id] !== savedTargets[k.id]),
+    [targetsFull, savedTargets, visibleKpiRows],
   );
 
   const sheetTargets = useMemo(() => mergeDefaultTargets(fyPartial), [fyPartial]);
@@ -451,6 +456,7 @@ export default function AdminNmacMasterPage() {
                     targets={targetsFull}
                     onChange={setTargetsFull}
                     disabled={savingTargets}
+                    kpis={visibleKpiRows}
                     baselineTargets={targetScope === "fy" ? undefined : mergeDefaultTargets(fyPartial)}
                     baselineLabel={targetScope === "fy" ? undefined : "FY target"}
                   />
@@ -541,6 +547,7 @@ export default function AdminNmacMasterPage() {
                     targets={sheetTargets}
                     year={year}
                     supportedYears={SUPPORTED_KPI_YEARS}
+                    kpis={visibleKpiRows}
                     onYearChange={setYear}
                     onSave={onPersistSheet}
                     saving={savingSheet}

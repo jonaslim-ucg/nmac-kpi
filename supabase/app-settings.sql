@@ -5,9 +5,13 @@ create table if not exists public.app_settings (
   hide_legacy_nav boolean not null default false,
   use_nmac_test_data boolean not null default true,
   nmac_month_cache_revision bigint not null default 0,
+  hidden_nmac_kpi_ids jsonb not null default '["call_answered","call_missed","checkin_checkout","appt_confirm","sop","engage","revenue","net_margin","revenue_trend"]'::jsonb,
   updated_at timestamptz not null default now(),
   constraint app_settings_singleton check (id = 'default')
 );
+
+alter table public.app_settings
+  add column if not exists hidden_nmac_kpi_ids jsonb not null default '["call_answered","call_missed","checkin_checkout","appt_confirm","sop","engage","revenue","net_margin","revenue_trend"]'::jsonb;
 
 insert into public.app_settings (id)
 values ('default')

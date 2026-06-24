@@ -15,7 +15,7 @@ export type RoleNmacNavAccess = Record<string, NmacNavViewId[]>;
 
 export const NMAC_NAV_ITEMS: { id: NmacNavViewId; label: string; href: string }[] = [
   { id: "overview", label: "Performance overview", href: "/nmac-2026" },
-  { id: "visits", label: "Visit volume", href: "/nmac-2026/visits" },
+  { id: "visits", label: "Patient check-outs", href: "/nmac-2026/visits" },
   { id: "scheduling", label: "Scheduling", href: "/nmac-2026/scheduling" },
   { id: "finance", label: "Finance & revenue", href: "/nmac-2026/finance" },
   { id: "calls", label: "Call performance", href: "/nmac-2026/calls" },

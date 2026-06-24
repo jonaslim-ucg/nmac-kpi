@@ -13,6 +13,7 @@ import { canManageUsers } from "@/lib/auth/types";
 import type { AppDashboardSettings } from "@/lib/auth/app-settings";
 import type { CustomRole } from "@/lib/auth/custom-roles";
 import type { NmacNavViewId, RoleNmacNavAccess } from "@/lib/auth/role-nmac-nav";
+import { DEFAULT_HIDDEN_NMAC_KPI_IDS } from "@/lib/kpi-nmac-2026/model";
 import {
   applySyncedDashboardPrefs,
   clearNmacMonthlyLocalCacheOnly,
@@ -31,10 +32,12 @@ type Ctx = {
   canClearCache: boolean;
   hideLegacyNav: boolean;
   useNmacTestData: boolean;
+  hiddenNmacKpiIds: string[];
   roleNmacNav: RoleNmacNavAccess;
   customRoles: CustomRole[];
   setHideLegacyNav: (next: boolean) => Promise<void>;
   setUseNmacTestData: (next: boolean) => Promise<void>;
+  setHiddenNmacKpiIds: (next: string[]) => Promise<boolean>;
   setRoleNmacNavForRole: (roleId: string, viewIds: NmacNavViewId[] | null) => Promise<void>;
   createCustomRole: (input: { label: string; canEditKpiData: boolean }) => Promise<CustomRole | null>;
   deleteCustomRole: (roleId: string) => Promise<boolean>;
@@ -89,6 +92,9 @@ export function DashboardPreferencesProvider({
   const [canClearCache, setCanClearCache] = useState(false);
   const [hideLegacyNav, setHideLegacyNavState] = useState(initialPreferences?.hideLegacyNav ?? false);
   const [useNmacTestData, setUseNmacTestDataState] = useState(initialPreferences?.useNmacTestData ?? true);
+  const [hiddenNmacKpiIds, setHiddenNmacKpiIdsState] = useState<string[]>(
+    initialPreferences?.hiddenNmacKpiIds ?? [...DEFAULT_HIDDEN_NMAC_KPI_IDS],
+  );
   const [roleNmacNav, setRoleNmacNavState] = useState<RoleNmacNavAccess>(initialPreferences?.roleNmacNav ?? {});
   const [customRoles, setCustomRolesState] = useState<CustomRole[]>(initialPreferences?.customRoles ?? []);
 
@@ -104,6 +110,7 @@ export function DashboardPreferencesProvider({
     writeLegacyLocalPrefs(prefs.hideLegacyNav, prefs.useNmacTestData);
     setHideLegacyNavState(prefs.hideLegacyNav);
     setUseNmacTestDataState(prefs.useNmacTestData);
+    setHiddenNmacKpiIdsState(prefs.hiddenNmacKpiIds);
     setRoleNmacNavState(prefs.roleNmacNav);
     setCustomRolesState(prefs.customRoles);
     dispatchPrefs();
@@ -124,11 +131,14 @@ export function DashboardPreferencesProvider({
     if (!user) {
       applySyncedDashboardPrefs(null);
       const legacy = readLegacyLocalPrefs();
-      setHideLegacyNavState(legacy.hideLegacyNav);
-      setUseNmacTestDataState(legacy.useNmacTestData);
-      setCanEdit(false);
-      setCanClearCache(false);
-      setReady(true);
+      queueMicrotask(() => {
+        setHideLegacyNavState(legacy.hideLegacyNav);
+        setUseNmacTestDataState(legacy.useNmacTestData);
+        setHiddenNmacKpiIdsState([...DEFAULT_HIDDEN_NMAC_KPI_IDS]);
+        setCanEdit(false);
+        setCanClearCache(false);
+        setReady(true);
+      });
       return;
     }
 
@@ -136,7 +146,7 @@ export function DashboardPreferencesProvider({
     const hasInitialPrefs = Boolean(initialPreferences);
 
     if (!hasInitialPrefs) {
-      setReady(false);
+      queueMicrotask(() => setReady(false));
     }
 
     void (async () => {
@@ -146,6 +156,7 @@ export function DashboardPreferencesProvider({
         const legacy = readLegacyLocalPrefs();
         setHideLegacyNavState(legacy.hideLegacyNav);
         setUseNmacTestDataState(legacy.useNmacTestData);
+        setHiddenNmacKpiIdsState([...DEFAULT_HIDDEN_NMAC_KPI_IDS]);
         setCanEdit(canManageUsers(user?.role));
         setCanClearCache(Boolean(user));
         applySyncedDashboardPrefs(null);
@@ -169,9 +180,9 @@ export function DashboardPreferencesProvider({
 
   const persist = useCallback(
     async (patch: Record<string, unknown>, detail?: DashboardPrefsDetail) => {
-      if (!canEdit) return;
+      if (!canEdit) return false;
       const res = await patchPreferences(patch);
-      if (!res?.preferences) return;
+      if (!res?.preferences) return false;
       setCanEdit(res.canEdit ?? true);
       applyServerPrefs(res.preferences);
       if (patch.clear_nmac_month_cache === true) {
@@ -179,6 +190,7 @@ export function DashboardPreferencesProvider({
         writeLocalCacheRevision(GLOBAL_CACHE_REVISION_KEY, res.preferences.nmacMonthCacheRevision);
       }
       dispatchPrefs(detail);
+      return true;
     },
     [canEdit, applyServerPrefs],
   );
@@ -200,6 +212,18 @@ export function DashboardPreferencesProvider({
       await persist({ use_nmac_test_data: next }, next ? undefined : { reloadNmacFromServer: true });
     },
     [canEdit, persist],
+  );
+
+  const setHiddenNmacKpiIds = useCallback(
+    async (next: string[]) => {
+      if (!canEdit) return false;
+      const prev = hiddenNmacKpiIds;
+      setHiddenNmacKpiIdsState(next);
+      const ok = await persist({ hidden_nmac_kpi_ids: next });
+      if (!ok) setHiddenNmacKpiIdsState(prev);
+      return ok;
+    },
+    [canEdit, hiddenNmacKpiIds, persist],
   );
 
   const setRoleNmacNavForRole = useCallback(
@@ -272,10 +296,12 @@ export function DashboardPreferencesProvider({
       canClearCache,
       hideLegacyNav,
       useNmacTestData,
+      hiddenNmacKpiIds,
       roleNmacNav,
       customRoles,
       setHideLegacyNav,
       setUseNmacTestData,
+      setHiddenNmacKpiIds,
       setRoleNmacNavForRole,
       createCustomRole,
       deleteCustomRole,
@@ -288,10 +314,12 @@ export function DashboardPreferencesProvider({
       canClearCache,
       hideLegacyNav,
       useNmacTestData,
+      hiddenNmacKpiIds,
       roleNmacNav,
       customRoles,
       setHideLegacyNav,
       setUseNmacTestData,
+      setHiddenNmacKpiIds,
       setRoleNmacNavForRole,
       createCustomRole,
       deleteCustomRole,

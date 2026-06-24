@@ -42,7 +42,7 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
     title: "NMAC master KPI",
     items: [
       { href: "/nmac-2026", label: "Performance overview", icon: BarChart3 },
-      { href: "/nmac-2026/visits", label: "Visit volume", icon: Activity },
+      { href: "/nmac-2026/visits", label: "Patient check-outs", icon: Activity },
       { href: "/nmac-2026/scheduling", label: "Scheduling", icon: Calendar },
       { href: "/nmac-2026/finance", label: "Finance & revenue", icon: Wallet },
       { href: "/nmac-2026/calls", label: "Call performance", icon: Phone },

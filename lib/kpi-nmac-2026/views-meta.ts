@@ -21,7 +21,7 @@ export function nk26Title(view: string): string {
     case "overview":
       return "Performance overview";
     case "visits":
-      return "Visit volume & annual exams";
+      return "Patient check-outs & exams";
     case "scheduling":
       return "Scheduling & utilization";
     case "finance":

@@ -38,26 +38,26 @@ export type KpiRow = {
 };
 
 export const KPIs: KpiRow[] = [
-  { id: "productivity", label: "Clinic Productivity", unit: "%", target: 90, gate: true, domain: "Operations", higher: true },
-  { id: "visits", label: "Completed Visits", unit: "", target: 2220, gate: false, domain: "Volume", higher: true },
-  { id: "annuals", label: "Annual Exams", unit: "", target: 150, gate: false, domain: "Volume", higher: true },
-  { id: "exec", label: "Executive Physicals", unit: "", target: 50, gate: false, domain: "Volume", higher: true },
-  { id: "wl", label: "WL Visit Compliance", unit: "%", target: 95, gate: true, domain: "Specialty", higher: true },
+  { id: "productivity", label: "Overall Clinic Productivity", unit: "%", target: 90, gate: true, domain: "Operations", higher: true },
+  { id: "visits", label: "Patient Check-Outs", unit: "", target: 2220, gate: false, domain: "Volume", higher: true },
+  { id: "annuals", label: "Annual / Physical Exams", unit: "", target: 150, gate: false, domain: "Volume", higher: true },
+  { id: "exec", label: "Executive Annual Exams", unit: "", target: 50, gate: false, domain: "Volume", higher: true },
+  { id: "wl", label: "Weight Loss Visit Compliance", unit: "%", target: 95, gate: true, domain: "Specialty", higher: true },
   { id: "util", label: "Doctor Utilisation", unit: "%", target: 90, gate: false, domain: "Scheduling", higher: true },
   { id: "noshow", label: "No-Show Rate", unit: "%", target: 7, gate: false, domain: "Scheduling", higher: false },
-  { id: "callrate", label: "Call Answer Rate", unit: "%", target: 90, gate: false, domain: "Calls", higher: true },
-  { id: "callvol", label: "Inbound Calls", unit: "", target: 300, gate: false, domain: "Calls", higher: true },
+  { id: "callrate", label: "Telephone Calls Answered", unit: "%", target: 90, gate: false, domain: "Calls", higher: true },
+  { id: "callvol", label: "Incoming Calls", unit: "", target: 300, gate: false, domain: "Calls", higher: true },
   { id: "call_answered", label: "Total Answered Calls", unit: "", target: 270, gate: false, domain: "Calls", higher: true },
   { id: "call_missed", label: "Total Missed/Abandoned Calls", unit: "", target: 30, gate: false, domain: "Calls", higher: false },
-  { id: "copay", label: "% Copay Collection Rate", unit: "%", target: 95, gate: false, domain: "Finance", higher: true },
+  { id: "copay", label: "Copay Collection Rate", unit: "%", target: 95, gate: false, domain: "Finance", higher: true },
   { id: "leakage", label: "Revenue Leakage", unit: "%", target: 10, gate: false, domain: "Finance", higher: false },
   { id: "eod", label: "EOD Variances", unit: "", target: 0, gate: false, domain: "Finance", higher: false },
-  { id: "ph", label: "PH-Generated Visits", unit: "", target: 190, gate: false, domain: "Scheduling", higher: true },
-  { id: "leads", label: "Lead → Appointment Conversion", unit: "%", target: 75, gate: false, domain: "Scheduling", higher: true },
+  { id: "ph", label: "Total Population Health Visits", unit: "", target: 190, gate: false, domain: "Scheduling", higher: true },
+  { id: "leads", label: "Lead-to-Booking Conversion", unit: "%", target: 75, gate: false, domain: "Scheduling", higher: true },
   { id: "checkin_checkout", label: "Avg. Check-In → Check-Out", unit: " min", target: 30, gate: false, domain: "Scheduling", higher: false },
   { id: "appt_confirm", label: "Appointment Confirmation Rate", unit: "%", target: 90, gate: false, domain: "Scheduling", higher: true },
-  { id: "trich", label: "Trichology Productivity", unit: "%", target: 90, gate: true, domain: "Specialty", higher: true },
-  { id: "ht", label: "Hair Transplant Prod.", unit: "%", target: 90, gate: true, domain: "Specialty", higher: true },
+  { id: "trich", label: "Trichology Schedule Productivity", unit: "%", target: 90, gate: true, domain: "Specialty", higher: true },
+  { id: "ht", label: "Hair Transplant Session Productivity", unit: "%", target: 90, gate: true, domain: "Specialty", higher: true },
   { id: "fp", label: "Facial Plastics Bookings", unit: "", target: 20, gate: false, domain: "Specialty", higher: true },
   { id: "shop", label: "ShopNMAC Sales ($)", unit: "$", target: 3750, gate: false, domain: "Finance", higher: true },
   { id: "satisfaction", label: "Ave Patient Satisfaction Score", unit: "", target: 85, gate: false, domain: "Compliance", higher: true },
@@ -75,11 +75,8 @@ export const KPIs: KpiRow[] = [
   { id: "rn_visits", label: "RN Visits (CPT 99211)", unit: "", target: 58, gate: false, domain: "Nursing", higher: true },
 ];
 
-/**
- * Developer-controlled KPI visibility.
- * Remove an id from this list to unhide it without deleting its Supabase data.
- */
-export const DEVELOPER_HIDDEN_KPI_IDS = [
+/** Default developer-controlled KPI visibility for new installs. */
+export const DEFAULT_HIDDEN_NMAC_KPI_IDS = [
   "call_answered",
   "call_missed",
   "checkin_checkout",
@@ -91,14 +88,37 @@ export const DEVELOPER_HIDDEN_KPI_IDS = [
   "revenue_trend",
 ] as const;
 
-const DEVELOPER_HIDDEN_KPI_ID_SET = new Set<string>(DEVELOPER_HIDDEN_KPI_IDS);
+export const DEVELOPER_HIDDEN_KPI_IDS = DEFAULT_HIDDEN_NMAC_KPI_IDS;
 
-export function isNmacKpiVisible(id: string): boolean {
-  return !DEVELOPER_HIDDEN_KPI_ID_SET.has(id);
+const KPI_ID_SET = new Set(KPIs.map((kpi) => kpi.id));
+
+export function normalizeHiddenNmacKpiIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [...DEFAULT_HIDDEN_NMAC_KPI_IDS];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const value of raw) {
+    if (typeof value !== "string") continue;
+    if (!KPI_ID_SET.has(value) || seen.has(value)) continue;
+    seen.add(value);
+    out.push(value);
+  }
+  return out;
 }
 
-export function visibleKpis(kpis: readonly KpiRow[] = KPIs): KpiRow[] {
-  return kpis.filter((kpi) => isNmacKpiVisible(kpi.id));
+function hiddenKpiSet(hiddenIds: readonly string[] = DEFAULT_HIDDEN_NMAC_KPI_IDS): Set<string> {
+  return new Set(hiddenIds);
+}
+
+export function isNmacKpiVisible(id: string, hiddenIds: readonly string[] = DEFAULT_HIDDEN_NMAC_KPI_IDS): boolean {
+  return !hiddenKpiSet(hiddenIds).has(id);
+}
+
+export function visibleKpis(
+  kpis: readonly KpiRow[] = KPIs,
+  hiddenIds: readonly string[] = DEFAULT_HIDDEN_NMAC_KPI_IDS,
+): KpiRow[] {
+  const hidden = hiddenKpiSet(hiddenIds);
+  return kpis.filter((kpi) => !hidden.has(kpi.id));
 }
 
 export const VISIBLE_KPIS = visibleKpis();
@@ -179,9 +199,10 @@ export function saveTargetOverrides(m: Record<string, number>, year = DEFAULT_KP
 export function buildKpisPerMonth(
   fyPartial: Record<string, number>,
   byMonth: Partial<Record<number, Record<string, number>>>,
+  hiddenIds: readonly string[] = DEFAULT_HIDDEN_NMAC_KPI_IDS,
 ): KpiRow[][] {
   return MONTHS.map((_, m) =>
-    visibleKpis(resolveKpisWithTargets(mergeDefaultTargets({ ...fyPartial, ...byMonth[m] }))),
+    visibleKpis(resolveKpisWithTargets(mergeDefaultTargets({ ...fyPartial, ...byMonth[m] })), hiddenIds),
   );
 }
 

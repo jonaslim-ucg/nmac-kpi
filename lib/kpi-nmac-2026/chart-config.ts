@@ -209,9 +209,11 @@ export function findKpi(id: string, kpis: readonly KpiRow[] = KPIs): KpiRow {
 export function trendDatasets(db: Record<number, MonthDb>, kpis: readonly KpiRow[] = KPIs) {
   const keyKPIs = ["satisfaction", "copay", "util", "feedback", "visits", "productivity"] as const;
   const colors = ["#22c55e", "#f59e0b", "#a78bfa", "#06b6d4", "#3b82f6", "#ef4444"];
-  return keyKPIs.map((id, i) => {
+  const visibleIds = new Set(kpis.map((kpi) => kpi.id));
+  return keyKPIs.flatMap((id, i) => {
+    if (!visibleIds.has(id)) return [];
     const k = findKpi(id, kpis);
-    return {
+    return [{
       label: k.label,
       data: MONTHS.map((_, mi) => yoyDeltaNumeric(getVal(db, mi, id), getLastYearVal(db, mi, id))),
       borderColor: colors[i],
@@ -221,7 +223,7 @@ export function trendDatasets(db: Record<number, MonthDb>, kpis: readonly KpiRow
       pointHoverRadius: 7,
       pointBorderWidth: 2,
       pointBorderColor: "rgba(15, 23, 42, 0.35)",
-    };
+    }];
   });
 }
 

@@ -2,8 +2,10 @@ import type { AppointmentReviewRow } from "@/lib/appointment-review/analytics";
 import {
   APPOINTMENT_REVIEW_MAX_SCORE,
   PATIENT_DURATION_OPTIONS,
+  REFERRAL_SOURCE_OPTIONS,
   TESTIMONIAL_PERMISSION_OPTIONS,
   WAIT_TIME_OPTIONS,
+  type ReferralSourceValue,
   type TestimonialPermissionValue,
 } from "@/lib/appointment-review/types";
 
@@ -23,7 +25,11 @@ export type AppointmentReviewDetail = {
   providerTimeAdequate: boolean;
   providerTimeComment: string;
   frontDeskRating: number;
+  isNewPatient: boolean;
   patientDurationLabel: string;
+  referralSources: ReferralSourceValue[];
+  referralSourcesLabel: string | null;
+  referralOther: string;
   exceptionalStaffComment: string;
   hasComments: boolean;
   commentPreview: string | null;
@@ -66,7 +72,11 @@ export function toAppointmentReviewDetail(row: AppointmentReviewRow): Appointmen
     providerTimeAdequate: row.provider_time_adequate,
     providerTimeComment: row.provider_time_comment.trim(),
     frontDeskRating: row.front_desk_rating,
+    isNewPatient: row.is_new_patient,
     patientDurationLabel: optionLabel(PATIENT_DURATION_OPTIONS, row.patient_duration),
+    referralSources: row.referral_sources,
+    referralSourcesLabel: formatReferralSources(row.referral_sources, row.referral_other),
+    referralOther: row.referral_other.trim(),
     exceptionalStaffComment: row.exceptional_staff_comment.trim(),
     hasComments: comments.length > 0,
     commentPreview: comments[0] ?? null,
@@ -98,4 +108,18 @@ export function formatYesNo(value: boolean): string {
 
 export function formatTestimonialPermission(value: TestimonialPermissionValue): string {
   return TESTIMONIAL_PERMISSION_OPTIONS.find((o) => o.value === value)?.label ?? value;
+}
+
+export function formatReferralSources(
+  sources: ReferralSourceValue[],
+  other: string,
+): string | null {
+  if (sources.length === 0) return null;
+  const labels: string[] = sources
+    .filter((value) => value !== "other")
+    .map((value) => REFERRAL_SOURCE_OPTIONS.find((o) => o.value === value)?.label ?? value);
+  if (sources.includes("other")) {
+    labels.push(other.trim() ? `Other: ${other.trim()}` : "Other");
+  }
+  return labels.join(", ");
 }

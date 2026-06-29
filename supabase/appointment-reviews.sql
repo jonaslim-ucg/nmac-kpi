@@ -15,7 +15,10 @@ create table if not exists public.appointment_reviews (
   provider_time_adequate boolean not null,
   provider_time_comment text not null default '',
   front_desk_rating smallint not null check (front_desk_rating between 1 and 5),
+  is_new_patient boolean not null,
   patient_duration text not null check (patient_duration in ('new', 'less-1', '1-4', '5-9', '10-plus')),
+  referral_sources text[] not null default '{}',
+  referral_other text not null default '',
   exceptional_staff_comment text not null default ''
 );
 

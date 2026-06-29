@@ -257,6 +257,26 @@ export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
 
           <YesNoPie title="Provider spent enough time" data={stats.providerTimeAdequate} />
 
+          {stats.referralSources.length > 0 ? (
+            <ChartCard title="How new patients heard about NMAC" subtitle="New patients only; check-all-that-apply">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats.referralSources} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--foreground)" }} stroke="var(--border)" interval={0} angle={-12} textAnchor="end" height={52} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
+                  <Tooltip
+                    {...TOOLTIP_STYLE}
+                    formatter={(value, _name, item) => {
+                      const pct = (item.payload as { pct?: number }).pct;
+                      return [`${value} (${pct ?? 0}%)`, "New patients"];
+                    }}
+                  />
+                  <Bar dataKey="count" fill="var(--chart-target)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          ) : null}
+
           {stats.recentComments.length > 0 ? (
             <div className="dashboard-card p-4 sm:p-5">
               <span className="dashboard-card-accent" aria-hidden />

@@ -15,6 +15,10 @@ export const PATIENT_DURATION_OPTIONS = [
   { value: "10-plus", label: "10 years or more" },
 ] as const;
 
+export const RETURNING_PATIENT_DURATION_OPTIONS = PATIENT_DURATION_OPTIONS.filter(
+  (option) => option.value !== "new",
+);
+
 export const TESTIMONIAL_PERMISSION_OPTIONS = [
   {
     value: "yes-named",
@@ -29,6 +33,21 @@ export const TESTIMONIAL_PERMISSION_OPTIONS = [
     label: "No, I prefer my feedback remain confidential.",
   },
 ] as const;
+
+export const REFERRAL_SOURCE_OPTIONS = [
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "facebook", label: "Facebook" },
+  { value: "instagram", label: "Instagram" },
+  { value: "bernews", label: "Bernews" },
+  { value: "tnn", label: "TNN" },
+  { value: "tv-ad", label: "TV Advertisement" },
+  { value: "friend-family", label: "Friend or Family" },
+  { value: "provider-referral", label: "Healthcare Provider Referral" },
+  { value: "nmac-staff", label: "NMAC staff" },
+  { value: "other", label: "Other (please specify)" },
+] as const;
+
+export type ReferralSourceValue = (typeof REFERRAL_SOURCE_OPTIONS)[number]["value"];
 
 export type WaitTimeValue = (typeof WAIT_TIME_OPTIONS)[number]["value"];
 export type PatientDurationValue = (typeof PATIENT_DURATION_OPTIONS)[number]["value"];
@@ -47,7 +66,10 @@ export type AppointmentReviewPayload = {
   providerTimeAdequate: boolean;
   providerTimeComment: string;
   frontDeskRating: number;
+  isNewPatient: boolean;
   patientDuration: PatientDurationValue;
+  referralSources: ReferralSourceValue[];
+  referralOther: string;
   exceptionalStaffComment: string;
 };
 
@@ -64,9 +86,23 @@ export type AppointmentReviewFormState = {
   providerTimeAdequate: boolean | null;
   providerTimeComment: string;
   frontDeskRating: number | null;
+  isNewPatient: boolean | null;
   patientDuration: PatientDurationValue | null;
+  referralSources: ReferralSourceValue[];
+  referralOther: string;
   exceptionalStaffComment: string;
 };
+
+export function isReferralSourceComplete(
+  isNewPatient: boolean,
+  sources: ReferralSourceValue[],
+  other: string,
+): boolean {
+  if (!isNewPatient) return true;
+  if (sources.length === 0) return false;
+  if (sources.includes("other") && !other.trim()) return false;
+  return true;
+}
 
 export const EMPTY_APPOINTMENT_REVIEW_FORM: AppointmentReviewFormState = {
   email: "",
@@ -81,6 +117,9 @@ export const EMPTY_APPOINTMENT_REVIEW_FORM: AppointmentReviewFormState = {
   providerTimeAdequate: null,
   providerTimeComment: "",
   frontDeskRating: null,
+  isNewPatient: null,
   patientDuration: null,
+  referralSources: [],
+  referralOther: "",
   exceptionalStaffComment: "",
 };

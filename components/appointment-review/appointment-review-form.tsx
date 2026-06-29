@@ -4,9 +4,11 @@ import { useCallback, useState } from "react";
 import {
   APPOINTMENT_REVIEW_MAX_SCORE,
   EMPTY_APPOINTMENT_REVIEW_FORM,
-  PATIENT_DURATION_OPTIONS,
+  RETURNING_PATIENT_DURATION_OPTIONS,
+  REFERRAL_SOURCE_OPTIONS,
   TESTIMONIAL_PERMISSION_OPTIONS,
   WAIT_TIME_OPTIONS,
+  isReferralSourceComplete,
   type AppointmentReviewFormState,
   type AppointmentReviewPayload,
 } from "@/lib/appointment-review/types";
@@ -142,7 +144,10 @@ function isFormComplete(form: AppointmentReviewFormState): form is AppointmentRe
     form.waitTime !== null &&
     form.providerTimeAdequate !== null &&
     form.frontDeskRating !== null &&
-    form.patientDuration !== null
+    form.isNewPatient !== null &&
+    (form.isNewPatient
+      ? isReferralSourceComplete(true, form.referralSources, form.referralOther)
+      : form.patientDuration !== null)
   );
 }
 
@@ -161,6 +166,17 @@ export function AppointmentReviewForm() {
     if (!isFormComplete(form)) {
       if (form.email.trim() && !isValidEmailFormat(form.email.trim())) {
         setError("Please enter a valid email address.");
+        return;
+      }
+      if (
+        form.isNewPatient === true &&
+        !isReferralSourceComplete(true, form.referralSources, form.referralOther)
+      ) {
+        setError(
+          form.referralSources.includes("other") && !form.referralOther.trim()
+            ? "Please specify how you heard about NMAC."
+            : "Please select at least one option for how you heard about NMAC.",
+        );
         return;
       }
       setError("Please answer all required questions before submitting.");
@@ -186,6 +202,11 @@ export function AppointmentReviewForm() {
       setBusy(false);
     }
   }, [form]);
+
+  const showReferralQuestion = form.isNewPatient === true;
+  const showReturningDuration = form.isNewPatient === false;
+  const exceptionalQuestionNumber =
+    12 + 1 + (showReferralQuestion ? 1 : 0) + (showReturningDuration ? 1 : 0);
 
   if (submitted) {
     return (
@@ -403,38 +424,107 @@ export function AppointmentReviewForm() {
         />
       </QuestionBlock>
 
-      <QuestionBlock
-        number={12}
-        title="How long have you been a patient of this provider?"
-        required
-      >
-        <div className="space-y-2" role="radiogroup" aria-label="Patient duration">
-          {PATIENT_DURATION_OPTIONS.map(({ value, label }) => (
-            <label
-              key={value}
-              className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-sm transition ${
-                form.patientDuration === value
-                  ? "border-accent bg-accent-muted/60"
-                  : "border-border bg-background hover:border-accent/40"
-              } ${busy ? "cursor-not-allowed opacity-50" : ""}`}
-            >
-              <input
-                type="radio"
-                name="patient-duration"
-                value={value}
-                checked={form.patientDuration === value}
-                onChange={() => patch({ patientDuration: value })}
-                disabled={busy}
-                className="h-4 w-4 accent-accent"
-              />
-              {label}
-            </label>
-          ))}
-        </div>
+      <QuestionBlock number={12} title="Are you a new patient?" required>
+        <YesNoInput
+          name="is-new-patient"
+          value={form.isNewPatient}
+          onChange={(v) =>
+            patch({
+              isNewPatient: v,
+              ...(v
+                ? { patientDuration: null }
+                : { referralSources: [], referralOther: "" }),
+            })
+          }
+          disabled={busy}
+        />
       </QuestionBlock>
 
+      {showReferralQuestion ? (
+        <QuestionBlock
+          number={13}
+          title="How did you hear about NMAC? (Check all that apply)"
+          required
+        >
+          <div className="space-y-2" role="group" aria-label="How did you hear about NMAC">
+            {REFERRAL_SOURCE_OPTIONS.map(({ value, label }) => {
+              const checked = form.referralSources.includes(value);
+              return (
+                <label
+                  key={value}
+                  className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-sm transition ${
+                    checked
+                      ? "border-accent bg-accent-muted/60"
+                      : "border-border bg-background hover:border-accent/40"
+                  } ${busy ? "cursor-not-allowed opacity-50" : ""}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      const next = checked
+                        ? form.referralSources.filter((v) => v !== value)
+                        : [...form.referralSources, value];
+                      patch({
+                        referralSources: next,
+                        ...(value === "other" && checked ? { referralOther: "" } : {}),
+                      });
+                    }}
+                    disabled={busy}
+                    className="h-4 w-4 accent-accent"
+                  />
+                  {label}
+                </label>
+              );
+            })}
+          </div>
+          {form.referralSources.includes("other") ? (
+            <input
+              type="text"
+              value={form.referralOther}
+              onChange={(e) => patch({ referralOther: e.target.value })}
+              disabled={busy}
+              placeholder="Please specify…"
+              className="mt-3 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
+            />
+          ) : null}
+        </QuestionBlock>
+      ) : null}
+
+      {showReturningDuration ? (
+        <QuestionBlock
+          number={showReferralQuestion ? 14 : 13}
+          title="How long have you been a patient of this provider?"
+          required
+        >
+          <div className="space-y-2" role="radiogroup" aria-label="Patient duration">
+            {RETURNING_PATIENT_DURATION_OPTIONS.map(({ value, label }) => (
+              <label
+                key={value}
+                className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-sm transition ${
+                  form.patientDuration === value
+                    ? "border-accent bg-accent-muted/60"
+                    : "border-border bg-background hover:border-accent/40"
+                } ${busy ? "cursor-not-allowed opacity-50" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name="patient-duration"
+                  value={value}
+                  checked={form.patientDuration === value}
+                  onChange={() => patch({ patientDuration: value })}
+                  disabled={busy}
+                  className="h-4 w-4 accent-accent"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        </QuestionBlock>
+      ) : null}
+
       <QuestionBlock
-        number={13}
+        number={exceptionalQuestionNumber}
         title="Would you like to name any staff member that provided exceptional service?"
       >
         <textarea

@@ -1,8 +1,10 @@
 import {
   APPOINTMENT_REVIEW_MAX_SCORE,
   PATIENT_DURATION_OPTIONS,
+  REFERRAL_SOURCE_OPTIONS,
   WAIT_TIME_OPTIONS,
   type PatientDurationValue,
+  type ReferralSourceValue,
   type TestimonialPermissionValue,
   type WaitTimeValue,
 } from "@/lib/appointment-review/types";
@@ -22,7 +24,10 @@ export type AppointmentReviewRow = {
   provider_time_adequate: boolean;
   provider_time_comment: string;
   front_desk_rating: number;
+  is_new_patient: boolean;
   patient_duration: PatientDurationValue;
+  referral_sources: ReferralSourceValue[];
+  referral_other: string;
   exceptional_staff_comment: string;
 };
 
@@ -39,6 +44,7 @@ export type AppointmentReviewStats = {
   waitTime: LabelCount[];
   patientDuration: LabelCount[];
   providerTimeAdequate: LabelCount[];
+  referralSources: LabelCount[];
   ratingTrend: { date: string; visit: number; ease: number; count: number }[];
   ratingScores: { metric: string; score: number }[];
   recentComments: {
@@ -128,6 +134,14 @@ export function buildAppointmentReviewStats(rows: AppointmentReviewRow[]): Appoi
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, 12);
 
+  const newPatients = rows.filter((r) => r.is_new_patient);
+
+  const referralSources = REFERRAL_SOURCE_OPTIONS.map(({ value, label }) => {
+    const count = newPatients.filter((r) => r.referral_sources.includes(value)).length;
+    const total = newPatients.length;
+    return { label, count, pct: total ? Math.round((count / total) * 100) : 0 };
+  }).filter((item) => item.count > 0);
+
   return {
     total,
     averages,
@@ -135,6 +149,7 @@ export function buildAppointmentReviewStats(rows: AppointmentReviewRow[]): Appoi
     waitTime: labelCounts(rows, WAIT_TIME_OPTIONS, (r) => r.wait_time),
     patientDuration: labelCounts(rows, PATIENT_DURATION_OPTIONS, (r) => r.patient_duration),
     providerTimeAdequate: yesNoCounts(rows, (r) => r.provider_time_adequate),
+    referralSources,
     ratingTrend: groupByDay(rows),
     ratingScores,
     recentComments,

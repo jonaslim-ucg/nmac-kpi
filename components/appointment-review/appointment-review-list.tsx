@@ -69,8 +69,10 @@ export function AppointmentReviewList({ reviews, onViewReview }: Props) {
             <thead>
               <tr className="border-b border-border bg-surface-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <th className="px-5 py-3 font-semibold">Submitted</th>
+                <th className="px-3 py-3 font-semibold">Patient</th>
                 <th className="px-3 py-3 font-semibold">Scheduling</th>
                 <th className="px-3 py-3 font-semibold">Visit</th>
+                <th className="px-3 py-3 font-semibold">Wait time</th>
                 <th className="px-3 py-3 font-semibold">Provider & services</th>
                 <th className="px-3 py-3 font-semibold">Responses</th>
                 <th className="px-5 py-3 font-semibold" />
@@ -84,8 +86,13 @@ export function AppointmentReviewList({ reviews, onViewReview }: Props) {
                   onClick={() => onViewReview(review.id)}
                 >
                   <td className="px-5 py-3 text-foreground">{formatReviewWhen(review.createdAt)}</td>
+                  <td className="max-w-[160px] px-3 py-3">
+                    <p className="font-medium text-foreground">{review.patientName}</p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{review.email}</p>
+                  </td>
                   <td className="px-3 py-3 font-mono text-foreground">{formatRating(review.appointmentEase)}</td>
                   <td className="px-3 py-3 font-mono text-foreground">{formatRating(review.visitRating)}</td>
+                  <td className="px-3 py-3 text-muted-foreground">{review.waitTimeLabel}</td>
                   <td className="max-w-[220px] px-3 py-3">
                     <p className="line-clamp-2 text-foreground">{review.providerAndServices || "—"}</p>
                   </td>

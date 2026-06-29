@@ -3,7 +3,7 @@
 import { ChevronLeft, ChevronRight, MessageSquareText, X } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
-import { formatRating, formatReviewWhen } from "@/lib/appointment-review/display";
+import { formatRating, formatReviewWhen, formatYesNo } from "@/lib/appointment-review/display";
 
 type Props = {
   review: AppointmentReviewDetail;
@@ -84,11 +84,24 @@ export function AppointmentReviewDetailModal({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-2">
           <div className="divide-y divide-border">
+            <Answer label="1. Email" value={review.email} />
+            <Answer label="2. Name" value={review.patientName} />
             <Answer
-              label="1. Ease of scheduling an appointment"
+              label="3. Ease of scheduling an appointment"
               value={formatRating(review.appointmentEase)}
             />
-            <Answer label="2. Overall visit with our practice" value={formatRating(review.visitRating)} />
+            <Answer label="4. Overall visit with our practice" value={formatRating(review.visitRating)} />
+            <Answer
+              label="8. Testimonial permission"
+              value={review.testimonialPermissionLabel}
+            />
+            <Answer label="9. Wait time before exam room" value={review.waitTimeLabel} />
+            <Answer
+              label="10. Provider spent enough time and answered questions"
+              value={formatYesNo(review.providerTimeAdequate)}
+            />
+            <Answer label="11. Front desk staff" value={formatRating(review.frontDeskRating)} />
+            <Answer label="12. How long a patient" value={review.patientDurationLabel} />
           </div>
 
           <div className="mt-4 space-y-3 border-t border-border pt-4">
@@ -96,9 +109,11 @@ export function AppointmentReviewDetailModal({
               <MessageSquareText className="h-4 w-4 text-accent" aria-hidden />
               Patient responses
             </div>
-            <CommentBlock label="3. Provider and services" text={review.providerAndServices} />
-            <CommentBlock label="4. Health, confidence, or quality of life" text={review.healthImprovement} />
-            <CommentBlock label="5. Message to prospective patients" text={review.recommendationMessage} />
+            <CommentBlock label="5. Provider and services" text={review.providerAndServices} />
+            <CommentBlock label="6. Health, confidence, or quality of life" text={review.healthImprovement} />
+            <CommentBlock label="7. Message to prospective patients" text={review.recommendationMessage} />
+            <CommentBlock label="10. Provider visit comments" text={review.providerTimeComment} />
+            <CommentBlock label="13. Exceptional staff" text={review.exceptionalStaffComment} />
             {!review.hasComments ? (
               <p className="text-sm text-muted-foreground">No written responses beyond the required fields.</p>
             ) : null}

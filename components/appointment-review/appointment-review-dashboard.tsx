@@ -9,6 +9,8 @@ import {
   Legend,
   Line,
   LineChart,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -18,7 +20,13 @@ import type { AppointmentReviewStats } from "@/lib/appointment-review/analytics"
 import { APPOINTMENT_REVIEW_MAX_SCORE } from "@/lib/appointment-review/types";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 
-const CHART_COLORS = ["var(--chart-this-year)", "var(--chart-target)"];
+const CHART_COLORS = [
+  "var(--chart-this-year)",
+  "var(--chart-target)",
+  "var(--accent-2)",
+];
+
+const YES_NO_COLORS = ["var(--chart-this-year)", "#64748b"];
 
 const TOOLTIP_STYLE = {
   contentStyle: {
@@ -67,6 +75,35 @@ function formatWhen(iso: string): string {
   }
 }
 
+function YesNoPie({ title, data }: { title: string; data: AppointmentReviewStats["providerTimeAdequate"] }) {
+  const chartData = data.filter((d) => d.count > 0);
+  return (
+    <ChartCard title={title} subtitle="Share of responses">
+      {chartData.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No data yet.</p>
+      ) : (
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie data={chartData} dataKey="count" nameKey="label" innerRadius={44} outerRadius={72} paddingAngle={2}>
+              {chartData.map((_, i) => (
+                <Cell key={i} fill={YES_NO_COLORS[i % YES_NO_COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip
+              {...TOOLTIP_STYLE}
+              formatter={(value, _name, item) => {
+                const pct = (item.payload as { pct?: number }).pct;
+                return [`${value} (${pct ?? 0}%)`, String(item.payload.label)];
+              }}
+            />
+            <Legend wrapperStyle={{ color: "var(--foreground)", fontSize: 12 }} />
+          </PieChart>
+        </ResponsiveContainer>
+      )}
+    </ChartCard>
+  );
+}
+
 type Props = { stats: AppointmentReviewStats; onViewReview?: (id: string) => void };
 
 export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
@@ -92,9 +129,9 @@ export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
             hint: "Overall visit with the practice",
           },
           {
-            label: `Top visit scores (${APPOINTMENT_REVIEW_MAX_SCORE})`,
-            value: empty ? "—" : `${stats.topVisitRatingPct}%`,
-            hint: "Share giving the highest visit rating",
+            label: "Avg. front desk",
+            value: empty ? "—" : `${stats.averages.frontDeskRating}/${APPOINTMENT_REVIEW_MAX_SCORE}`,
+            hint: "Front desk friendliness and courtesy",
           },
         ]}
       />
@@ -179,6 +216,46 @@ export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
               </ResponsiveContainer>
             </ChartCard>
           </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <ChartCard title="Wait time before exam room">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats.waitTime} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--foreground)" }} stroke="var(--border)" interval={0} angle={-12} textAnchor="end" height={52} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
+                  <Tooltip
+                    {...TOOLTIP_STYLE}
+                    formatter={(value, _name, item) => {
+                      const pct = (item.payload as { pct?: number }).pct;
+                      return [`${value} (${pct ?? 0}%)`, "Responses"];
+                    }}
+                  />
+                  <Bar dataKey="count" fill="var(--chart-this-year)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+
+            <ChartCard title="Patient tenure">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats.patientDuration} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--foreground)" }} stroke="var(--border)" interval={0} angle={-12} textAnchor="end" height={52} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
+                  <Tooltip
+                    {...TOOLTIP_STYLE}
+                    formatter={(value, _name, item) => {
+                      const pct = (item.payload as { pct?: number }).pct;
+                      return [`${value} (${pct ?? 0}%)`, "Responses"];
+                    }}
+                  />
+                  <Bar dataKey="count" fill="var(--accent-2)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </div>
+
+          <YesNoPie title="Provider spent enough time" data={stats.providerTimeAdequate} />
 
           {stats.recentComments.length > 0 ? (
             <div className="dashboard-card p-4 sm:p-5">

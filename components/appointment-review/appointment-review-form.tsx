@@ -4,9 +4,13 @@ import { useCallback, useState } from "react";
 import {
   APPOINTMENT_REVIEW_MAX_SCORE,
   EMPTY_APPOINTMENT_REVIEW_FORM,
+  PATIENT_DURATION_OPTIONS,
+  TESTIMONIAL_PERMISSION_OPTIONS,
+  WAIT_TIME_OPTIONS,
   type AppointmentReviewFormState,
   type AppointmentReviewPayload,
 } from "@/lib/appointment-review/types";
+import { isValidEmailFormat } from "@/lib/auth/email-policy";
 
 function ScaleInput({
   name,
@@ -61,6 +65,49 @@ function ScaleInput({
   );
 }
 
+function YesNoInput({
+  name,
+  value,
+  onChange,
+  disabled,
+}: {
+  name: string;
+  value: boolean | null;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex gap-3" role="radiogroup" aria-label={name}>
+      {[
+        { label: "Yes", v: true },
+        { label: "No", v: false },
+      ].map(({ label, v }) => {
+        const selected = value === v;
+        return (
+          <label
+            key={label}
+            className={`flex min-w-[5rem] cursor-pointer items-center justify-center rounded-lg border px-4 py-2.5 text-sm font-medium transition ${
+              selected
+                ? "border-accent bg-accent text-white"
+                : "border-border bg-background text-foreground hover:border-accent/50"
+            } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+          >
+            <input
+              type="radio"
+              name={name}
+              checked={selected}
+              onChange={() => onChange(v)}
+              disabled={disabled}
+              className="sr-only"
+            />
+            {label}
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
 function QuestionBlock({
   number,
   title,
@@ -86,9 +133,16 @@ function QuestionBlock({
 
 function isFormComplete(form: AppointmentReviewFormState): form is AppointmentReviewPayload {
   return (
+    isValidEmailFormat(form.email.trim()) &&
+    form.patientName.trim().length > 0 &&
     form.appointmentEase !== null &&
     form.visitRating !== null &&
-    form.providerAndServices.trim().length > 0
+    form.providerAndServices.trim().length > 0 &&
+    form.testimonialPermission !== null &&
+    form.waitTime !== null &&
+    form.providerTimeAdequate !== null &&
+    form.frontDeskRating !== null &&
+    form.patientDuration !== null
   );
 }
 
@@ -105,6 +159,10 @@ export function AppointmentReviewForm() {
   const submit = useCallback(async () => {
     setError(null);
     if (!isFormComplete(form)) {
+      if (form.email.trim() && !isValidEmailFormat(form.email.trim())) {
+        setError("Please enter a valid email address.");
+        return;
+      }
       setError("Please answer all required questions before submitting.");
       return;
     }
@@ -149,8 +207,32 @@ export function AppointmentReviewForm() {
         void submit();
       }}
     >
+      <QuestionBlock number={1} title="What is your email address?" required>
+        <input
+          type="email"
+          value={form.email}
+          onChange={(e) => patch({ email: e.target.value })}
+          disabled={busy}
+          autoComplete="email"
+          placeholder="you@example.com"
+          className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
+        />
+      </QuestionBlock>
+
+      <QuestionBlock number={2} title="What is your name?" required>
+        <input
+          type="text"
+          value={form.patientName}
+          onChange={(e) => patch({ patientName: e.target.value })}
+          disabled={busy}
+          autoComplete="name"
+          placeholder="Your full name"
+          className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
+        />
+      </QuestionBlock>
+
       <QuestionBlock
-        number={1}
+        number={3}
         title="How would you rate the ease of scheduling an appointment?"
         required
       >
@@ -165,7 +247,7 @@ export function AppointmentReviewForm() {
       </QuestionBlock>
 
       <QuestionBlock
-        number={2}
+        number={4}
         title="How would you rank your overall visit with our practice?"
         required
       >
@@ -180,7 +262,7 @@ export function AppointmentReviewForm() {
       </QuestionBlock>
 
       <QuestionBlock
-        number={3}
+        number={5}
         title="Who was your provider and what services did they treat you for (Annual Exam, Cardio Specialist, Weight loss, etc)?"
         required
       >
@@ -195,7 +277,7 @@ export function AppointmentReviewForm() {
       </QuestionBlock>
 
       <QuestionBlock
-        number={4}
+        number={6}
         title="How has your health, confidence, or quality of life improved since receiving care from NMAC?"
       >
         <textarea
@@ -209,7 +291,7 @@ export function AppointmentReviewForm() {
       </QuestionBlock>
 
       <QuestionBlock
-        number={5}
+        number={7}
         title="What would you say to someone considering becoming a NMAC patient?"
       >
         <textarea
@@ -218,6 +300,149 @@ export function AppointmentReviewForm() {
           onChange={(e) => patch({ recommendationMessage: e.target.value })}
           disabled={busy}
           placeholder="Your message to someone thinking about joining NMAC (optional)…"
+          className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
+        />
+      </QuestionBlock>
+
+      <QuestionBlock
+        number={8}
+        title="May we use your comments as a testimonial in our marketing materials (website, social media, advertisements, and other promotional materials)?"
+        required
+      >
+        <div className="space-y-2" role="radiogroup" aria-label="Testimonial permission">
+          {TESTIMONIAL_PERMISSION_OPTIONS.map(({ value, label }) => (
+            <label
+              key={value}
+              className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 text-sm transition ${
+                form.testimonialPermission === value
+                  ? "border-accent bg-accent-muted/60"
+                  : "border-border bg-background hover:border-accent/40"
+              } ${busy ? "cursor-not-allowed opacity-50" : ""}`}
+            >
+              <input
+                type="radio"
+                name="testimonial-permission"
+                value={value}
+                checked={form.testimonialPermission === value}
+                onChange={() => patch({ testimonialPermission: value })}
+                disabled={busy}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
+              />
+              <span className="leading-snug">{label}</span>
+            </label>
+          ))}
+        </div>
+      </QuestionBlock>
+
+      <p className="border-t border-border pt-8 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Visit experience
+      </p>
+
+      <QuestionBlock
+        number={9}
+        title="What was your wait time before the clinical staff brought you to an exam room?"
+        required
+      >
+        <div className="space-y-2" role="radiogroup" aria-label="Wait time">
+          {WAIT_TIME_OPTIONS.map(({ value, label }) => (
+            <label
+              key={value}
+              className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-sm transition ${
+                form.waitTime === value
+                  ? "border-accent bg-accent-muted/60"
+                  : "border-border bg-background hover:border-accent/40"
+              } ${busy ? "cursor-not-allowed opacity-50" : ""}`}
+            >
+              <input
+                type="radio"
+                name="wait-time"
+                value={value}
+                checked={form.waitTime === value}
+                onChange={() => patch({ waitTime: value })}
+                disabled={busy}
+                className="h-4 w-4 accent-accent"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      </QuestionBlock>
+
+      <QuestionBlock
+        number={10}
+        title="My provider spent enough time with me to address my needs and answered all my questions."
+        required
+      >
+        <YesNoInput
+          name="provider-time"
+          value={form.providerTimeAdequate}
+          onChange={(v) => patch({ providerTimeAdequate: v })}
+          disabled={busy}
+        />
+        <label className="mt-4 block text-sm text-muted-foreground">
+          Comments (optional)
+          <textarea
+            rows={3}
+            value={form.providerTimeComment}
+            onChange={(e) => patch({ providerTimeComment: e.target.value })}
+            disabled={busy}
+            placeholder="Share any additional feedback about your provider visit…"
+            className="mt-1.5 w-full resize-y rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
+          />
+        </label>
+      </QuestionBlock>
+
+      <QuestionBlock number={11} title="The front desk staff were friendly and courteous." required>
+        <ScaleInput
+          name="front-desk"
+          value={form.frontDeskRating}
+          onChange={(n) => patch({ frontDeskRating: n })}
+          minLabel="worst"
+          maxLabel="best"
+          disabled={busy}
+        />
+      </QuestionBlock>
+
+      <QuestionBlock
+        number={12}
+        title="How long have you been a patient of this provider?"
+        required
+      >
+        <div className="space-y-2" role="radiogroup" aria-label="Patient duration">
+          {PATIENT_DURATION_OPTIONS.map(({ value, label }) => (
+            <label
+              key={value}
+              className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-sm transition ${
+                form.patientDuration === value
+                  ? "border-accent bg-accent-muted/60"
+                  : "border-border bg-background hover:border-accent/40"
+              } ${busy ? "cursor-not-allowed opacity-50" : ""}`}
+            >
+              <input
+                type="radio"
+                name="patient-duration"
+                value={value}
+                checked={form.patientDuration === value}
+                onChange={() => patch({ patientDuration: value })}
+                disabled={busy}
+                className="h-4 w-4 accent-accent"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      </QuestionBlock>
+
+      <QuestionBlock
+        number={13}
+        title="Would you like to name any staff member that provided exceptional service?"
+      >
+        <textarea
+          rows={3}
+          value={form.exceptionalStaffComment}
+          onChange={(e) => patch({ exceptionalStaffComment: e.target.value })}
+          disabled={busy}
+          placeholder="Staff member name and details (optional)…"
           className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
         />
       </QuestionBlock>

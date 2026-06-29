@@ -19,6 +19,10 @@ export const RETURNING_PATIENT_DURATION_OPTIONS = PATIENT_DURATION_OPTIONS.filte
   (option) => option.value !== "new",
 );
 
+export function isNewPatientDuration(duration: PatientDurationValue | null): boolean {
+  return duration === "new";
+}
+
 export const TESTIMONIAL_PERMISSION_OPTIONS = [
   {
     value: "yes-named",
@@ -66,7 +70,6 @@ export type AppointmentReviewPayload = {
   providerTimeAdequate: boolean;
   providerTimeComment: string;
   frontDeskRating: number;
-  isNewPatient: boolean;
   patientDuration: PatientDurationValue;
   referralSources: ReferralSourceValue[];
   referralOther: string;
@@ -86,7 +89,6 @@ export type AppointmentReviewFormState = {
   providerTimeAdequate: boolean | null;
   providerTimeComment: string;
   frontDeskRating: number | null;
-  isNewPatient: boolean | null;
   patientDuration: PatientDurationValue | null;
   referralSources: ReferralSourceValue[];
   referralOther: string;
@@ -94,11 +96,11 @@ export type AppointmentReviewFormState = {
 };
 
 export function isReferralSourceComplete(
-  isNewPatient: boolean,
+  duration: PatientDurationValue,
   sources: ReferralSourceValue[],
   other: string,
 ): boolean {
-  if (!isNewPatient) return true;
+  if (duration !== "new") return true;
   if (sources.length === 0) return false;
   if (sources.includes("other") && !other.trim()) return false;
   return true;
@@ -117,7 +119,6 @@ export const EMPTY_APPOINTMENT_REVIEW_FORM: AppointmentReviewFormState = {
   providerTimeAdequate: null,
   providerTimeComment: "",
   frontDeskRating: null,
-  isNewPatient: null,
   patientDuration: null,
   referralSources: [],
   referralOther: "",

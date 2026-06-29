@@ -4,10 +4,11 @@ import { useCallback, useState } from "react";
 import {
   APPOINTMENT_REVIEW_MAX_SCORE,
   EMPTY_APPOINTMENT_REVIEW_FORM,
-  RETURNING_PATIENT_DURATION_OPTIONS,
+  PATIENT_DURATION_OPTIONS,
   REFERRAL_SOURCE_OPTIONS,
   TESTIMONIAL_PERMISSION_OPTIONS,
   WAIT_TIME_OPTIONS,
+  isNewPatientDuration,
   isReferralSourceComplete,
   type AppointmentReviewFormState,
   type AppointmentReviewPayload,
@@ -144,10 +145,8 @@ function isFormComplete(form: AppointmentReviewFormState): form is AppointmentRe
     form.waitTime !== null &&
     form.providerTimeAdequate !== null &&
     form.frontDeskRating !== null &&
-    form.isNewPatient !== null &&
-    (form.isNewPatient
-      ? isReferralSourceComplete(true, form.referralSources, form.referralOther)
-      : form.patientDuration !== null)
+    form.patientDuration !== null &&
+    isReferralSourceComplete(form.patientDuration, form.referralSources, form.referralOther)
   );
 }
 
@@ -169,8 +168,8 @@ export function AppointmentReviewForm() {
         return;
       }
       if (
-        form.isNewPatient === true &&
-        !isReferralSourceComplete(true, form.referralSources, form.referralOther)
+        form.patientDuration === "new" &&
+        !isReferralSourceComplete(form.patientDuration, form.referralSources, form.referralOther)
       ) {
         setError(
           form.referralSources.includes("other") && !form.referralOther.trim()
@@ -203,10 +202,7 @@ export function AppointmentReviewForm() {
     }
   }, [form]);
 
-  const showReferralQuestion = form.isNewPatient === true;
-  const showReturningDuration = form.isNewPatient === false;
-  const exceptionalQuestionNumber =
-    12 + 1 + (showReferralQuestion ? 1 : 0) + (showReturningDuration ? 1 : 0);
+  const showReferralQuestion = isNewPatientDuration(form.patientDuration);
 
   if (submitted) {
     return (
@@ -424,20 +420,39 @@ export function AppointmentReviewForm() {
         />
       </QuestionBlock>
 
-      <QuestionBlock number={12} title="Are you a new patient?" required>
-        <YesNoInput
-          name="is-new-patient"
-          value={form.isNewPatient}
-          onChange={(v) =>
-            patch({
-              isNewPatient: v,
-              ...(v
-                ? { patientDuration: null }
-                : { referralSources: [], referralOther: "" }),
-            })
-          }
-          disabled={busy}
-        />
+      <QuestionBlock
+        number={12}
+        title="How long have you been a patient of this provider?"
+        required
+      >
+        <div className="space-y-2" role="radiogroup" aria-label="Patient duration">
+          {PATIENT_DURATION_OPTIONS.map(({ value, label }) => (
+            <label
+              key={value}
+              className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-sm transition ${
+                form.patientDuration === value
+                  ? "border-accent bg-accent-muted/60"
+                  : "border-border bg-background hover:border-accent/40"
+              } ${busy ? "cursor-not-allowed opacity-50" : ""}`}
+            >
+              <input
+                type="radio"
+                name="patient-duration"
+                value={value}
+                checked={form.patientDuration === value}
+                onChange={() =>
+                  patch({
+                    patientDuration: value,
+                    ...(value !== "new" ? { referralSources: [], referralOther: "" } : {}),
+                  })
+                }
+                disabled={busy}
+                className="h-4 w-4 accent-accent"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
       </QuestionBlock>
 
       {showReferralQuestion ? (
@@ -491,40 +506,8 @@ export function AppointmentReviewForm() {
         </QuestionBlock>
       ) : null}
 
-      {showReturningDuration ? (
-        <QuestionBlock
-          number={showReferralQuestion ? 14 : 13}
-          title="How long have you been a patient of this provider?"
-          required
-        >
-          <div className="space-y-2" role="radiogroup" aria-label="Patient duration">
-            {RETURNING_PATIENT_DURATION_OPTIONS.map(({ value, label }) => (
-              <label
-                key={value}
-                className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-sm transition ${
-                  form.patientDuration === value
-                    ? "border-accent bg-accent-muted/60"
-                    : "border-border bg-background hover:border-accent/40"
-                } ${busy ? "cursor-not-allowed opacity-50" : ""}`}
-              >
-                <input
-                  type="radio"
-                  name="patient-duration"
-                  value={value}
-                  checked={form.patientDuration === value}
-                  onChange={() => patch({ patientDuration: value })}
-                  disabled={busy}
-                  className="h-4 w-4 accent-accent"
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-        </QuestionBlock>
-      ) : null}
-
       <QuestionBlock
-        number={exceptionalQuestionNumber}
+        number={showReferralQuestion ? 14 : 13}
         title="Would you like to name any staff member that provided exceptional service?"
       >
         <textarea

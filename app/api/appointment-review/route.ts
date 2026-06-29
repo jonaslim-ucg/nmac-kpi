@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { isValidEmailFormat } from "@/lib/auth/email-policy";
 import {
   APPOINTMENT_REVIEW_MAX_SCORE,
-  RETURNING_PATIENT_DURATION_OPTIONS,
+  PATIENT_DURATION_OPTIONS,
   REFERRAL_SOURCE_OPTIONS,
   TESTIMONIAL_PERMISSION_OPTIONS,
   WAIT_TIME_OPTIONS,
@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 const TESTIMONIAL_VALUES = new Set(TESTIMONIAL_PERMISSION_OPTIONS.map((o) => o.value));
 const WAIT_VALUES = new Set(WAIT_TIME_OPTIONS.map((o) => o.value));
-const RETURNING_DURATION_VALUES = new Set(RETURNING_PATIENT_DURATION_OPTIONS.map((o) => o.value));
+const DURATION_VALUES = new Set(PATIENT_DURATION_OPTIONS.map((o) => o.value));
 const REFERRAL_VALUES = new Set(REFERRAL_SOURCE_OPTIONS.map((o) => o.value));
 
 function scale(n: unknown): number | null {
@@ -64,8 +64,11 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
       : null;
   const waitTime =
     typeof b.waitTime === "string" && WAIT_VALUES.has(b.waitTime as never) ? b.waitTime : null;
+  const patientDuration =
+    typeof b.patientDuration === "string" && DURATION_VALUES.has(b.patientDuration as never)
+      ? (b.patientDuration as PatientDurationValue)
+      : null;
   const providerTimeAdequate = bool(b.providerTimeAdequate);
-  const isNewPatient = bool(b.isNewPatient);
 
   if (
     !email ||
@@ -77,38 +80,23 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
     !providerAndServices ||
     !testimonialPermission ||
     !waitTime ||
-    providerTimeAdequate === null ||
-    isNewPatient === null
+    !patientDuration ||
+    providerTimeAdequate === null
   ) {
     return { error: "Please answer all required questions." };
   }
 
-  let patientDuration: PatientDurationValue;
-  let referralSources: ReferralSourceValue[] = [];
-  let referralOther = "";
+  const referralSources =
+    patientDuration === "new" ? parseReferralSources(b.referralSources) : ([] as ReferralSourceValue[]);
+  const referralOther = patientDuration === "new" ? str(b.referralOther, 500) : "";
 
-  if (isNewPatient) {
-    patientDuration = "new";
-    referralSources = parseReferralSources(b.referralSources);
-    referralOther = str(b.referralOther, 500);
-    if (!isReferralSourceComplete(true, referralSources, referralOther)) {
-      return {
-        error:
-          referralSources.includes("other") && !referralOther
-            ? "Please specify how you heard about NMAC."
-            : "Please select at least one option for how you heard about NMAC.",
-      };
-    }
-  } else {
-    const returningDuration =
-      typeof b.patientDuration === "string" &&
-      RETURNING_DURATION_VALUES.has(b.patientDuration as never)
-        ? b.patientDuration
-        : null;
-    if (!returningDuration) {
-      return { error: "Please answer all required questions." };
-    }
-    patientDuration = returningDuration as PatientDurationValue;
+  if (!isReferralSourceComplete(patientDuration, referralSources, referralOther)) {
+    return {
+      error:
+        referralSources.includes("other") && !referralOther
+          ? "Please specify how you heard about NMAC."
+          : "Please select at least one option for how you heard about NMAC.",
+    };
   }
 
   return {
@@ -124,7 +112,6 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
     providerTimeAdequate,
     providerTimeComment: str(b.providerTimeComment),
     frontDeskRating,
-    isNewPatient,
     patientDuration,
     referralSources,
     referralOther,

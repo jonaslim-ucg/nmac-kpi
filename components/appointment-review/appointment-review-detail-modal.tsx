@@ -101,12 +101,9 @@ export function AppointmentReviewDetailModal({
               value={formatYesNo(review.providerTimeAdequate)}
             />
             <Answer label="11. Front desk staff" value={formatRating(review.frontDeskRating)} />
-            <Answer label="12. Are you a new patient?" value={formatYesNo(review.isNewPatient)} />
+            <Answer label="12. How long a patient" value={review.patientDurationLabel} />
             {review.referralSourcesLabel ? (
               <Answer label="13. How did you hear about NMAC" value={review.referralSourcesLabel} />
-            ) : null}
-            {!review.isNewPatient ? (
-              <Answer label="13. How long a patient" value={review.patientDurationLabel} />
             ) : null}
           </div>
 
@@ -119,7 +116,10 @@ export function AppointmentReviewDetailModal({
             <CommentBlock label="6. Health, confidence, or quality of life" text={review.healthImprovement} />
             <CommentBlock label="7. Message to prospective patients" text={review.recommendationMessage} />
             <CommentBlock label="10. Provider visit comments" text={review.providerTimeComment} />
-            <CommentBlock label="14. Exceptional staff" text={review.exceptionalStaffComment} />
+            <CommentBlock
+              label={review.referralSourcesLabel ? "14. Exceptional staff" : "13. Exceptional staff"}
+              text={review.exceptionalStaffComment}
+            />
             {!review.hasComments ? (
               <p className="text-sm text-muted-foreground">No written responses beyond the required fields.</p>
             ) : null}

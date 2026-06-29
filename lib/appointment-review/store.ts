@@ -52,7 +52,7 @@ export async function insertAppointmentReview(payload: AppointmentReviewPayload)
       provider_time_adequate: payload.providerTimeAdequate,
       provider_time_comment: payload.providerTimeComment,
       front_desk_rating: payload.frontDeskRating,
-      is_new_patient: payload.isNewPatient,
+      is_new_patient: payload.patientDuration === "new",
       patient_duration: payload.patientDuration,
       referral_sources: payload.referralSources,
       referral_other: payload.referralOther,

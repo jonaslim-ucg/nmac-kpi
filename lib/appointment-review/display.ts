@@ -1,41 +1,20 @@
 import type { AppointmentReviewRow } from "@/lib/appointment-review/analytics";
-import { APPOINTMENT_REVIEW_MAX_SCORE, PATIENT_DURATION_OPTIONS, WAIT_TIME_OPTIONS } from "@/lib/appointment-review/types";
+import { APPOINTMENT_REVIEW_MAX_SCORE } from "@/lib/appointment-review/types";
 
 export type AppointmentReviewDetail = {
   id: string;
   createdAt: string;
   appointmentEase: number;
-  waitTimeLabel: string;
   visitRating: number;
-  providerTimeAdequate: boolean;
-  providerTimeComment: string;
-  understandDiagnosis: boolean;
-  clinicalCareRating: number;
-  clinicalCareComment: string;
-  frontDeskRating: number;
-  isPatient: boolean;
-  patientDurationLabel: string;
-  exceptionalStaffComment: string;
-  improvementStaffComment: string;
-  recommendLikelihood: number;
+  providerAndServices: string;
+  healthImprovement: string;
+  recommendationMessage: string;
   hasComments: boolean;
   commentPreview: string | null;
 };
 
-function optionLabel(
-  options: readonly { value: string; label: string }[],
-  value: string,
-): string {
-  return options.find((o) => o.value === value)?.label ?? value;
-}
-
 function reviewComments(row: AppointmentReviewRow): string[] {
-  return [
-    row.provider_time_comment,
-    row.clinical_care_comment,
-    row.exceptional_staff_comment,
-    row.improvement_staff_comment,
-  ]
+  return [row.provider_and_services, row.health_improvement, row.recommendation_message]
     .map((c) => c.trim())
     .filter(Boolean);
 }
@@ -46,19 +25,10 @@ export function toAppointmentReviewDetail(row: AppointmentReviewRow): Appointmen
     id: row.id,
     createdAt: row.created_at,
     appointmentEase: row.appointment_ease,
-    waitTimeLabel: optionLabel(WAIT_TIME_OPTIONS, row.wait_time),
     visitRating: row.visit_rating,
-    providerTimeAdequate: row.provider_time_adequate,
-    providerTimeComment: row.provider_time_comment.trim(),
-    understandDiagnosis: row.understand_diagnosis,
-    clinicalCareRating: row.clinical_care_rating,
-    clinicalCareComment: row.clinical_care_comment.trim(),
-    frontDeskRating: row.front_desk_rating,
-    isPatient: row.is_patient,
-    patientDurationLabel: optionLabel(PATIENT_DURATION_OPTIONS, row.patient_duration),
-    exceptionalStaffComment: row.exceptional_staff_comment.trim(),
-    improvementStaffComment: row.improvement_staff_comment.trim(),
-    recommendLikelihood: row.recommend_likelihood,
+    providerAndServices: row.provider_and_services.trim(),
+    healthImprovement: row.health_improvement.trim(),
+    recommendationMessage: row.recommendation_message.trim(),
     hasComments: comments.length > 0,
     commentPreview: comments[0] ?? null,
   };
@@ -77,10 +47,6 @@ export function formatReviewWhen(iso: string): string {
   } catch {
     return iso;
   }
-}
-
-export function formatYesNo(value: boolean): string {
-  return value ? "Yes" : "No";
 }
 
 export function formatRating(value: number): string {

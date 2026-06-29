@@ -3,7 +3,7 @@
 import { ChevronLeft, ChevronRight, MessageSquareText, X } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
-import { formatRating, formatReviewWhen, formatYesNo } from "@/lib/appointment-review/display";
+import { formatRating, formatReviewWhen } from "@/lib/appointment-review/display";
 
 type Props = {
   review: AppointmentReviewDetail;
@@ -84,40 +84,25 @@ export function AppointmentReviewDetailModal({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-2">
           <div className="divide-y divide-border">
-            <Answer label="1. Ease of appointment" value={formatRating(review.appointmentEase)} />
-            <Answer label="2. Wait time before exam room" value={review.waitTimeLabel} />
-            <Answer label="3. Visit with our practice" value={formatRating(review.visitRating)} />
             <Answer
-              label="4. Provider spent enough time and answered questions"
-              value={formatYesNo(review.providerTimeAdequate)}
+              label="1. Ease of scheduling an appointment"
+              value={formatRating(review.appointmentEase)}
             />
-            <Answer
-              label="5. Understand diagnosis and treatments"
-              value={formatYesNo(review.understandDiagnosis)}
-            />
-            <Answer label="6. Overall clinical care" value={formatRating(review.clinicalCareRating)} />
-            <Answer label="7. Front desk staff" value={formatRating(review.frontDeskRating)} />
-            <Answer label="8. Are you a patient?" value={formatYesNo(review.isPatient)} />
-            <Answer label="9. How long a patient" value={review.patientDurationLabel} />
-            <Answer label="12. Likely to recommend" value={formatRating(review.recommendLikelihood)} />
+            <Answer label="2. Overall visit with our practice" value={formatRating(review.visitRating)} />
           </div>
 
-          {review.hasComments ? (
-            <div className="mt-4 space-y-3 border-t border-border pt-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <MessageSquareText className="h-4 w-4 text-accent" aria-hidden />
-                Patient comments
-              </div>
-              <CommentBlock label="Provider visit" text={review.providerTimeComment} />
-              <CommentBlock label="Clinical care" text={review.clinicalCareComment} />
-              <CommentBlock label="Exceptional staff" text={review.exceptionalStaffComment} />
-              <CommentBlock label="Needs improvement" text={review.improvementStaffComment} />
+          <div className="mt-4 space-y-3 border-t border-border pt-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <MessageSquareText className="h-4 w-4 text-accent" aria-hidden />
+              Patient responses
             </div>
-          ) : (
-            <p className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
-              No written comments were left on this review.
-            </p>
-          )}
+            <CommentBlock label="3. Provider and services" text={review.providerAndServices} />
+            <CommentBlock label="4. Health, confidence, or quality of life" text={review.healthImprovement} />
+            <CommentBlock label="5. Message to prospective patients" text={review.recommendationMessage} />
+            {!review.hasComments ? (
+              <p className="text-sm text-muted-foreground">No written responses beyond the required fields.</p>
+            ) : null}
+          </div>
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-border px-5 py-4">

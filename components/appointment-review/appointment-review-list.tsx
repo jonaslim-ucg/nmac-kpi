@@ -30,14 +30,14 @@ export function AppointmentReviewList({ reviews, onViewReview }: Props) {
           <p className="text-sm font-semibold text-foreground">All reviews</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {filtered.length} review{filtered.length === 1 ? "" : "s"}
-            {commentFilter === "with-comments" ? " with comments" : ""}
+            {commentFilter === "with-comments" ? " with written responses" : ""}
           </p>
         </div>
         <div className="flex gap-2">
           {(
             [
               { id: "all", label: "All" },
-              { id: "with-comments", label: "With comments" },
+              { id: "with-comments", label: "With responses" },
             ] as const
           ).map(({ id, label }) => (
             <button
@@ -60,7 +60,7 @@ export function AppointmentReviewList({ reviews, onViewReview }: Props) {
       {filtered.length === 0 ? (
         <p className="px-5 py-8 text-sm text-muted-foreground">
           {commentFilter === "with-comments"
-            ? "No reviews with comments in this period."
+            ? "No reviews with written responses in this period."
             : "No reviews in this period."}
         </p>
       ) : (
@@ -69,10 +69,10 @@ export function AppointmentReviewList({ reviews, onViewReview }: Props) {
             <thead>
               <tr className="border-b border-border bg-surface-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <th className="px-5 py-3 font-semibold">Submitted</th>
-                <th className="px-3 py-3 font-semibold">Recommend</th>
+                <th className="px-3 py-3 font-semibold">Scheduling</th>
                 <th className="px-3 py-3 font-semibold">Visit</th>
-                <th className="px-3 py-3 font-semibold">Wait time</th>
-                <th className="px-3 py-3 font-semibold">Comments</th>
+                <th className="px-3 py-3 font-semibold">Provider & services</th>
+                <th className="px-3 py-3 font-semibold">Responses</th>
                 <th className="px-5 py-3 font-semibold" />
               </tr>
             </thead>
@@ -84,14 +84,18 @@ export function AppointmentReviewList({ reviews, onViewReview }: Props) {
                   onClick={() => onViewReview(review.id)}
                 >
                   <td className="px-5 py-3 text-foreground">{formatReviewWhen(review.createdAt)}</td>
-                  <td className="px-3 py-3 font-mono text-foreground">{formatRating(review.recommendLikelihood)}</td>
+                  <td className="px-3 py-3 font-mono text-foreground">{formatRating(review.appointmentEase)}</td>
                   <td className="px-3 py-3 font-mono text-foreground">{formatRating(review.visitRating)}</td>
-                  <td className="px-3 py-3 text-muted-foreground">{review.waitTimeLabel}</td>
                   <td className="max-w-[220px] px-3 py-3">
-                    {review.hasComments ? (
+                    <p className="line-clamp-2 text-foreground">{review.providerAndServices || "—"}</p>
+                  </td>
+                  <td className="max-w-[220px] px-3 py-3">
+                    {review.healthImprovement || review.recommendationMessage ? (
                       <div className="flex items-start gap-2">
                         <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
-                        <p className="line-clamp-2 text-foreground">{review.commentPreview}</p>
+                        <p className="line-clamp-2 text-foreground">
+                          {[review.healthImprovement, review.recommendationMessage].filter(Boolean).join(" · ")}
+                        </p>
                       </div>
                     ) : (
                       <span className="text-muted-foreground">—</span>

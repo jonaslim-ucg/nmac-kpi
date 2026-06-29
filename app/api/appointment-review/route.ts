@@ -1,26 +1,13 @@
 import { NextResponse } from "next/server";
-import {
-  APPOINTMENT_REVIEW_MAX_SCORE,
-  PATIENT_DURATION_OPTIONS,
-  WAIT_TIME_OPTIONS,
-  type AppointmentReviewPayload,
-} from "@/lib/appointment-review/types";
+import { APPOINTMENT_REVIEW_MAX_SCORE, type AppointmentReviewPayload } from "@/lib/appointment-review/types";
 import { insertAppointmentReview } from "@/lib/appointment-review/store";
 
 export const dynamic = "force-dynamic";
-
-const WAIT_VALUES = new Set(WAIT_TIME_OPTIONS.map((o) => o.value));
-const DURATION_VALUES = new Set(PATIENT_DURATION_OPTIONS.map((o) => o.value));
 
 function scale(n: unknown): number | null {
   const v = Number(n);
   if (!Number.isInteger(v) || v < 1 || v > APPOINTMENT_REVIEW_MAX_SCORE) return null;
   return v;
-}
-
-function bool(v: unknown): boolean | null {
-  if (v === true || v === false) return v;
-  return null;
 }
 
 function str(v: unknown, max = 4000): string {
@@ -36,50 +23,18 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
 
   const appointmentEase = scale(b.appointmentEase);
   const visitRating = scale(b.visitRating);
-  const clinicalCareRating = scale(b.clinicalCareRating);
-  const frontDeskRating = scale(b.frontDeskRating);
-  const recommendLikelihood = scale(b.recommendLikelihood);
+  const providerAndServices = str(b.providerAndServices);
 
-  const waitTime = typeof b.waitTime === "string" && WAIT_VALUES.has(b.waitTime as never) ? b.waitTime : null;
-  const patientDuration =
-    typeof b.patientDuration === "string" && DURATION_VALUES.has(b.patientDuration as never)
-      ? b.patientDuration
-      : null;
-
-  const providerTimeAdequate = bool(b.providerTimeAdequate);
-  const understandDiagnosis = bool(b.understandDiagnosis);
-  const isPatient = bool(b.isPatient);
-
-  if (
-    appointmentEase === null ||
-    visitRating === null ||
-    clinicalCareRating === null ||
-    frontDeskRating === null ||
-    recommendLikelihood === null ||
-    !waitTime ||
-    !patientDuration ||
-    providerTimeAdequate === null ||
-    understandDiagnosis === null ||
-    isPatient === null
-  ) {
+  if (appointmentEase === null || visitRating === null || !providerAndServices) {
     return { error: "Please answer all required questions." };
   }
 
   return {
     appointmentEase,
-    waitTime: waitTime as AppointmentReviewPayload["waitTime"],
     visitRating,
-    providerTimeAdequate,
-    providerTimeComment: str(b.providerTimeComment),
-    understandDiagnosis,
-    clinicalCareRating,
-    clinicalCareComment: str(b.clinicalCareComment),
-    frontDeskRating,
-    isPatient,
-    patientDuration: patientDuration as AppointmentReviewPayload["patientDuration"],
-    exceptionalStaffComment: str(b.exceptionalStaffComment),
-    improvementStaffComment: str(b.improvementStaffComment),
-    recommendLikelihood,
+    providerAndServices,
+    healthImprovement: str(b.healthImprovement),
+    recommendationMessage: str(b.recommendationMessage),
   };
 }
 

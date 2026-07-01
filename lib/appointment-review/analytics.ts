@@ -2,9 +2,11 @@ import {
   APPOINTMENT_REVIEW_MAX_SCORE,
   PATIENT_DURATION_OPTIONS,
   REFERRAL_SOURCE_OPTIONS,
+  SERVICE_TYPE_OPTIONS,
   WAIT_TIME_OPTIONS,
   type PatientDurationValue,
   type ReferralSourceValue,
+  type ServiceTypeValue,
   type TestimonialPermissionValue,
   type WaitTimeValue,
 } from "@/lib/appointment-review/types";
@@ -17,8 +19,16 @@ export type AppointmentReviewRow = {
   appointment_ease: number;
   visit_rating: number;
   provider_and_services: string;
+  service_type: ServiceTypeValue | null;
+  service_type_other: string;
+  provider_rating: number | null;
   health_improvement: string;
+  health_rating: number | null;
+  confidence_rating: number | null;
+  quality_of_life_rating: number | null;
   recommendation_message: string;
+  recommendation_rating: number | null;
+  would_encourage_patient: boolean | null;
   testimonial_permission: TestimonialPermissionValue;
   wait_time: WaitTimeValue;
   provider_time_adequate: boolean;
@@ -38,9 +48,16 @@ export type AppointmentReviewStats = {
   averages: {
     appointmentEase: number;
     visitRating: number;
+    providerRating: number;
+    healthRating: number;
+    confidenceRating: number;
+    qualityOfLifeRating: number;
+    recommendationRating: number;
     frontDeskRating: number;
   };
   topVisitRatingPct: number;
+  wouldEncouragePatient: LabelCount[];
+  serviceTypes: LabelCount[];
   waitTime: LabelCount[];
   patientDuration: LabelCount[];
   providerTimeAdequate: LabelCount[];
@@ -60,16 +77,23 @@ function avg(values: number[]): number {
   return values.reduce((s, v) => s + v, 0) / values.length;
 }
 
+function avgNullable(rows: AppointmentReviewRow[], pick: (row: AppointmentReviewRow) => number | null): number {
+  const values = rows.map(pick).filter((v): v is number => v !== null);
+  return Math.round(avg(values) * 10) / 10;
+}
+
 function labelCounts(
   rows: AppointmentReviewRow[],
   options: readonly { value: string; label: string }[],
-  pick: (row: AppointmentReviewRow) => string,
+  pick: (row: AppointmentReviewRow) => string | null,
 ): LabelCount[] {
   const total = rows.length;
-  return options.map(({ value, label }) => {
-    const count = rows.filter((r) => pick(r) === value).length;
-    return { label, count, pct: total ? Math.round((count / total) * 100) : 0 };
-  });
+  return options
+    .map(({ value, label }) => {
+      const count = rows.filter((r) => pick(r) === value).length;
+      return { label, count, pct: total ? Math.round((count / total) * 100) : 0 };
+    })
+    .filter((item) => item.count > 0);
 }
 
 function yesNoCounts(rows: AppointmentReviewRow[], pick: (row: AppointmentReviewRow) => boolean): LabelCount[] {
@@ -108,18 +132,27 @@ export function buildAppointmentReviewStats(rows: AppointmentReviewRow[]): Appoi
   const averages = {
     appointmentEase: Math.round(avg(rows.map((r) => r.appointment_ease)) * 10) / 10,
     visitRating: Math.round(avg(rows.map((r) => r.visit_rating)) * 10) / 10,
+    providerRating: avgNullable(rows, (r) => r.provider_rating),
+    healthRating: avgNullable(rows, (r) => r.health_rating),
+    confidenceRating: avgNullable(rows, (r) => r.confidence_rating),
+    qualityOfLifeRating: avgNullable(rows, (r) => r.quality_of_life_rating),
+    recommendationRating: avgNullable(rows, (r) => r.recommendation_rating),
     frontDeskRating: Math.round(avg(rows.map((r) => r.front_desk_rating)) * 10) / 10,
   };
 
   const ratingScores = [
     { metric: "Scheduling ease", score: averages.appointmentEase },
     { metric: "Overall visit", score: averages.visitRating },
+    { metric: "Provider", score: averages.providerRating },
+    { metric: "Health improvement", score: averages.healthRating },
+    { metric: "Confidence improvement", score: averages.confidenceRating },
+    { metric: "Quality of life", score: averages.qualityOfLifeRating },
+    { metric: "Likelihood to recommend", score: averages.recommendationRating },
     { metric: "Front desk", score: averages.frontDeskRating },
-  ];
+  ].filter((item) => item.score > 0);
 
   const commentKinds: { kind: string; pick: (r: AppointmentReviewRow) => string }[] = [
-    { kind: "Provider & services", pick: (r) => r.provider_and_services },
-    { kind: "Health & quality of life", pick: (r) => r.health_improvement },
+    { kind: "Care outcomes", pick: (r) => r.health_improvement },
     { kind: "Recommendation", pick: (r) => r.recommendation_message },
     { kind: "Provider visit", pick: (r) => r.provider_time_comment },
     { kind: "Exceptional staff", pick: (r) => r.exceptional_staff_comment },
@@ -138,14 +171,24 @@ export function buildAppointmentReviewStats(rows: AppointmentReviewRow[]): Appoi
 
   const referralSources = REFERRAL_SOURCE_OPTIONS.map(({ value, label }) => {
     const count = newPatients.filter((r) => r.referral_sources.includes(value)).length;
-    const total = newPatients.length;
-    return { label, count, pct: total ? Math.round((count / total) * 100) : 0 };
+    const referralTotal = newPatients.length;
+    return { label, count, pct: referralTotal ? Math.round((count / referralTotal) * 100) : 0 };
   }).filter((item) => item.count > 0);
+
+  const serviceTypes = labelCounts(rows, SERVICE_TYPE_OPTIONS, (r) => r.service_type);
+
+  const wouldEncourageRows = rows.filter((r) => r.would_encourage_patient !== null);
+  const wouldEncouragePatient = yesNoCounts(
+    wouldEncourageRows,
+    (r) => r.would_encourage_patient === true,
+  );
 
   return {
     total,
     averages,
     topVisitRatingPct: total ? Math.round((topVisit / total) * 100) : 0,
+    wouldEncouragePatient,
+    serviceTypes,
     waitTime: labelCounts(rows, WAIT_TIME_OPTIONS, (r) => r.wait_time),
     patientDuration: labelCounts(rows, PATIENT_DURATION_OPTIONS, (r) => r.patient_duration),
     providerTimeAdequate: yesNoCounts(rows, (r) => r.provider_time_adequate),

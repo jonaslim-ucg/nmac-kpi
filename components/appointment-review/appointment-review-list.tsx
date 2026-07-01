@@ -73,8 +73,9 @@ export function AppointmentReviewList({ reviews, onViewReview }: Props) {
                 <th className="px-3 py-3 font-semibold">Scheduling</th>
                 <th className="px-3 py-3 font-semibold">Visit</th>
                 <th className="px-3 py-3 font-semibold">Wait time</th>
-                <th className="px-3 py-3 font-semibold">Provider & services</th>
-                <th className="px-3 py-3 font-semibold">Responses</th>
+                <th className="px-3 py-3 font-semibold">Service</th>
+                <th className="px-3 py-3 font-semibold">Recommend</th>
+                <th className="px-3 py-3 font-semibold">Comments</th>
                 <th className="px-5 py-3 font-semibold" />
               </tr>
             </thead>
@@ -94,14 +95,17 @@ export function AppointmentReviewList({ reviews, onViewReview }: Props) {
                   <td className="px-3 py-3 font-mono text-foreground">{formatRating(review.visitRating)}</td>
                   <td className="px-3 py-3 text-muted-foreground">{review.waitTimeLabel}</td>
                   <td className="max-w-[220px] px-3 py-3">
-                    <p className="line-clamp-2 text-foreground">{review.providerAndServices || "—"}</p>
+                    <p className="line-clamp-2 text-foreground">{review.serviceTypeLabel || "—"}</p>
+                  </td>
+                  <td className="px-3 py-3 font-mono text-foreground">
+                    {review.recommendationRating !== null ? formatRating(review.recommendationRating) : "—"}
                   </td>
                   <td className="max-w-[220px] px-3 py-3">
-                    {review.healthImprovement || review.recommendationMessage ? (
+                    {review.healthImprovementComment || review.recommendationMessage ? (
                       <div className="flex items-start gap-2">
                         <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
                         <p className="line-clamp-2 text-foreground">
-                          {[review.healthImprovement, review.recommendationMessage].filter(Boolean).join(" · ")}
+                          {[review.healthImprovementComment, review.recommendationMessage].filter(Boolean).join(" · ")}
                         </p>
                       </div>
                     ) : (

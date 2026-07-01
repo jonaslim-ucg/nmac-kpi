@@ -6,10 +6,12 @@ import {
   EMPTY_APPOINTMENT_REVIEW_FORM,
   PATIENT_DURATION_OPTIONS,
   REFERRAL_SOURCE_OPTIONS,
+  SERVICE_TYPE_OPTIONS,
   TESTIMONIAL_PERMISSION_OPTIONS,
   WAIT_TIME_OPTIONS,
   isNewPatientDuration,
   isReferralSourceComplete,
+  isServiceTypeComplete,
   type AppointmentReviewFormState,
   type AppointmentReviewPayload,
 } from "@/lib/appointment-review/types";
@@ -140,7 +142,13 @@ function isFormComplete(form: AppointmentReviewFormState): form is AppointmentRe
     form.patientName.trim().length > 0 &&
     form.appointmentEase !== null &&
     form.visitRating !== null &&
-    form.providerAndServices.trim().length > 0 &&
+    isServiceTypeComplete(form.serviceType, form.serviceTypeOther) &&
+    form.providerRating !== null &&
+    form.healthRating !== null &&
+    form.confidenceRating !== null &&
+    form.qualityOfLifeRating !== null &&
+    form.recommendationRating !== null &&
+    form.wouldEncouragePatient !== null &&
     form.testimonialPermission !== null &&
     form.waitTime !== null &&
     form.providerTimeAdequate !== null &&
@@ -165,6 +173,14 @@ export function AppointmentReviewForm() {
     if (!isFormComplete(form)) {
       if (form.email.trim() && !isValidEmailFormat(form.email.trim())) {
         setError("Please enter a valid email address.");
+        return;
+      }
+      if (!isServiceTypeComplete(form.serviceType, form.serviceTypeOther)) {
+        setError(
+          form.serviceType === "other" && !form.serviceTypeOther.trim()
+            ? "Please specify the type of service you received."
+            : "Please select the type of service you received.",
+        );
         return;
       }
       if (
@@ -278,41 +294,159 @@ export function AppointmentReviewForm() {
         />
       </QuestionBlock>
 
-      <QuestionBlock
-        number={5}
-        title="Who was your provider and what services did they treat you for (Annual Exam, Cardio Specialist, Weight loss, etc)?"
-        required
-      >
-        <textarea
-          rows={3}
-          value={form.providerAndServices}
-          onChange={(e) => patch({ providerAndServices: e.target.value })}
+      <QuestionBlock number={5} title="What type of service did you receive?" required>
+        <div className="space-y-2" role="radiogroup" aria-label="Service type">
+          {SERVICE_TYPE_OPTIONS.map(({ value, label }) => (
+            <label
+              key={value}
+              className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-sm transition ${
+                form.serviceType === value
+                  ? "border-accent bg-accent-muted/60"
+                  : "border-border bg-background hover:border-accent/40"
+              } ${busy ? "cursor-not-allowed opacity-50" : ""}`}
+            >
+              <input
+                type="radio"
+                name="service-type"
+                value={value}
+                checked={form.serviceType === value}
+                onChange={() =>
+                  patch({
+                    serviceType: value,
+                    ...(value !== "other" ? { serviceTypeOther: "" } : {}),
+                  })
+                }
+                disabled={busy}
+                className="h-4 w-4 accent-accent"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+        {form.serviceType === "other" ? (
+          <input
+            type="text"
+            value={form.serviceTypeOther}
+            onChange={(e) => patch({ serviceTypeOther: e.target.value })}
+            disabled={busy}
+            placeholder="Please specify the service…"
+            className="mt-3 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
+          />
+        ) : null}
+      </QuestionBlock>
+
+      <QuestionBlock number={6} title="How would you rate your provider?" required>
+        <ScaleInput
+          name="provider-rating"
+          value={form.providerRating}
+          onChange={(n) => patch({ providerRating: n })}
+          minLabel="poor"
+          maxLabel="excellent"
           disabled={busy}
-          placeholder="Provider name and services received…"
-          className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
         />
       </QuestionBlock>
 
-      <QuestionBlock
-        number={6}
-        title="How has your health, confidence, or quality of life improved since receiving care from NMAC?"
-      >
-        <textarea
-          rows={4}
-          value={form.healthImprovement}
-          onChange={(e) => patch({ healthImprovement: e.target.value })}
-          disabled={busy}
-          placeholder="Share how your care has made a difference (optional)…"
-          className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
-        />
-      </QuestionBlock>
+      <p className="border-t border-border pt-8 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Care outcomes
+      </p>
 
       <QuestionBlock
         number={7}
+        title="Since receiving care at NMAC, how would you rate the improvement in your overall health?"
+        required
+      >
+        <ScaleInput
+          name="health-rating"
+          value={form.healthRating}
+          onChange={(n) => patch({ healthRating: n })}
+          minLabel="no improvement"
+          maxLabel="significant improvement"
+          disabled={busy}
+        />
+      </QuestionBlock>
+
+      <QuestionBlock
+        number={8}
+        title="Since receiving care at NMAC, how would you rate the improvement in your confidence in managing your health?"
+        required
+      >
+        <ScaleInput
+          name="confidence-rating"
+          value={form.confidenceRating}
+          onChange={(n) => patch({ confidenceRating: n })}
+          minLabel="no improvement"
+          maxLabel="significant improvement"
+          disabled={busy}
+        />
+      </QuestionBlock>
+
+      <QuestionBlock
+        number={9}
+        title="Since receiving care at NMAC, how would you rate the improvement in your overall quality of life?"
+        required
+      >
+        <ScaleInput
+          name="quality-of-life-rating"
+          value={form.qualityOfLifeRating}
+          onChange={(n) => patch({ qualityOfLifeRating: n })}
+          minLabel="no improvement"
+          maxLabel="significant improvement"
+          disabled={busy}
+        />
+      </QuestionBlock>
+
+      <QuestionBlock
+        number={10}
+        title="Would you like to share more about how your care has made a difference?"
+      >
+        <textarea
+          rows={3}
+          value={form.healthImprovementComment}
+          onChange={(e) => patch({ healthImprovementComment: e.target.value })}
+          disabled={busy}
+          placeholder="Additional comments about your health, confidence, or quality of life (optional)…"
+          className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
+        />
+      </QuestionBlock>
+
+      <p className="border-t border-border pt-8 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Recommendation
+      </p>
+
+      <QuestionBlock
+        number={11}
+        title="How likely are you to recommend NMAC to a friend or family member?"
+        required
+      >
+        <ScaleInput
+          name="recommendation-rating"
+          value={form.recommendationRating}
+          onChange={(n) => patch({ recommendationRating: n })}
+          minLabel="not at all likely"
+          maxLabel="extremely likely"
+          disabled={busy}
+        />
+      </QuestionBlock>
+
+      <QuestionBlock
+        number={12}
+        title="Would you encourage someone considering NMAC to become a patient?"
+        required
+      >
+        <YesNoInput
+          name="would-encourage"
+          value={form.wouldEncouragePatient}
+          onChange={(v) => patch({ wouldEncouragePatient: v })}
+          disabled={busy}
+        />
+      </QuestionBlock>
+
+      <QuestionBlock
+        number={13}
         title="What would you say to someone considering becoming a NMAC patient?"
       >
         <textarea
-          rows={4}
+          rows={3}
           value={form.recommendationMessage}
           onChange={(e) => patch({ recommendationMessage: e.target.value })}
           disabled={busy}
@@ -322,7 +456,7 @@ export function AppointmentReviewForm() {
       </QuestionBlock>
 
       <QuestionBlock
-        number={8}
+        number={14}
         title="May we use your comments as a testimonial in our marketing materials (website, social media, advertisements, and other promotional materials)?"
         required
       >
@@ -356,7 +490,7 @@ export function AppointmentReviewForm() {
       </p>
 
       <QuestionBlock
-        number={9}
+        number={15}
         title="What was your wait time before the clinical staff brought you to an exam room?"
         required
       >
@@ -386,7 +520,7 @@ export function AppointmentReviewForm() {
       </QuestionBlock>
 
       <QuestionBlock
-        number={10}
+        number={16}
         title="My provider spent enough time with me to address my needs and answered all my questions."
         required
       >
@@ -409,7 +543,7 @@ export function AppointmentReviewForm() {
         </label>
       </QuestionBlock>
 
-      <QuestionBlock number={11} title="The front desk staff were friendly and courteous." required>
+      <QuestionBlock number={17} title="The front desk staff were friendly and courteous." required>
         <ScaleInput
           name="front-desk"
           value={form.frontDeskRating}
@@ -421,7 +555,7 @@ export function AppointmentReviewForm() {
       </QuestionBlock>
 
       <QuestionBlock
-        number={12}
+        number={18}
         title="How long have you been a patient of this provider?"
         required
       >
@@ -457,7 +591,7 @@ export function AppointmentReviewForm() {
 
       {showReferralQuestion ? (
         <QuestionBlock
-          number={13}
+          number={19}
           title="How did you hear about NMAC? (Check all that apply)"
           required
         >
@@ -507,7 +641,7 @@ export function AppointmentReviewForm() {
       ) : null}
 
       <QuestionBlock
-        number={showReferralQuestion ? 14 : 13}
+        number={showReferralQuestion ? 20 : 19}
         title="Would you like to name any staff member that provided exceptional service?"
       >
         <textarea

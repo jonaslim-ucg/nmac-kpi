@@ -4,12 +4,15 @@ import {
   APPOINTMENT_REVIEW_MAX_SCORE,
   PATIENT_DURATION_OPTIONS,
   REFERRAL_SOURCE_OPTIONS,
+  SERVICE_TYPE_OPTIONS,
   TESTIMONIAL_PERMISSION_OPTIONS,
   WAIT_TIME_OPTIONS,
   isReferralSourceComplete,
+  isServiceTypeComplete,
   type AppointmentReviewPayload,
   type PatientDurationValue,
   type ReferralSourceValue,
+  type ServiceTypeValue,
   type TestimonialPermissionValue,
 } from "@/lib/appointment-review/types";
 import { insertAppointmentReview } from "@/lib/appointment-review/store";
@@ -20,6 +23,7 @@ const TESTIMONIAL_VALUES = new Set(TESTIMONIAL_PERMISSION_OPTIONS.map((o) => o.v
 const WAIT_VALUES = new Set(WAIT_TIME_OPTIONS.map((o) => o.value));
 const DURATION_VALUES = new Set(PATIENT_DURATION_OPTIONS.map((o) => o.value));
 const REFERRAL_VALUES = new Set(REFERRAL_SOURCE_OPTIONS.map((o) => o.value));
+const SERVICE_TYPE_VALUES = new Set(SERVICE_TYPE_OPTIONS.map((o) => o.value));
 
 function scale(n: unknown): number | null {
   const v = Number(n);
@@ -53,10 +57,19 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
 
   const appointmentEase = scale(b.appointmentEase);
   const visitRating = scale(b.visitRating);
+  const providerRating = scale(b.providerRating);
+  const healthRating = scale(b.healthRating);
+  const confidenceRating = scale(b.confidenceRating);
+  const qualityOfLifeRating = scale(b.qualityOfLifeRating);
+  const recommendationRating = scale(b.recommendationRating);
   const frontDeskRating = scale(b.frontDeskRating);
-  const providerAndServices = str(b.providerAndServices);
   const email = str(b.email, 320).toLowerCase();
   const patientName = str(b.patientName, 200);
+  const serviceType =
+    typeof b.serviceType === "string" && SERVICE_TYPE_VALUES.has(b.serviceType as ServiceTypeValue)
+      ? (b.serviceType as ServiceTypeValue)
+      : null;
+  const serviceTypeOther = str(b.serviceTypeOther, 500);
   const testimonialPermission =
     typeof b.testimonialPermission === "string" &&
     TESTIMONIAL_VALUES.has(b.testimonialPermission as TestimonialPermissionValue)
@@ -69,6 +82,7 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
       ? (b.patientDuration as PatientDurationValue)
       : null;
   const providerTimeAdequate = bool(b.providerTimeAdequate);
+  const wouldEncouragePatient = bool(b.wouldEncouragePatient);
 
   if (
     !email ||
@@ -76,12 +90,19 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
     !patientName ||
     appointmentEase === null ||
     visitRating === null ||
+    providerRating === null ||
+    healthRating === null ||
+    confidenceRating === null ||
+    qualityOfLifeRating === null ||
+    recommendationRating === null ||
     frontDeskRating === null ||
-    !providerAndServices ||
+    !serviceType ||
+    !isServiceTypeComplete(serviceType, serviceTypeOther) ||
     !testimonialPermission ||
     !waitTime ||
     !patientDuration ||
-    providerTimeAdequate === null
+    providerTimeAdequate === null ||
+    wouldEncouragePatient === null
   ) {
     return { error: "Please answer all required questions." };
   }
@@ -104,8 +125,15 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
     patientName,
     appointmentEase,
     visitRating,
-    providerAndServices,
-    healthImprovement: str(b.healthImprovement),
+    serviceType,
+    serviceTypeOther,
+    providerRating,
+    healthRating,
+    confidenceRating,
+    qualityOfLifeRating,
+    healthImprovementComment: str(b.healthImprovementComment),
+    recommendationRating,
+    wouldEncouragePatient,
     recommendationMessage: str(b.recommendationMessage),
     testimonialPermission,
     waitTime: waitTime as AppointmentReviewPayload["waitTime"],

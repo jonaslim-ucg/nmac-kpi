@@ -3,9 +3,12 @@ import {
   APPOINTMENT_REVIEW_MAX_SCORE,
   PATIENT_DURATION_OPTIONS,
   REFERRAL_SOURCE_OPTIONS,
+  SERVICE_TYPE_OPTIONS,
   TESTIMONIAL_PERMISSION_OPTIONS,
   WAIT_TIME_OPTIONS,
+  serviceTypeLabel,
   type ReferralSourceValue,
+  type ServiceTypeValue,
   type TestimonialPermissionValue,
 } from "@/lib/appointment-review/types";
 
@@ -16,8 +19,14 @@ export type AppointmentReviewDetail = {
   patientName: string;
   appointmentEase: number;
   visitRating: number;
-  providerAndServices: string;
-  healthImprovement: string;
+  serviceTypeLabel: string;
+  providerRating: number | null;
+  healthRating: number | null;
+  confidenceRating: number | null;
+  qualityOfLifeRating: number | null;
+  healthImprovementComment: string;
+  recommendationRating: number | null;
+  wouldEncouragePatient: boolean | null;
   recommendationMessage: string;
   testimonialPermission: TestimonialPermissionValue;
   testimonialPermissionLabel: string;
@@ -42,9 +51,15 @@ function optionLabel(
   return options.find((o) => o.value === value)?.label ?? value;
 }
 
+function resolveServiceTypeLabel(row: AppointmentReviewRow): string {
+  if (row.service_type) {
+    return serviceTypeLabel(row.service_type, row.service_type_other);
+  }
+  return row.provider_and_services.trim();
+}
+
 function reviewComments(row: AppointmentReviewRow): string[] {
   return [
-    row.provider_and_services,
     row.health_improvement,
     row.recommendation_message,
     row.provider_time_comment,
@@ -63,8 +78,14 @@ export function toAppointmentReviewDetail(row: AppointmentReviewRow): Appointmen
     patientName: row.patient_name.trim(),
     appointmentEase: row.appointment_ease,
     visitRating: row.visit_rating,
-    providerAndServices: row.provider_and_services.trim(),
-    healthImprovement: row.health_improvement.trim(),
+    serviceTypeLabel: resolveServiceTypeLabel(row),
+    providerRating: row.provider_rating,
+    healthRating: row.health_rating,
+    confidenceRating: row.confidence_rating,
+    qualityOfLifeRating: row.quality_of_life_rating,
+    healthImprovementComment: row.health_improvement.trim(),
+    recommendationRating: row.recommendation_rating,
+    wouldEncouragePatient: row.would_encourage_patient,
     recommendationMessage: row.recommendation_message.trim(),
     testimonialPermission: row.testimonial_permission,
     testimonialPermissionLabel: formatTestimonialPermission(row.testimonial_permission),
@@ -102,8 +123,16 @@ export function formatRating(value: number): string {
   return `${value}/${APPOINTMENT_REVIEW_MAX_SCORE}`;
 }
 
+export function formatRatingOrDash(value: number | null): string {
+  return value === null ? "—" : formatRating(value);
+}
+
 export function formatYesNo(value: boolean): string {
   return value ? "Yes" : "No";
+}
+
+export function formatYesNoOrDash(value: boolean | null): string {
+  return value === null ? "—" : formatYesNo(value);
 }
 
 export function formatTestimonialPermission(value: TestimonialPermissionValue): string {
@@ -123,3 +152,10 @@ export function formatReferralSources(
   }
   return labels.join(", ");
 }
+
+export function formatServiceType(value: ServiceTypeValue | null, other: string): string {
+  if (!value) return "—";
+  return serviceTypeLabel(value, other);
+}
+
+export { SERVICE_TYPE_OPTIONS };

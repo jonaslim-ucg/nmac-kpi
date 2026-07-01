@@ -15,6 +15,16 @@ export const PATIENT_DURATION_OPTIONS = [
   { value: "10-plus", label: "10 years or more" },
 ] as const;
 
+export const SERVICE_TYPE_OPTIONS = [
+  { value: "primary-care", label: "Primary care / Annual exam" },
+  { value: "cardiology", label: "Cardiology" },
+  { value: "dermatology-aesthetics", label: "Dermatology / Aesthetics" },
+  { value: "weight-loss", label: "Weight loss" },
+  { value: "lab-diagnostics", label: "Lab / Diagnostics" },
+  { value: "rheumatology", label: "Rheumatology" },
+  { value: "other", label: "Other (please specify)" },
+] as const;
+
 export const RETURNING_PATIENT_DURATION_OPTIONS = PATIENT_DURATION_OPTIONS.filter(
   (option) => option.value !== "new",
 );
@@ -52,6 +62,7 @@ export const REFERRAL_SOURCE_OPTIONS = [
 ] as const;
 
 export type ReferralSourceValue = (typeof REFERRAL_SOURCE_OPTIONS)[number]["value"];
+export type ServiceTypeValue = (typeof SERVICE_TYPE_OPTIONS)[number]["value"];
 
 export type WaitTimeValue = (typeof WAIT_TIME_OPTIONS)[number]["value"];
 export type PatientDurationValue = (typeof PATIENT_DURATION_OPTIONS)[number]["value"];
@@ -62,8 +73,15 @@ export type AppointmentReviewPayload = {
   patientName: string;
   appointmentEase: number;
   visitRating: number;
-  providerAndServices: string;
-  healthImprovement: string;
+  serviceType: ServiceTypeValue;
+  serviceTypeOther: string;
+  providerRating: number;
+  healthRating: number;
+  confidenceRating: number;
+  qualityOfLifeRating: number;
+  healthImprovementComment: string;
+  recommendationRating: number;
+  wouldEncouragePatient: boolean;
   recommendationMessage: string;
   testimonialPermission: TestimonialPermissionValue;
   waitTime: WaitTimeValue;
@@ -81,8 +99,15 @@ export type AppointmentReviewFormState = {
   patientName: string;
   appointmentEase: number | null;
   visitRating: number | null;
-  providerAndServices: string;
-  healthImprovement: string;
+  serviceType: ServiceTypeValue | null;
+  serviceTypeOther: string;
+  providerRating: number | null;
+  healthRating: number | null;
+  confidenceRating: number | null;
+  qualityOfLifeRating: number | null;
+  healthImprovementComment: string;
+  recommendationRating: number | null;
+  wouldEncouragePatient: boolean | null;
   recommendationMessage: string;
   testimonialPermission: TestimonialPermissionValue | null;
   waitTime: WaitTimeValue | null;
@@ -106,13 +131,35 @@ export function isReferralSourceComplete(
   return true;
 }
 
+export function isServiceTypeComplete(
+  serviceType: ServiceTypeValue | null,
+  other: string,
+): boolean {
+  if (!serviceType) return false;
+  if (serviceType === "other" && !other.trim()) return false;
+  return true;
+}
+
+export function serviceTypeLabel(value: ServiceTypeValue, other: string): string {
+  const base = SERVICE_TYPE_OPTIONS.find((o) => o.value === value)?.label ?? value;
+  if (value === "other" && other.trim()) return `Other: ${other.trim()}`;
+  return base;
+}
+
 export const EMPTY_APPOINTMENT_REVIEW_FORM: AppointmentReviewFormState = {
   email: "",
   patientName: "",
   appointmentEase: null,
   visitRating: null,
-  providerAndServices: "",
-  healthImprovement: "",
+  serviceType: null,
+  serviceTypeOther: "",
+  providerRating: null,
+  healthRating: null,
+  confidenceRating: null,
+  qualityOfLifeRating: null,
+  healthImprovementComment: "",
+  recommendationRating: null,
+  wouldEncouragePatient: null,
   recommendationMessage: "",
   testimonialPermission: null,
   waitTime: null,

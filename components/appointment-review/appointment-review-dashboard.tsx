@@ -129,9 +129,14 @@ export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
             hint: "Overall visit with the practice",
           },
           {
-            label: "Avg. front desk",
-            value: empty ? "—" : `${stats.averages.frontDeskRating}/${APPOINTMENT_REVIEW_MAX_SCORE}`,
-            hint: "Front desk friendliness and courtesy",
+            label: "Avg. provider rating",
+            value: empty || !stats.averages.providerRating ? "—" : `${stats.averages.providerRating}/${APPOINTMENT_REVIEW_MAX_SCORE}`,
+            hint: "Rating of the provider who treated them",
+          },
+          {
+            label: "Avg. recommend score",
+            value: empty || !stats.averages.recommendationRating ? "—" : `${stats.averages.recommendationRating}/${APPOINTMENT_REVIEW_MAX_SCORE}`,
+            hint: "Likelihood to recommend NMAC",
           },
         ]}
       />
@@ -256,6 +261,30 @@ export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
           </div>
 
           <YesNoPie title="Provider spent enough time" data={stats.providerTimeAdequate} />
+
+          {stats.wouldEncouragePatient.some((d) => d.count > 0) ? (
+            <YesNoPie title="Would encourage someone to become a patient" data={stats.wouldEncouragePatient} />
+          ) : null}
+
+          {stats.serviceTypes.length > 0 ? (
+            <ChartCard title="Services received">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats.serviceTypes} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--foreground)" }} stroke="var(--border)" interval={0} angle={-12} textAnchor="end" height={52} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
+                  <Tooltip
+                    {...TOOLTIP_STYLE}
+                    formatter={(value, _name, item) => {
+                      const pct = (item.payload as { pct?: number }).pct;
+                      return [`${value} (${pct ?? 0}%)`, "Responses"];
+                    }}
+                  />
+                  <Bar dataKey="count" fill="var(--chart-this-year)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          ) : null}
 
           {stats.referralSources.length > 0 ? (
             <ChartCard title="How new patients heard about NMAC" subtitle="New patients only; check-all-that-apply">

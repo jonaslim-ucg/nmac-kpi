@@ -90,39 +90,37 @@ export function AppointmentReviewDetailModal({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-2">
           <div className="divide-y divide-border">
-            <Answer label="1. Email" value={review.email} />
-            <Answer label="2. Name" value={review.patientName} />
+            <Answer label="Email" value={review.email} />
+            <Answer label="Name" value={review.patientName} />
             <Answer
-              label="3. Ease of scheduling an appointment"
+              label="1. Ease of scheduling an appointment"
               value={formatRating(review.appointmentEase)}
             />
-            <Answer label="4. Overall visit with our practice" value={formatRating(review.visitRating)} />
-            <Answer label="5. Service type" value={review.serviceTypeLabel} />
-            <Answer label="6. Provider rating" value={formatRatingOrDash(review.providerRating)} />
-            <Answer label="7. Overall health improvement" value={formatRatingOrDash(review.healthRating)} />
-            <Answer label="8. Confidence in managing health" value={formatRatingOrDash(review.confidenceRating)} />
-            <Answer label="9. Overall quality of life improvement" value={formatRatingOrDash(review.qualityOfLifeRating)} />
+            <Answer label="2. Overall visit with our practice" value={formatRating(review.visitRating)} />
+            <Answer label="3. Provider seen" value={review.serviceTypeLabel} />
+            <Answer label="4. Provider rating" value={formatRatingOrDash(review.providerRating)} />
+            <Answer label="5. Overall health improvement" value={formatRatingOrDash(review.healthRating)} />
             <Answer
-              label="11. Likelihood to recommend NMAC"
+              label="6. Likelihood to recommend NMAC"
               value={formatRatingOrDash(review.recommendationRating)}
             />
             <Answer
-              label="12. Would encourage someone to become a patient"
+              label="7. Would encourage someone to become a patient"
               value={formatYesNoOrDash(review.wouldEncouragePatient)}
             />
             <Answer
-              label="14. Testimonial permission"
+              label="8. Testimonial permission"
               value={review.testimonialPermissionLabel}
             />
-            <Answer label="15. Wait time before exam room" value={review.waitTimeLabel} />
+            <Answer label="9. Wait time before exam room" value={review.waitTimeLabel} />
             <Answer
-              label="16. Provider spent enough time and answered questions"
+              label="10. Provider spent enough time and answered questions"
               value={formatYesNo(review.providerTimeAdequate)}
             />
-            <Answer label="17. Front desk staff" value={formatRating(review.frontDeskRating)} />
-            <Answer label="18. How long a patient" value={review.patientDurationLabel} />
+            <Answer label="11. Front desk staff" value={formatRating(review.frontDeskRating)} />
+            <Answer label="12. How long a patient" value={review.patientDurationLabel} />
             {review.referralSourcesLabel ? (
-              <Answer label="19. How did you hear about NMAC" value={review.referralSourcesLabel} />
+              <Answer label="12 follow-up. How did you hear about NMAC" value={review.referralSourcesLabel} />
             ) : null}
           </div>
 
@@ -131,13 +129,7 @@ export function AppointmentReviewDetailModal({
               <MessageSquareText className="h-4 w-4 text-accent" aria-hidden />
               Optional written responses
             </div>
-            <CommentBlock label="10. Care outcomes comments" text={review.healthImprovementComment} />
-            <CommentBlock label="13. Message to prospective patients" text={review.recommendationMessage} />
-            <CommentBlock label="16. Provider visit comments" text={review.providerTimeComment} />
-            <CommentBlock
-              label={review.referralSourcesLabel ? "20. Exceptional staff" : "19. Exceptional staff"}
-              text={review.exceptionalStaffComment}
-            />
+            <CommentBlock label="10. Provider visit comments" text={review.providerTimeComment} />
             {!review.hasComments ? (
               <p className="text-sm text-muted-foreground">No optional written responses.</p>
             ) : null}

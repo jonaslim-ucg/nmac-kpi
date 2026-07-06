@@ -37,6 +37,9 @@ function isMaintenanceExemptApi(pathname: string): boolean {
     pathname === "/api/auth/logout" ||
     pathname === "/api/auth/session" ||
     pathname === "/api/appointment-review" ||
+    pathname.startsWith("/api/survey-outreach/lookup") ||
+    pathname.startsWith("/api/survey-outreach/cron") ||
+    pathname.startsWith("/api/survey-outreach/test") ||
     pathname.startsWith("/api/dev/maintenance") ||
     isAuthAttemptApi(pathname)
   );

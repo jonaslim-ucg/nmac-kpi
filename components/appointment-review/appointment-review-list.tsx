@@ -73,7 +73,7 @@ export function AppointmentReviewList({ reviews, onViewReview }: Props) {
                 <th className="px-3 py-3 font-semibold">Scheduling</th>
                 <th className="px-3 py-3 font-semibold">Visit</th>
                 <th className="px-3 py-3 font-semibold">Wait time</th>
-                <th className="px-3 py-3 font-semibold">Service</th>
+                <th className="px-3 py-3 font-semibold">Provider</th>
                 <th className="px-3 py-3 font-semibold">Recommend</th>
                 <th className="px-3 py-3 font-semibold">Comments</th>
                 <th className="px-5 py-3 font-semibold" />
@@ -101,12 +101,10 @@ export function AppointmentReviewList({ reviews, onViewReview }: Props) {
                     {review.recommendationRating !== null ? formatRating(review.recommendationRating) : "—"}
                   </td>
                   <td className="max-w-[220px] px-3 py-3">
-                    {review.healthImprovementComment || review.recommendationMessage ? (
+                    {review.providerTimeComment ? (
                       <div className="flex items-start gap-2">
                         <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
-                        <p className="line-clamp-2 text-foreground">
-                          {[review.healthImprovementComment, review.recommendationMessage].filter(Boolean).join(" · ")}
-                        </p>
+                        <p className="line-clamp-2 text-foreground">{review.providerTimeComment}</p>
                       </div>
                     ) : (
                       <span className="text-muted-foreground">—</span>

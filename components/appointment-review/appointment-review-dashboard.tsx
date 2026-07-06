@@ -267,7 +267,7 @@ export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
           ) : null}
 
           {stats.serviceTypes.length > 0 ? (
-            <ChartCard title="Services received">
+            <ChartCard title="Providers seen">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={stats.serviceTypes} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />

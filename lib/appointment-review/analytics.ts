@@ -145,17 +145,12 @@ export function buildAppointmentReviewStats(rows: AppointmentReviewRow[]): Appoi
     { metric: "Overall visit", score: averages.visitRating },
     { metric: "Provider", score: averages.providerRating },
     { metric: "Health improvement", score: averages.healthRating },
-    { metric: "Confidence improvement", score: averages.confidenceRating },
-    { metric: "Quality of life", score: averages.qualityOfLifeRating },
     { metric: "Likelihood to recommend", score: averages.recommendationRating },
     { metric: "Front desk", score: averages.frontDeskRating },
   ].filter((item) => item.score > 0);
 
   const commentKinds: { kind: string; pick: (r: AppointmentReviewRow) => string }[] = [
-    { kind: "Care outcomes", pick: (r) => r.health_improvement },
-    { kind: "Recommendation", pick: (r) => r.recommendation_message },
     { kind: "Provider visit", pick: (r) => r.provider_time_comment },
-    { kind: "Exceptional staff", pick: (r) => r.exceptional_staff_comment },
   ];
 
   const recentComments = rows

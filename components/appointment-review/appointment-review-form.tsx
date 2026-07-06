@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   APPOINTMENT_REVIEW_MAX_SCORE,
   EMPTY_APPOINTMENT_REVIEW_FORM,
@@ -145,8 +145,6 @@ function isFormComplete(form: AppointmentReviewFormState): form is AppointmentRe
     isServiceTypeComplete(form.serviceType, form.serviceTypeOther) &&
     form.providerRating !== null &&
     form.healthRating !== null &&
-    form.confidenceRating !== null &&
-    form.qualityOfLifeRating !== null &&
     form.recommendationRating !== null &&
     form.wouldEncouragePatient !== null &&
     form.testimonialPermission !== null &&
@@ -158,11 +156,57 @@ function isFormComplete(form: AppointmentReviewFormState): form is AppointmentRe
   );
 }
 
-export function AppointmentReviewForm() {
-  const [form, setForm] = useState<AppointmentReviewFormState>(EMPTY_APPOINTMENT_REVIEW_FORM);
+export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: string | null }) {
+  const [form, setForm] = useState<AppointmentReviewFormState>({
+    ...EMPTY_APPOINTMENT_REVIEW_FORM,
+    surveyToken,
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [linkLoading, setLinkLoading] = useState(Boolean(surveyToken));
+  const [alreadyCompleted, setAlreadyCompleted] = useState(false);
+
+  useEffect(() => {
+    if (!surveyToken) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`/api/survey-outreach/lookup?t=${encodeURIComponent(surveyToken)}`, {
+          cache: "no-store",
+        });
+        const j = (await r.json()) as {
+          ok?: boolean;
+          email?: string;
+          patientName?: string;
+          completed?: boolean;
+          error?: string;
+        };
+        if (cancelled) return;
+        if (!r.ok || !j.ok) {
+          setError(j.error ?? "This survey link is not valid.");
+          return;
+        }
+        if (j.completed) {
+          setAlreadyCompleted(true);
+          return;
+        }
+        setForm((prev) => ({
+          ...prev,
+          email: j.email ?? prev.email,
+          patientName: j.patientName ?? prev.patientName,
+          surveyToken,
+        }));
+      } catch {
+        if (!cancelled) setError("Could not load your survey link.");
+      } finally {
+        if (!cancelled) setLinkLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [surveyToken]);
 
   const patch = useCallback((partial: Partial<AppointmentReviewFormState>) => {
     setForm((prev) => ({ ...prev, ...partial }));
@@ -178,8 +222,8 @@ export function AppointmentReviewForm() {
       if (!isServiceTypeComplete(form.serviceType, form.serviceTypeOther)) {
         setError(
           form.serviceType === "other" && !form.serviceTypeOther.trim()
-            ? "Please specify the type of service you received."
-            : "Please select the type of service you received.",
+            ? "Please specify the provider you saw."
+            : "Please select the provider you saw.",
         );
         return;
       }
@@ -203,7 +247,10 @@ export function AppointmentReviewForm() {
       const r = await fetch("/api/appointment-review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          surveyToken: form.surveyToken ?? undefined,
+        }),
       });
       const j = (await r.json()) as { ok?: boolean; message?: string; error?: string };
       if (!r.ok || !j.ok) {
@@ -219,6 +266,25 @@ export function AppointmentReviewForm() {
   }, [form]);
 
   const showReferralQuestion = isNewPatientDuration(form.patientDuration);
+
+  if (linkLoading) {
+    return (
+      <div className="rounded-xl border border-border bg-surface-muted/50 p-6 text-center text-sm text-muted-foreground">
+        Loading your survey…
+      </div>
+    );
+  }
+
+  if (alreadyCompleted) {
+    return (
+      <div className="rounded-xl border border-border bg-surface-muted/50 p-6 text-center">
+        <p className="text-lg font-semibold text-foreground">Thank you</p>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          We already received your feedback for this visit. We appreciate you taking the time to share your experience.
+        </p>
+      </div>
+    );
+  }
 
   if (submitted) {
     return (
@@ -240,32 +306,40 @@ export function AppointmentReviewForm() {
         void submit();
       }}
     >
-      <QuestionBlock number={1} title="What is your email address?" required>
-        <input
-          type="email"
-          value={form.email}
-          onChange={(e) => patch({ email: e.target.value })}
-          disabled={busy}
-          autoComplete="email"
-          placeholder="you@example.com"
-          className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
-        />
-      </QuestionBlock>
-
-      <QuestionBlock number={2} title="What is your name?" required>
-        <input
-          type="text"
-          value={form.patientName}
-          onChange={(e) => patch({ patientName: e.target.value })}
-          disabled={busy}
-          autoComplete="name"
-          placeholder="Your full name"
-          className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
-        />
-      </QuestionBlock>
+      <section className="rounded-xl border border-border bg-surface-muted/40 p-4">
+        <h2 className="text-sm font-semibold text-foreground">Contact information</h2>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-xs font-medium text-muted-foreground">Email</span>
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => patch({ email: e.target.value })}
+              disabled={busy}
+              readOnly={Boolean(surveyToken)}
+              autoComplete="email"
+              placeholder="you@example.com"
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 read-only:bg-surface-muted/40 focus:ring-2"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-medium text-muted-foreground">Name</span>
+            <input
+              type="text"
+              value={form.patientName}
+              onChange={(e) => patch({ patientName: e.target.value })}
+              disabled={busy}
+              readOnly={Boolean(surveyToken)}
+              autoComplete="name"
+              placeholder="Your full name"
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 read-only:bg-surface-muted/40 focus:ring-2"
+            />
+          </label>
+        </div>
+      </section>
 
       <QuestionBlock
-        number={3}
+        number={1}
         title="How would you rate the ease of scheduling an appointment?"
         required
       >
@@ -280,7 +354,7 @@ export function AppointmentReviewForm() {
       </QuestionBlock>
 
       <QuestionBlock
-        number={4}
+        number={2}
         title="How would you rank your overall visit with our practice?"
         required
       >
@@ -294,8 +368,8 @@ export function AppointmentReviewForm() {
         />
       </QuestionBlock>
 
-      <QuestionBlock number={5} title="What type of service did you receive?" required>
-        <div className="space-y-2" role="radiogroup" aria-label="Service type">
+      <QuestionBlock number={3} title="Which provider did they see?" required>
+        <div className="space-y-2" role="radiogroup" aria-label="Provider seen">
           {SERVICE_TYPE_OPTIONS.map(({ value, label }) => (
             <label
               key={value}
@@ -307,7 +381,7 @@ export function AppointmentReviewForm() {
             >
               <input
                 type="radio"
-                name="service-type"
+                name="provider-seen"
                 value={value}
                 checked={form.serviceType === value}
                 onChange={() =>
@@ -329,13 +403,13 @@ export function AppointmentReviewForm() {
             value={form.serviceTypeOther}
             onChange={(e) => patch({ serviceTypeOther: e.target.value })}
             disabled={busy}
-            placeholder="Please specify the service…"
+            placeholder="Please specify the provider…"
             className="mt-3 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
           />
         ) : null}
       </QuestionBlock>
 
-      <QuestionBlock number={6} title="How would you rate your provider?" required>
+      <QuestionBlock number={4} title="How would you rate your provider?" required>
         <ScaleInput
           name="provider-rating"
           value={form.providerRating}
@@ -351,7 +425,7 @@ export function AppointmentReviewForm() {
       </p>
 
       <QuestionBlock
-        number={7}
+        number={5}
         title="Since receiving care at NMAC, how would you rate the improvement in your overall health?"
         required
       >
@@ -365,56 +439,12 @@ export function AppointmentReviewForm() {
         />
       </QuestionBlock>
 
-      <QuestionBlock
-        number={8}
-        title="Since receiving care at NMAC, how would you rate the improvement in your confidence in managing your health?"
-        required
-      >
-        <ScaleInput
-          name="confidence-rating"
-          value={form.confidenceRating}
-          onChange={(n) => patch({ confidenceRating: n })}
-          minLabel="no improvement"
-          maxLabel="significant improvement"
-          disabled={busy}
-        />
-      </QuestionBlock>
-
-      <QuestionBlock
-        number={9}
-        title="Since receiving care at NMAC, how would you rate the improvement in your overall quality of life?"
-        required
-      >
-        <ScaleInput
-          name="quality-of-life-rating"
-          value={form.qualityOfLifeRating}
-          onChange={(n) => patch({ qualityOfLifeRating: n })}
-          minLabel="no improvement"
-          maxLabel="significant improvement"
-          disabled={busy}
-        />
-      </QuestionBlock>
-
-      <QuestionBlock
-        number={10}
-        title="Would you like to share more about how your care has made a difference?"
-      >
-        <textarea
-          rows={3}
-          value={form.healthImprovementComment}
-          onChange={(e) => patch({ healthImprovementComment: e.target.value })}
-          disabled={busy}
-          placeholder="Additional comments about your health, confidence, or quality of life (optional)…"
-          className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
-        />
-      </QuestionBlock>
-
       <p className="border-t border-border pt-8 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Recommendation
       </p>
 
       <QuestionBlock
-        number={11}
+        number={6}
         title="How likely are you to recommend NMAC to a friend or family member?"
         required
       >
@@ -429,7 +459,7 @@ export function AppointmentReviewForm() {
       </QuestionBlock>
 
       <QuestionBlock
-        number={12}
+        number={7}
         title="Would you encourage someone considering NMAC to become a patient?"
         required
       >
@@ -442,21 +472,7 @@ export function AppointmentReviewForm() {
       </QuestionBlock>
 
       <QuestionBlock
-        number={13}
-        title="What would you say to someone considering becoming a NMAC patient?"
-      >
-        <textarea
-          rows={3}
-          value={form.recommendationMessage}
-          onChange={(e) => patch({ recommendationMessage: e.target.value })}
-          disabled={busy}
-          placeholder="Your message to someone thinking about joining NMAC (optional)…"
-          className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
-        />
-      </QuestionBlock>
-
-      <QuestionBlock
-        number={14}
+        number={8}
         title="May we use your comments as a testimonial in our marketing materials (website, social media, advertisements, and other promotional materials)?"
         required
       >
@@ -490,7 +506,7 @@ export function AppointmentReviewForm() {
       </p>
 
       <QuestionBlock
-        number={15}
+        number={9}
         title="What was your wait time before the clinical staff brought you to an exam room?"
         required
       >
@@ -520,7 +536,7 @@ export function AppointmentReviewForm() {
       </QuestionBlock>
 
       <QuestionBlock
-        number={16}
+        number={10}
         title="My provider spent enough time with me to address my needs and answered all my questions."
         required
       >
@@ -543,7 +559,7 @@ export function AppointmentReviewForm() {
         </label>
       </QuestionBlock>
 
-      <QuestionBlock number={17} title="The front desk staff were friendly and courteous." required>
+      <QuestionBlock number={11} title="The front desk staff were friendly and courteous." required>
         <ScaleInput
           name="front-desk"
           value={form.frontDeskRating}
@@ -555,7 +571,7 @@ export function AppointmentReviewForm() {
       </QuestionBlock>
 
       <QuestionBlock
-        number={18}
+        number={12}
         title="How long have you been a patient of this provider?"
         required
       >
@@ -587,71 +603,56 @@ export function AppointmentReviewForm() {
             </label>
           ))}
         </div>
-      </QuestionBlock>
-
-      {showReferralQuestion ? (
-        <QuestionBlock
-          number={19}
-          title="How did you hear about NMAC? (Check all that apply)"
-          required
-        >
-          <div className="space-y-2" role="group" aria-label="How did you hear about NMAC">
-            {REFERRAL_SOURCE_OPTIONS.map(({ value, label }) => {
-              const checked = form.referralSources.includes(value);
-              return (
-                <label
-                  key={value}
-                  className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-sm transition ${
-                    checked
-                      ? "border-accent bg-accent-muted/60"
-                      : "border-border bg-background hover:border-accent/40"
-                  } ${busy ? "cursor-not-allowed opacity-50" : ""}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => {
-                      const next = checked
-                        ? form.referralSources.filter((v) => v !== value)
-                        : [...form.referralSources, value];
-                      patch({
-                        referralSources: next,
-                        ...(value === "other" && checked ? { referralOther: "" } : {}),
-                      });
-                    }}
-                    disabled={busy}
-                    className="h-4 w-4 accent-accent"
-                  />
-                  {label}
-                </label>
-              );
-            })}
+        {showReferralQuestion ? (
+          <div className="mt-5 border-t border-border pt-4">
+            <p className="mb-3 text-sm font-medium leading-snug text-foreground">
+              How did you hear about NMAC? (Check all that apply)
+              <span className="ml-0.5 text-red-600 dark:text-red-400">*</span>
+            </p>
+            <div className="space-y-2" role="group" aria-label="How did you hear about NMAC">
+              {REFERRAL_SOURCE_OPTIONS.map(({ value, label }) => {
+                const checked = form.referralSources.includes(value);
+                return (
+                  <label
+                    key={value}
+                    className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-sm transition ${
+                      checked
+                        ? "border-accent bg-accent-muted/60"
+                        : "border-border bg-background hover:border-accent/40"
+                    } ${busy ? "cursor-not-allowed opacity-50" : ""}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => {
+                        const next = checked
+                          ? form.referralSources.filter((v) => v !== value)
+                          : [...form.referralSources, value];
+                        patch({
+                          referralSources: next,
+                          ...(value === "other" && checked ? { referralOther: "" } : {}),
+                        });
+                      }}
+                      disabled={busy}
+                      className="h-4 w-4 accent-accent"
+                    />
+                    {label}
+                  </label>
+                );
+              })}
+            </div>
+            {form.referralSources.includes("other") ? (
+              <input
+                type="text"
+                value={form.referralOther}
+                onChange={(e) => patch({ referralOther: e.target.value })}
+                disabled={busy}
+                placeholder="Please specify…"
+                className="mt-3 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
+              />
+            ) : null}
           </div>
-          {form.referralSources.includes("other") ? (
-            <input
-              type="text"
-              value={form.referralOther}
-              onChange={(e) => patch({ referralOther: e.target.value })}
-              disabled={busy}
-              placeholder="Please specify…"
-              className="mt-3 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
-            />
-          ) : null}
-        </QuestionBlock>
-      ) : null}
-
-      <QuestionBlock
-        number={showReferralQuestion ? 20 : 19}
-        title="Would you like to name any staff member that provided exceptional service?"
-      >
-        <textarea
-          rows={3}
-          value={form.exceptionalStaffComment}
-          onChange={(e) => patch({ exceptionalStaffComment: e.target.value })}
-          disabled={busy}
-          placeholder="Staff member name and details (optional)…"
-          className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
-        />
+        ) : null}
       </QuestionBlock>
 
       {error ? (

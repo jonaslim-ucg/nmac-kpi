@@ -22,6 +22,7 @@ cp .env.example .env.local
    - **Auth:** `AUTH_SECRET` — at least 32 characters (e.g. `openssl rand -base64 32`).
    - **Optional:** `AUTH_ALLOWED_EMAIL_DOMAINS` (comma-separated, e.g. `ucg.bm`) to restrict sign-in; `AUTH_BOOTSTRAP_ADMIN_EMAILS` for extra admin grants on first signup (after the first user); `BITRIX_ALLOWED_PORTALS` to restrict Bitrix auto sign-in to specific portal hostnames.
    - **Microsoft Graph (email codes):** `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `GRAPH_SENDER_EMAIL` (mailbox that sends mail), `GRAPH_SENDER_NAME` (e.g. `NMAC KPI`). In Azure Entra ID, the app registration needs **Application** permission **Mail.Send** on Microsoft Graph, with **admin consent**.
+   - **NMAC CRM + survey outreach:** `NMAC_CRM_BASE_URL` (default `https://crm.nmac.bm`), `REPORTS_API_TOKEN`, `APP_BASE_URL` (public URL for survey links), `SURVEY_OUTREACH_SECRET`, `CRON_SECRET`, optional `SURVEY_FINAL_REMINDER_DAYS` (`14` or `21`), and optional `SURVEY_OUTREACH_TEST_EMAILS` for scheduled test sends. **Patient survey emails are off by default** — set `SURVEY_OUTREACH_SEND_EMAILS=true` only when ready to go live. See [`.env.example`](.env.example).
 
    **If Outlook still shows the wrong sender name (e.g. “NMAC CRM”):** Microsoft 365 often uses the **mailbox / user display name** from the directory, not only the Graph API. In [Microsoft 365 admin](https://admin.microsoft.com) go to **Users** → open the account for `GRAPH_SENDER_EMAIL` → set **Display name** to **NMAC KPI** (or **Exchange admin center** → **Recipients** → **Mailboxes** → same mailbox → edit display name). Redeploy is not required for that change.
 
@@ -39,6 +40,11 @@ cp .env.example .env.local
 ```bash
 npm run dev
 ```
+
+For local survey reminder testing, keep `SURVEY_OUTREACH_SEND_EMAILS=false` and
+`SURVEY_OUTREACH_TEST_EMAILS=kim.ramirez@ucg.bm`. In **Dev → Survey outreach**,
+turn on **Local scheduled checks** while testing a scheduled reminder; local
+development does not run Vercel Cron in the background.
 
 ## Data model
 
@@ -80,6 +86,6 @@ Email OTP sign-in still works when Bitrix auth is unavailable (standalone browse
 ## Vercel
 
 1. In [Supabase](https://supabase.com/dashboard) → your project → **Settings → API**, copy **Project URL**, **anon public**, and **service_role** (secret).
-2. In [Vercel](https://vercel.com) → your project → **Settings → Environment Variables**, add every variable from `.env.local` that the app needs, including `AUTH_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, and the Azure / Graph keys for sending login codes.
+2. In [Vercel](https://vercel.com) → your project → **Settings → Environment Variables**, add every variable from `.env.local` that the app needs, including `AUTH_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, the Azure / Graph keys for sending login codes, and for survey outreach: `REPORTS_API_TOKEN`, `APP_BASE_URL`, `SURVEY_OUTREACH_SECRET`, `CRON_SECRET`, and `SURVEY_OUTREACH_TEST_EMAILS=kim.ramirez@ucg.bm` while testing. Leave **`SURVEY_OUTREACH_SEND_EMAILS` unset or `false`** until you are ready to email patients.
 3. Enable **Production** (and **Preview** if you use preview URLs) for each variable as appropriate.
 4. **Redeploy** after changing variables. `NEXT_PUBLIC_*` values are baked in at build time; server secrets apply at runtime but still require a new deployment when first added.

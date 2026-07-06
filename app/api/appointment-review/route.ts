@@ -16,6 +16,7 @@ import {
   type TestimonialPermissionValue,
 } from "@/lib/appointment-review/types";
 import { insertAppointmentReview } from "@/lib/appointment-review/store";
+import { markOutreachCompleted } from "@/lib/survey-outreach/store";
 
 export const dynamic = "force-dynamic";
 
@@ -92,8 +93,6 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
     visitRating === null ||
     providerRating === null ||
     healthRating === null ||
-    confidenceRating === null ||
-    qualityOfLifeRating === null ||
     recommendationRating === null ||
     frontDeskRating === null ||
     !serviceType ||
@@ -131,10 +130,10 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
     healthRating,
     confidenceRating,
     qualityOfLifeRating,
-    healthImprovementComment: str(b.healthImprovementComment),
+    healthImprovementComment: "",
     recommendationRating,
     wouldEncouragePatient,
-    recommendationMessage: str(b.recommendationMessage),
+    recommendationMessage: "",
     testimonialPermission,
     waitTime: waitTime as AppointmentReviewPayload["waitTime"],
     providerTimeAdequate,
@@ -143,7 +142,8 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
     patientDuration,
     referralSources,
     referralOther,
-    exceptionalStaffComment: str(b.exceptionalStaffComment),
+    exceptionalStaffComment: "",
+    surveyToken: typeof b.surveyToken === "string" && b.surveyToken.trim() ? b.surveyToken.trim() : null,
   };
 }
 
@@ -173,6 +173,14 @@ export async function POST(req: Request) {
       );
     }
     return NextResponse.json({ ok: false, message: result.error }, { status: 500 });
+  }
+
+  if (parsed.surveyToken) {
+    try {
+      await markOutreachCompleted(parsed.surveyToken);
+    } catch (e) {
+      console.error("survey outreach complete:", e);
+    }
   }
 
   return NextResponse.json({ ok: true });

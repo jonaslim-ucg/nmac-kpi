@@ -16,12 +16,14 @@ export const PATIENT_DURATION_OPTIONS = [
 ] as const;
 
 export const SERVICE_TYPE_OPTIONS = [
-  { value: "primary-care", label: "Primary care / Annual exam" },
-  { value: "cardiology", label: "Cardiology" },
-  { value: "dermatology-aesthetics", label: "Dermatology / Aesthetics" },
-  { value: "weight-loss", label: "Weight loss" },
-  { value: "lab-diagnostics", label: "Lab / Diagnostics" },
-  { value: "rheumatology", label: "Rheumatology" },
+  { value: "dr-ansuh-amponsah-natalie", label: "Dr. Natalie Ansuh-Amponsah" },
+  { value: "dr-brown-kyjuan", label: "Dr. Kyjuan Brown" },
+  { value: "dr-chandrruangphen-pornpat", label: "Dr. Pornpat Chandrruangphen" },
+  { value: "dr-estwick-paula", label: "Dr. Paula Estwick" },
+  { value: "dr-gonzalez-fermin", label: "Dr. Fermin Gonzalez" },
+  { value: "dr-flood-amani", label: "Dr. Amani Flood" },
+  { value: "dr-dzepina-davor", label: "Dr. Davor Dzepina" },
+  { value: "alexander-dill", label: "Alexander Dill" },
   { value: "other", label: "Other (please specify)" },
 ] as const;
 
@@ -77,8 +79,8 @@ export type AppointmentReviewPayload = {
   serviceTypeOther: string;
   providerRating: number;
   healthRating: number;
-  confidenceRating: number;
-  qualityOfLifeRating: number;
+  confidenceRating: number | null;
+  qualityOfLifeRating: number | null;
   healthImprovementComment: string;
   recommendationRating: number;
   wouldEncouragePatient: boolean;
@@ -92,6 +94,7 @@ export type AppointmentReviewPayload = {
   referralSources: ReferralSourceValue[];
   referralOther: string;
   exceptionalStaffComment: string;
+  surveyToken: string | null;
 };
 
 export type AppointmentReviewFormState = {
@@ -118,6 +121,7 @@ export type AppointmentReviewFormState = {
   referralSources: ReferralSourceValue[];
   referralOther: string;
   exceptionalStaffComment: string;
+  surveyToken: string | null;
 };
 
 export function isReferralSourceComplete(
@@ -170,4 +174,5 @@ export const EMPTY_APPOINTMENT_REVIEW_FORM: AppointmentReviewFormState = {
   referralSources: [],
   referralOther: "",
   exceptionalStaffComment: "",
+  surveyToken: null,
 };

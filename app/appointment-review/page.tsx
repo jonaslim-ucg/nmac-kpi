@@ -7,7 +7,14 @@ export const metadata: Metadata = {
   description: "Share feedback about your recent visit with NMAC.",
 };
 
-export default function AppointmentReviewPage() {
+type Props = {
+  searchParams: Promise<{ t?: string }>;
+};
+
+export default async function AppointmentReviewPage({ searchParams }: Props) {
+  const params = await searchParams;
+  const surveyToken = params.t?.trim() || null;
+
   return (
     <div className="min-h-full py-8 sm:py-12">
       <div className="mx-auto w-full max-w-xl px-4">
@@ -20,7 +27,7 @@ export default function AppointmentReviewPage() {
               marked with <span className="text-red-600 dark:text-red-400">*</span> are required.
             </p>
           </div>
-          <AppointmentReviewForm />
+          <AppointmentReviewForm surveyToken={surveyToken} />
         </div>
       </div>
     </div>

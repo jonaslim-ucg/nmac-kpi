@@ -23,6 +23,7 @@ cp .env.example .env.local
    - **Optional:** `AUTH_ALLOWED_EMAIL_DOMAINS` (comma-separated, e.g. `ucg.bm`) to restrict sign-in; `AUTH_BOOTSTRAP_ADMIN_EMAILS` for extra admin grants on first signup (after the first user); `BITRIX_ALLOWED_PORTALS` to restrict Bitrix auto sign-in to specific portal hostnames.
    - **Microsoft Graph (email codes):** `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `GRAPH_SENDER_EMAIL` (mailbox that sends mail), `GRAPH_SENDER_NAME` (e.g. `NMAC KPI`). In Azure Entra ID, the app registration needs **Application** permission **Mail.Send** on Microsoft Graph, with **admin consent**.
    - **NMAC CRM + survey outreach:** `NMAC_CRM_BASE_URL` (default `https://crm.nmac.bm`), `REPORTS_API_TOKEN`, `APP_BASE_URL` (public URL for survey links), `SURVEY_OUTREACH_SECRET`, `CRON_SECRET`, optional `SURVEY_FINAL_REMINDER_DAYS` (`14` or `21`), and optional `SURVEY_OUTREACH_TEST_EMAILS` for scheduled test sends. **Patient survey emails are off by default** — set `SURVEY_OUTREACH_SEND_EMAILS=true` only when ready to go live. See [`.env.example`](.env.example).
+   - **3CX report email import:** add Microsoft Graph **Application** permission **Mail.Read** with admin consent. Set `GRAPH_3CX_REPORT_MAILBOX` to the mailbox that receives the scheduled 3CX report emails. Optional filters: `GRAPH_3CX_SUBJECT_QUERY` (defaults to `3CX`), `GRAPH_3CX_SENDER`, and `GRAPH_3CX_FOLDER` (defaults to `inbox`).
 
    **If Outlook still shows the wrong sender name (e.g. “NMAC CRM”):** Microsoft 365 often uses the **mailbox / user display name** from the directory, not only the Graph API. In [Microsoft 365 admin](https://admin.microsoft.com) go to **Users** → open the account for `GRAPH_SENDER_EMAIL` → set **Display name** to **NMAC KPI** (or **Exchange admin center** → **Recipients** → **Mailboxes** → same mailbox → edit display name). Redeploy is not required for that change.
 
@@ -82,6 +83,17 @@ Email OTP sign-in still works when Bitrix auth is unavailable (standalone browse
 - **Viewer** — Dashboard and doctors (read-only).
 - **Editor** — Can use **Data entry** to save weekly values and **NMAC master (Supabase)** for NMAC targets plus monthly this year / last year actuals.
 - **Admin** — Editor capabilities plus **Users** to add users and change roles.
+
+## 3CX email import
+
+In **Developer → 3CX import**, use **Fetch email** to pull the newest matching scheduled 3CX report for the selected month and week-of-month range. Use **Import CSV** to manually upload the same 3CX report format. The importer reads CSV/text-style 3CX queue performance exports and stores queue + extension rows in the `threecx_queue_report_*` tables by report start/end date. Full-month imports also update these NMAC call KPIs:
+
+- Incoming Calls
+- Total Answered Calls
+- Total Missed/Abandoned Calls
+- Telephone Calls Answered
+
+Use the month bar plus week selector for the full month, first week, second week, third week, or fourth/last week. The email path searches messages received inside that selected date window. Successful and failed imports are logged under **Developer → 3CX import** and the general **Developer → Activity** page.
 
 ## Vercel
 

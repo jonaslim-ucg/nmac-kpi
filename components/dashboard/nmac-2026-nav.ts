@@ -8,6 +8,7 @@ import {
   Database,
   HeartPulse,
   LayoutDashboard,
+  MailSearch,
   Phone,
   ScrollText,
   Settings,
@@ -87,6 +88,7 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
     items: [
       { href: "/dev", label: "Maintenance", icon: Wrench, requireDev: true },
       { href: "/dev/survey-outreach", label: "Survey emails", icon: Mail, requireDev: true },
+      { href: "/dev/3cx", label: "3CX import", icon: MailSearch, requireDev: true },
       { href: "/dev/logs", label: "Activity", icon: ScrollText, requireDev: true },
     ],
   },

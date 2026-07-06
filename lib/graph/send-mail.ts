@@ -4,7 +4,7 @@ type SendMailInput = {
   textBody: string;
 };
 
-async function getAccessToken(): Promise<string> {
+export async function getGraphAccessToken(): Promise<string> {
   const tenant = process.env.AZURE_TENANT_ID;
   const clientId = process.env.AZURE_CLIENT_ID;
   const clientSecret = process.env.AZURE_CLIENT_SECRET;
@@ -39,7 +39,7 @@ export async function sendMailViaGraph(input: SendMailInput): Promise<void> {
     throw new Error("GRAPH_SENDER_EMAIL is not set");
   }
 
-  const token = await getAccessToken();
+  const token = await getGraphAccessToken();
   const url = `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(sender)}/sendMail`;
 
   const res = await fetch(url, {

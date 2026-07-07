@@ -23,7 +23,6 @@ function ScaleInput({
   onChange,
   minLabel,
   maxLabel,
-  pointLabels,
   disabled,
 }: {
   name: string;
@@ -31,26 +30,30 @@ function ScaleInput({
   onChange: (n: number) => void;
   minLabel: string;
   maxLabel: string;
-  /** When set (length 5), renders a full-width labeled scale instead of compact buttons. */
-  pointLabels?: readonly [string, string, string, string, string];
   disabled?: boolean;
 }) {
   const scores = Array.from({ length: APPOINTMENT_REVIEW_MAX_SCORE }, (_, i) => i + 1);
 
-  if (pointLabels?.length === APPOINTMENT_REVIEW_MAX_SCORE) {
-    return (
-      <div role="radiogroup" aria-label={name}>
-        <div className="grid grid-cols-5 gap-2 sm:gap-3">
-          {scores.map((n, i) => {
+  return (
+    <div className="space-y-2.5">
+      <div
+        className={`rounded-xl border border-border bg-background/70 p-1.5 shadow-inner ${
+          disabled ? "opacity-50" : ""
+        }`}
+        role="radiogroup"
+        aria-label={name}
+      >
+        <div className="grid grid-cols-5 gap-1">
+          {scores.map((n) => {
             const selected = value === n;
             return (
               <label
                 key={n}
-                className={`flex min-h-[4.75rem] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border px-1 py-3 text-center transition sm:min-h-[5.25rem] ${
+                className={`flex min-h-[3rem] cursor-pointer items-center justify-center rounded-lg px-1.5 py-2 text-center transition sm:min-h-[3.25rem] ${
                   selected
-                    ? "border-accent bg-accent text-white shadow-sm ring-2 ring-accent/30"
-                    : "border-border bg-background text-foreground hover:border-accent/40 hover:bg-surface-muted/40"
-                } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+                    ? "bg-accent text-white shadow-sm"
+                    : "text-foreground hover:bg-surface-muted/80"
+                } ${disabled ? "cursor-not-allowed" : ""}`}
               >
                 <input
                   type="radio"
@@ -61,53 +64,15 @@ function ScaleInput({
                   disabled={disabled}
                   className="sr-only"
                 />
-                <span className="text-xl font-semibold leading-none tabular-nums">{n}</span>
-                <span
-                  className={`max-w-full px-0.5 text-[10px] font-medium leading-tight sm:text-xs ${
-                    selected ? "text-white/90" : "text-muted-foreground"
-                  }`}
-                >
-                  {pointLabels[i]}
-                </span>
+                <span className="text-base font-semibold leading-none tabular-nums sm:text-lg">{n}</span>
               </label>
             );
           })}
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div>
-      <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={name}>
-        {scores.map((n) => {
-          const selected = value === n;
-          return (
-            <label
-              key={n}
-              className={`flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border text-sm font-medium transition ${
-                selected
-                  ? "border-accent bg-accent text-white"
-                  : "border-border bg-background text-foreground hover:border-accent/50"
-              } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
-            >
-              <input
-                type="radio"
-                name={name}
-                value={n}
-                checked={selected}
-                onChange={() => onChange(n)}
-                disabled={disabled}
-                className="sr-only"
-              />
-              {n}
-            </label>
-          );
-        })}
-      </div>
-      <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+      <div className="flex justify-between gap-3 text-xs text-muted-foreground">
         <span>1 — {minLabel}</span>
-        <span>
+        <span className="text-right">
           {APPOINTMENT_REVIEW_MAX_SCORE} — {maxLabel}
         </span>
       </div>
@@ -462,7 +427,6 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
           onChange={(n) => patch({ providerRating: n })}
           minLabel="poor"
           maxLabel="excellent"
-          pointLabels={["Poor", "Fair", "Good", "Very good", "Excellent"]}
           disabled={busy}
         />
       </QuestionBlock>

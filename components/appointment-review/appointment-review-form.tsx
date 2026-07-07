@@ -306,40 +306,34 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
         void submit();
       }}
     >
-      <section className="rounded-xl border border-border bg-surface-muted/40 p-4">
-        <h2 className="text-sm font-semibold text-foreground">Contact information</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <label className="block">
-            <span className="text-xs font-medium text-muted-foreground">Email</span>
-            <input
-              type="email"
-              value={form.email}
-              onChange={(e) => patch({ email: e.target.value })}
-              disabled={busy}
-              readOnly={Boolean(surveyToken)}
-              autoComplete="email"
-              placeholder="you@example.com"
-              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 read-only:bg-surface-muted/40 focus:ring-2"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs font-medium text-muted-foreground">Name</span>
-            <input
-              type="text"
-              value={form.patientName}
-              onChange={(e) => patch({ patientName: e.target.value })}
-              disabled={busy}
-              readOnly={Boolean(surveyToken)}
-              autoComplete="name"
-              placeholder="Your full name"
-              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 read-only:bg-surface-muted/40 focus:ring-2"
-            />
-          </label>
-        </div>
-      </section>
+      <QuestionBlock number={1} title="What is your email address?" required>
+        <input
+          type="email"
+          value={form.email}
+          onChange={(e) => patch({ email: e.target.value })}
+          disabled={busy}
+          readOnly={Boolean(surveyToken)}
+          autoComplete="email"
+          placeholder="you@example.com"
+          className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 read-only:bg-surface-muted/40 focus:ring-2"
+        />
+      </QuestionBlock>
+
+      <QuestionBlock number={2} title="What is your name?" required>
+        <input
+          type="text"
+          value={form.patientName}
+          onChange={(e) => patch({ patientName: e.target.value })}
+          disabled={busy}
+          readOnly={Boolean(surveyToken)}
+          autoComplete="name"
+          placeholder="Your full name"
+          className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 read-only:bg-surface-muted/40 focus:ring-2"
+        />
+      </QuestionBlock>
 
       <QuestionBlock
-        number={1}
+        number={3}
         title="How would you rate the ease of scheduling an appointment?"
         required
       >
@@ -354,7 +348,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
       </QuestionBlock>
 
       <QuestionBlock
-        number={2}
+        number={4}
         title="How would you rank your overall visit with our practice?"
         required
       >
@@ -368,7 +362,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
         />
       </QuestionBlock>
 
-      <QuestionBlock number={3} title="Which provider did they see?" required>
+      <QuestionBlock number={5} title="Which provider did they see?" required>
         <div className="space-y-2" role="radiogroup" aria-label="Provider seen">
           {SERVICE_TYPE_OPTIONS.map(({ value, label }) => (
             <label
@@ -409,7 +403,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
         ) : null}
       </QuestionBlock>
 
-      <QuestionBlock number={4} title="How would you rate your provider?" required>
+      <QuestionBlock number={6} title="How would you rate your provider?" required>
         <ScaleInput
           name="provider-rating"
           value={form.providerRating}
@@ -425,7 +419,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
       </p>
 
       <QuestionBlock
-        number={5}
+        number={7}
         title="Since receiving care at NMAC, how would you rate the improvement in your overall health?"
         required
       >
@@ -444,7 +438,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
       </p>
 
       <QuestionBlock
-        number={6}
+        number={8}
         title="How likely are you to recommend NMAC to a friend or family member?"
         required
       >
@@ -459,7 +453,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
       </QuestionBlock>
 
       <QuestionBlock
-        number={7}
+        number={9}
         title="Would you encourage someone considering NMAC to become a patient?"
         required
       >
@@ -472,7 +466,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
       </QuestionBlock>
 
       <QuestionBlock
-        number={8}
+        number={10}
         title="May we use your comments as a testimonial in our marketing materials (website, social media, advertisements, and other promotional materials)?"
         required
       >
@@ -506,7 +500,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
       </p>
 
       <QuestionBlock
-        number={9}
+        number={11}
         title="What was your wait time before the clinical staff brought you to an exam room?"
         required
       >
@@ -536,7 +530,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
       </QuestionBlock>
 
       <QuestionBlock
-        number={10}
+        number={12}
         title="My provider spent enough time with me to address my needs and answered all my questions."
         required
       >
@@ -559,7 +553,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
         </label>
       </QuestionBlock>
 
-      <QuestionBlock number={11} title="The front desk staff were friendly and courteous." required>
+      <QuestionBlock number={13} title="The front desk staff were friendly and courteous." required>
         <ScaleInput
           name="front-desk"
           value={form.frontDeskRating}
@@ -571,7 +565,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
       </QuestionBlock>
 
       <QuestionBlock
-        number={12}
+        number={14}
         title="How long have you been a patient of this provider?"
         required
       >
@@ -607,7 +601,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
 
       {showReferralQuestion ? (
         <QuestionBlock
-          number={13}
+          number={15}
           title="How did you hear about NMAC? (Check all that apply)"
           required
         >
@@ -657,7 +651,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
       ) : null}
 
       <QuestionBlock
-        number={showReferralQuestion ? 14 : 13}
+        number={showReferralQuestion ? 16 : 15}
         title="Would you like to name any staff member that provided exceptional service?"
       >
         <textarea

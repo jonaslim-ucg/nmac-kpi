@@ -35,40 +35,32 @@ function ScaleInput({
   const scores = Array.from({ length: APPOINTMENT_REVIEW_MAX_SCORE }, (_, i) => i + 1);
 
   return (
-    <div className="space-y-2.5">
-      <div
-        className={`rounded-xl border border-border bg-background/70 p-1.5 shadow-inner ${
-          disabled ? "opacity-50" : ""
-        }`}
-        role="radiogroup"
-        aria-label={name}
-      >
-        <div className="grid grid-cols-5 gap-1">
-          {scores.map((n) => {
-            const selected = value === n;
-            return (
-              <label
-                key={n}
-                className={`flex min-h-[3rem] cursor-pointer items-center justify-center rounded-lg px-1.5 py-2 text-center transition sm:min-h-[3.25rem] ${
-                  selected
-                    ? "bg-accent text-white shadow-sm"
-                    : "text-foreground hover:bg-surface-muted/80"
-                } ${disabled ? "cursor-not-allowed" : ""}`}
-              >
-                <input
-                  type="radio"
-                  name={name}
-                  value={n}
-                  checked={selected}
-                  onChange={() => onChange(n)}
-                  disabled={disabled}
-                  className="sr-only"
-                />
-                <span className="text-base font-semibold leading-none tabular-nums sm:text-lg">{n}</span>
-              </label>
-            );
-          })}
-        </div>
+    <div className="space-y-2">
+      <div className="flex gap-1.5" role="radiogroup" aria-label={name}>
+        {scores.map((n) => {
+          const selected = value === n;
+          return (
+            <label
+              key={n}
+              className={`flex h-10 flex-1 cursor-pointer items-center justify-center rounded-lg border text-sm font-semibold tabular-nums transition ${
+                selected
+                  ? "border-accent bg-accent text-white"
+                  : "border-border bg-background text-foreground hover:border-accent/40"
+              } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+            >
+              <input
+                type="radio"
+                name={name}
+                value={n}
+                checked={selected}
+                onChange={() => onChange(n)}
+                disabled={disabled}
+                className="sr-only"
+              />
+              {n}
+            </label>
+          );
+        })}
       </div>
       <div className="flex justify-between gap-3 text-xs text-muted-foreground">
         <span>1 — {minLabel}</span>

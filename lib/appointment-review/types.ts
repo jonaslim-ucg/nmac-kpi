@@ -23,8 +23,7 @@ export const SERVICE_TYPE_OPTIONS = [
   { value: "dr-gonzalez-fermin", label: "Dr. Fermin Gonzalez" },
   { value: "dr-flood-amani", label: "Dr. Amani Flood" },
   { value: "dr-dzepina-davor", label: "Dr. Davor Dzepina" },
-  { value: "alexander-dill", label: "Alexander Dill" },
-  { value: "other", label: "Other (please specify)" },
+  { value: "other", label: "Other Providers" },
 ] as const;
 
 export const RETURNING_PATIENT_DURATION_OPTIONS = PATIENT_DURATION_OPTIONS.filter(
@@ -83,7 +82,7 @@ export type AppointmentReviewPayload = {
   qualityOfLifeRating: number | null;
   healthImprovementComment: string;
   recommendationRating: number;
-  wouldEncouragePatient: boolean;
+  wouldEncouragePatient: boolean | null;
   recommendationMessage: string;
   testimonialPermission: TestimonialPermissionValue;
   waitTime: WaitTimeValue;
@@ -144,9 +143,11 @@ export function isServiceTypeComplete(
   return true;
 }
 
-export function serviceTypeLabel(value: ServiceTypeValue, other: string): string {
-  const base = SERVICE_TYPE_OPTIONS.find((o) => o.value === value)?.label ?? value;
-  if (value === "other" && other.trim()) return `Other: ${other.trim()}`;
+export function serviceTypeLabel(value: string, other: string): string {
+  const base =
+    SERVICE_TYPE_OPTIONS.find((o) => o.value === value)?.label ??
+    (value === "alexander-dill" ? "Alexander Dill" : value);
+  if (value === "other" && other.trim()) return `Other Providers: ${other.trim()}`;
   return base;
 }
 

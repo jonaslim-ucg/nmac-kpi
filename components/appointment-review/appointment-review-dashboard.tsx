@@ -262,10 +262,6 @@ export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
 
           <YesNoPie title="Provider spent enough time" data={stats.providerTimeAdequate} />
 
-          {stats.wouldEncouragePatient.some((d) => d.count > 0) ? (
-            <YesNoPie title="Would encourage someone to become a patient" data={stats.wouldEncouragePatient} />
-          ) : null}
-
           {stats.serviceTypes.length > 0 ? (
             <ChartCard title="Providers seen">
               <ResponsiveContainer width="100%" height="100%">

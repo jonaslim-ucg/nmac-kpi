@@ -100,8 +100,7 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
     !testimonialPermission ||
     !waitTime ||
     !patientDuration ||
-    providerTimeAdequate === null ||
-    wouldEncouragePatient === null
+    providerTimeAdequate === null
   ) {
     return { error: "Please answer all required questions." };
   }
@@ -137,7 +136,7 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
     testimonialPermission,
     waitTime: waitTime as AppointmentReviewPayload["waitTime"],
     providerTimeAdequate,
-    providerTimeComment: str(b.providerTimeComment),
+    providerTimeComment: "",
     frontDeskRating,
     patientDuration,
     referralSources,

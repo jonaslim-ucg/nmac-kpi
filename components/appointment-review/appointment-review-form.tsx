@@ -23,6 +23,7 @@ function ScaleInput({
   onChange,
   minLabel,
   maxLabel,
+  pointLabels,
   disabled,
 }: {
   name: string;
@@ -30,12 +31,56 @@ function ScaleInput({
   onChange: (n: number) => void;
   minLabel: string;
   maxLabel: string;
+  /** When set (length 5), renders a full-width labeled scale instead of compact buttons. */
+  pointLabels?: readonly [string, string, string, string, string];
   disabled?: boolean;
 }) {
+  const scores = Array.from({ length: APPOINTMENT_REVIEW_MAX_SCORE }, (_, i) => i + 1);
+
+  if (pointLabels?.length === APPOINTMENT_REVIEW_MAX_SCORE) {
+    return (
+      <div role="radiogroup" aria-label={name}>
+        <div className="grid grid-cols-5 gap-2 sm:gap-3">
+          {scores.map((n, i) => {
+            const selected = value === n;
+            return (
+              <label
+                key={n}
+                className={`flex min-h-[4.75rem] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border px-1 py-3 text-center transition sm:min-h-[5.25rem] ${
+                  selected
+                    ? "border-accent bg-accent text-white shadow-sm ring-2 ring-accent/30"
+                    : "border-border bg-background text-foreground hover:border-accent/40 hover:bg-surface-muted/40"
+                } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name={name}
+                  value={n}
+                  checked={selected}
+                  onChange={() => onChange(n)}
+                  disabled={disabled}
+                  className="sr-only"
+                />
+                <span className="text-xl font-semibold leading-none tabular-nums">{n}</span>
+                <span
+                  className={`max-w-full px-0.5 text-[10px] font-medium leading-tight sm:text-xs ${
+                    selected ? "text-white/90" : "text-muted-foreground"
+                  }`}
+                >
+                  {pointLabels[i]}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={name}>
-        {Array.from({ length: APPOINTMENT_REVIEW_MAX_SCORE }, (_, i) => i + 1).map((n) => {
+        {scores.map((n) => {
           const selected = value === n;
           return (
             <label
@@ -146,7 +191,6 @@ function isFormComplete(form: AppointmentReviewFormState): form is AppointmentRe
     form.providerRating !== null &&
     form.healthRating !== null &&
     form.recommendationRating !== null &&
-    form.wouldEncouragePatient !== null &&
     form.testimonialPermission !== null &&
     form.waitTime !== null &&
     form.providerTimeAdequate !== null &&
@@ -249,6 +293,8 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          wouldEncouragePatient: null,
+          providerTimeComment: "",
           surveyToken: form.surveyToken ?? undefined,
         }),
       });
@@ -416,6 +462,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
           onChange={(n) => patch({ providerRating: n })}
           minLabel="poor"
           maxLabel="excellent"
+          pointLabels={["Poor", "Fair", "Good", "Very good", "Excellent"]}
           disabled={busy}
         />
       </QuestionBlock>
@@ -460,19 +507,6 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
 
       <QuestionBlock
         number={7}
-        title="Would you encourage someone considering NMAC to become a patient?"
-        required
-      >
-        <YesNoInput
-          name="would-encourage"
-          value={form.wouldEncouragePatient}
-          onChange={(v) => patch({ wouldEncouragePatient: v })}
-          disabled={busy}
-        />
-      </QuestionBlock>
-
-      <QuestionBlock
-        number={8}
         title="May we use your comments as a testimonial in our marketing materials (website, social media, advertisements, and other promotional materials)?"
         required
       >
@@ -506,7 +540,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
       </p>
 
       <QuestionBlock
-        number={9}
+        number={8}
         title="What was your wait time before the clinical staff brought you to an exam room?"
         required
       >
@@ -536,7 +570,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
       </QuestionBlock>
 
       <QuestionBlock
-        number={10}
+        number={9}
         title="My provider spent enough time with me to address my needs and answered all my questions."
         required
       >
@@ -546,20 +580,9 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
           onChange={(v) => patch({ providerTimeAdequate: v })}
           disabled={busy}
         />
-        <label className="mt-4 block text-sm text-muted-foreground">
-          Comments (optional)
-          <textarea
-            rows={3}
-            value={form.providerTimeComment}
-            onChange={(e) => patch({ providerTimeComment: e.target.value })}
-            disabled={busy}
-            placeholder="Share any additional feedback about your provider visit…"
-            className="mt-1.5 w-full resize-y rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
-          />
-        </label>
       </QuestionBlock>
 
-      <QuestionBlock number={11} title="The front desk staff were friendly and courteous." required>
+      <QuestionBlock number={10} title="The front desk staff were friendly and courteous." required>
         <ScaleInput
           name="front-desk"
           value={form.frontDeskRating}
@@ -571,7 +594,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
       </QuestionBlock>
 
       <QuestionBlock
-        number={12}
+        number={11}
         title="How long have you been a patient of this provider?"
         required
       >
@@ -607,7 +630,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
 
       {showReferralQuestion ? (
         <QuestionBlock
-          number={13}
+          number={12}
           title="How did you hear about NMAC? (Check all that apply)"
           required
         >
@@ -657,7 +680,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
       ) : null}
 
       <QuestionBlock
-        number={showReferralQuestion ? 14 : 13}
+        number={showReferralQuestion ? 13 : 12}
         title="Would you like to name any staff member that provided exceptional service?"
       >
         <textarea

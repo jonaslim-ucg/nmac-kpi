@@ -150,7 +150,6 @@ export function buildAppointmentReviewStats(rows: AppointmentReviewRow[]): Appoi
   ].filter((item) => item.score > 0);
 
   const commentKinds: { kind: string; pick: (r: AppointmentReviewRow) => string }[] = [
-    { kind: "Provider visit", pick: (r) => r.provider_time_comment },
     { kind: "Exceptional staff", pick: (r) => r.exceptional_staff_comment },
   ];
 

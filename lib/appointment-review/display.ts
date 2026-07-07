@@ -59,7 +59,7 @@ function resolveServiceTypeLabel(row: AppointmentReviewRow): string {
 }
 
 function reviewComments(row: AppointmentReviewRow): string[] {
-  return [row.provider_time_comment, row.exceptional_staff_comment]
+  return [row.exceptional_staff_comment]
     .map((c) => c.trim())
     .filter(Boolean);
 }

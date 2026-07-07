@@ -8,7 +8,6 @@ import {
   formatRatingOrDash,
   formatReviewWhen,
   formatYesNo,
-  formatYesNoOrDash,
 } from "@/lib/appointment-review/display";
 
 type Props = {
@@ -105,22 +104,18 @@ export function AppointmentReviewDetailModal({
               value={formatRatingOrDash(review.recommendationRating)}
             />
             <Answer
-              label="7. Would encourage someone to become a patient"
-              value={formatYesNoOrDash(review.wouldEncouragePatient)}
-            />
-            <Answer
-              label="8. Testimonial permission"
+              label="7. Testimonial permission"
               value={review.testimonialPermissionLabel}
             />
-            <Answer label="9. Wait time before exam room" value={review.waitTimeLabel} />
+            <Answer label="8. Wait time before exam room" value={review.waitTimeLabel} />
             <Answer
-              label="10. Provider spent enough time and answered questions"
+              label="9. Provider spent enough time and answered questions"
               value={formatYesNo(review.providerTimeAdequate)}
             />
-            <Answer label="11. Front desk staff" value={formatRating(review.frontDeskRating)} />
-            <Answer label="12. How long a patient" value={review.patientDurationLabel} />
+            <Answer label="10. Front desk staff" value={formatRating(review.frontDeskRating)} />
+            <Answer label="11. How long a patient" value={review.patientDurationLabel} />
             {review.referralSourcesLabel ? (
-              <Answer label="13. How did you hear about NMAC" value={review.referralSourcesLabel} />
+              <Answer label="12. How did you hear about NMAC" value={review.referralSourcesLabel} />
             ) : null}
           </div>
 
@@ -129,9 +124,8 @@ export function AppointmentReviewDetailModal({
               <MessageSquareText className="h-4 w-4 text-accent" aria-hidden />
               Optional written responses
             </div>
-            <CommentBlock label="10. Provider visit comments" text={review.providerTimeComment} />
             <CommentBlock
-              label={review.referralSourcesLabel ? "14. Exceptional staff" : "13. Exceptional staff"}
+              label={review.referralSourcesLabel ? "13. Exceptional staff" : "12. Exceptional staff"}
               text={review.exceptionalStaffComment}
             />
             {!review.hasComments ? (

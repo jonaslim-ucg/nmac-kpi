@@ -142,7 +142,7 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
     patientDuration,
     referralSources,
     referralOther,
-    exceptionalStaffComment: "",
+    exceptionalStaffComment: str(b.exceptionalStaffComment),
     surveyToken: typeof b.surveyToken === "string" && b.surveyToken.trim() ? b.surveyToken.trim() : null,
   };
 }

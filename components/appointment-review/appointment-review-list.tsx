@@ -101,10 +101,10 @@ export function AppointmentReviewList({ reviews, onViewReview }: Props) {
                     {review.recommendationRating !== null ? formatRating(review.recommendationRating) : "—"}
                   </td>
                   <td className="max-w-[220px] px-3 py-3">
-                    {review.providerTimeComment ? (
+                    {review.commentPreview ? (
                       <div className="flex items-start gap-2">
                         <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
-                        <p className="line-clamp-2 text-foreground">{review.providerTimeComment}</p>
+                        <p className="line-clamp-2 text-foreground">{review.commentPreview}</p>
                       </div>
                     ) : (
                       <span className="text-muted-foreground">—</span>

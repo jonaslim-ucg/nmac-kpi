@@ -603,56 +603,71 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
             </label>
           ))}
         </div>
-        {showReferralQuestion ? (
-          <div className="mt-5 border-t border-border pt-4">
-            <p className="mb-3 text-sm font-medium leading-snug text-foreground">
-              How did you hear about NMAC? (Check all that apply)
-              <span className="ml-0.5 text-red-600 dark:text-red-400">*</span>
-            </p>
-            <div className="space-y-2" role="group" aria-label="How did you hear about NMAC">
-              {REFERRAL_SOURCE_OPTIONS.map(({ value, label }) => {
-                const checked = form.referralSources.includes(value);
-                return (
-                  <label
-                    key={value}
-                    className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-sm transition ${
-                      checked
-                        ? "border-accent bg-accent-muted/60"
-                        : "border-border bg-background hover:border-accent/40"
-                    } ${busy ? "cursor-not-allowed opacity-50" : ""}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => {
-                        const next = checked
-                          ? form.referralSources.filter((v) => v !== value)
-                          : [...form.referralSources, value];
-                        patch({
-                          referralSources: next,
-                          ...(value === "other" && checked ? { referralOther: "" } : {}),
-                        });
-                      }}
-                      disabled={busy}
-                      className="h-4 w-4 accent-accent"
-                    />
-                    {label}
-                  </label>
-                );
-              })}
-            </div>
-            {form.referralSources.includes("other") ? (
-              <input
-                type="text"
-                value={form.referralOther}
-                onChange={(e) => patch({ referralOther: e.target.value })}
-                disabled={busy}
-                placeholder="Please specify…"
-                className="mt-3 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
-              />
-            ) : null}
+      </QuestionBlock>
+
+      {showReferralQuestion ? (
+        <QuestionBlock
+          number={13}
+          title="How did you hear about NMAC? (Check all that apply)"
+          required
+        >
+          <div className="space-y-2" role="group" aria-label="How did you hear about NMAC">
+            {REFERRAL_SOURCE_OPTIONS.map(({ value, label }) => {
+              const checked = form.referralSources.includes(value);
+              return (
+                <label
+                  key={value}
+                  className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-sm transition ${
+                    checked
+                      ? "border-accent bg-accent-muted/60"
+                      : "border-border bg-background hover:border-accent/40"
+                  } ${busy ? "cursor-not-allowed opacity-50" : ""}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      const next = checked
+                        ? form.referralSources.filter((v) => v !== value)
+                        : [...form.referralSources, value];
+                      patch({
+                        referralSources: next,
+                        ...(value === "other" && checked ? { referralOther: "" } : {}),
+                      });
+                    }}
+                    disabled={busy}
+                    className="h-4 w-4 accent-accent"
+                  />
+                  {label}
+                </label>
+              );
+            })}
           </div>
-        ) : null}
+          {form.referralSources.includes("other") ? (
+            <input
+              type="text"
+              value={form.referralOther}
+              onChange={(e) => patch({ referralOther: e.target.value })}
+              disabled={busy}
+              placeholder="Please specify…"
+              className="mt-3 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
+            />
+          ) : null}
+        </QuestionBlock>
+      ) : null}
+
+      <QuestionBlock
+        number={showReferralQuestion ? 14 : 13}
+        title="Would you like to name any staff member that provided exceptional service?"
+      >
+        <textarea
+          rows={3}
+          value={form.exceptionalStaffComment}
+          onChange={(e) => patch({ exceptionalStaffComment: e.target.value })}
+          disabled={busy}
+          placeholder="Staff member name and details (optional)…"
+          className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
+        />
       </QuestionBlock>
 
       {error ? (

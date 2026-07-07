@@ -120,7 +120,7 @@ export function AppointmentReviewDetailModal({
             <Answer label="11. Front desk staff" value={formatRating(review.frontDeskRating)} />
             <Answer label="12. How long a patient" value={review.patientDurationLabel} />
             {review.referralSourcesLabel ? (
-              <Answer label="12 follow-up. How did you hear about NMAC" value={review.referralSourcesLabel} />
+              <Answer label="13. How did you hear about NMAC" value={review.referralSourcesLabel} />
             ) : null}
           </div>
 
@@ -130,6 +130,10 @@ export function AppointmentReviewDetailModal({
               Optional written responses
             </div>
             <CommentBlock label="10. Provider visit comments" text={review.providerTimeComment} />
+            <CommentBlock
+              label={review.referralSourcesLabel ? "14. Exceptional staff" : "13. Exceptional staff"}
+              text={review.exceptionalStaffComment}
+            />
             {!review.hasComments ? (
               <p className="text-sm text-muted-foreground">No optional written responses.</p>
             ) : null}

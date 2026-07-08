@@ -12,6 +12,15 @@ function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 }
 
+function currentQuarterRange(now = new Date()): { start: number; end: number } {
+  const year = now.getUTCFullYear();
+  const startMonth = Math.floor(now.getUTCMonth() / 3) * 3;
+  return {
+    start: Date.UTC(year, startMonth, 1),
+    end: Date.UTC(year, startMonth + 3, 1),
+  };
+}
+
 export async function GET(req: Request) {
   const session = await getSessionFromCookies();
   if (!session) {
@@ -25,9 +34,19 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const daysRaw = url.searchParams.get("days");
+  const range = url.searchParams.get("range");
   const days = daysRaw ? Number(daysRaw) : null;
 
-  const result = await listAppointmentReviews();
+  const filters: { createdFrom?: string; createdBefore?: string } = {};
+  if (range === "quarter") {
+    const { start, end } = currentQuarterRange();
+    filters.createdFrom = new Date(start).toISOString();
+    filters.createdBefore = new Date(end).toISOString();
+  } else if (days && Number.isFinite(days) && days > 0) {
+    filters.createdFrom = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  }
+
+  const result = await listAppointmentReviews(filters);
   if (!result.ok) {
     if (result.setupRequired) {
       return NextResponse.json(
@@ -42,11 +61,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: result.error ?? "Could not load reviews." }, { status: 500 });
   }
 
-  let rows = result.rows;
-  if (days && Number.isFinite(days) && days > 0) {
-    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-    rows = rows.filter((r) => new Date(r.created_at).getTime() >= cutoff);
-  }
+  const rows = result.rows;
 
   return NextResponse.json(
     {

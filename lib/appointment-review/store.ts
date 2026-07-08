@@ -97,18 +97,32 @@ type ListResult =
   | { ok: true; rows: AppointmentReviewRow[] }
   | { ok: false; error: string; setupRequired?: boolean };
 
-export async function listAppointmentReviews(limit = 500): Promise<ListResult> {
+type ListAppointmentReviewsOptions = {
+  limit?: number;
+  createdFrom?: string;
+  createdBefore?: string;
+};
+
+export async function listAppointmentReviews(options: ListAppointmentReviewsOptions = {}): Promise<ListResult> {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return { ok: false, error: "Review storage is not available." };
   }
 
   try {
     const supabase = createServiceRoleClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from("appointment_reviews")
       .select("*")
-      .order("created_at", { ascending: false })
-      .limit(limit);
+      .order("created_at", { ascending: false });
+
+    if (options.createdFrom) {
+      query = query.gte("created_at", options.createdFrom);
+    }
+    if (options.createdBefore) {
+      query = query.lt("created_at", options.createdBefore);
+    }
+
+    const { data, error } = await query.limit(options.limit ?? 500);
 
     if (error) {
       if (/appointment_reviews/i.test(error.message) && /does not exist|schema cache/i.test(error.message)) {

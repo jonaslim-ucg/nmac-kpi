@@ -13,7 +13,7 @@ import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
 import { APPOINTMENT_REVIEWS_SETUP_SQL } from "@/lib/appointment-review/store";
 import { canEditKpiData } from "@/lib/auth/types";
 
-type FilterDays = "all" | "30" | "90";
+type ReviewPeriod = "all" | "quarter" | "30" | "90";
 type Tab = "overview" | "reviews";
 
 type ApiResponse = {
@@ -33,7 +33,7 @@ export default function AdminAppointmentReviewsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [setupRequired, setSetupRequired] = useState(false);
-  const [days, setDays] = useState<FilterDays>("all");
+  const [period, setPeriod] = useState<ReviewPeriod>("all");
   const [tab, setTab] = useState<Tab>("overview");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -45,14 +45,27 @@ export default function AdminAppointmentReviewsPage() {
   );
   const selectedReview = selectedIndex >= 0 ? reviews[selectedIndex] : null;
 
-  const load = useCallback(async (filter: FilterDays, silent = false) => {
+  const periodLabel = useMemo(() => {
+    switch (period) {
+      case "quarter":
+        return "This quarter";
+      case "30":
+        return "Last 30 days";
+      case "90":
+        return "Last 90 days";
+      default:
+        return "All";
+    }
+  }, [period]);
+
+  const load = useCallback(async (filter: ReviewPeriod, silent = false) => {
     if (!silent) setInitialLoading(true);
     else setRefreshing(true);
     setLoadError(null);
     setSetupRequired(false);
 
     try {
-      const qs = filter === "all" ? "" : `?days=${filter}`;
+      const qs = filter === "all" ? "" : filter === "quarter" ? "?range=quarter" : `?days=${filter}`;
       const r = await fetch(`/api/admin/appointment-reviews${qs}`, { credentials: "include" });
       const j = (await r.json()) as ApiResponse;
       if (!r.ok) {
@@ -80,8 +93,8 @@ export default function AdminAppointmentReviewsPage() {
 
   useEffect(() => {
     if (loading || !allowed) return;
-    void load(days);
-  }, [allowed, days, load, loading]);
+    void load(period);
+  }, [allowed, load, loading, period]);
 
   const viewReview = useCallback((id: string) => {
     setSelectedId(id);
@@ -137,6 +150,7 @@ export default function AdminAppointmentReviewsPage() {
           {(
             [
               { id: "all", label: "All time" },
+              { id: "quarter", label: "This quarter" },
               { id: "30", label: "Last 30 days" },
               { id: "90", label: "Last 90 days" },
             ] as const
@@ -145,12 +159,12 @@ export default function AdminAppointmentReviewsPage() {
               key={id}
               type="button"
               onClick={() => {
-                setDays(id);
+                setPeriod(id);
                 setSelectedId(null);
               }}
               className={
                 "rounded-lg border px-3 py-1.5 text-sm font-medium transition " +
-                (days === id
+                (period === id
                   ? "border-accent bg-nav-active-bg text-nav-active-fg"
                   : "border-border bg-card text-muted-foreground hover:text-foreground")
               }
@@ -161,7 +175,7 @@ export default function AdminAppointmentReviewsPage() {
         </div>
         <button
           type="button"
-          onClick={() => void load(days, true)}
+          onClick={() => void load(period, true)}
           disabled={refreshing}
           className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-surface-muted/80 disabled:opacity-50"
         >
@@ -186,7 +200,9 @@ export default function AdminAppointmentReviewsPage() {
         <AppointmentReviewDashboard stats={stats} onViewReview={viewReview} />
       ) : null}
 
-      {tab === "reviews" ? <AppointmentReviewList reviews={reviews} onViewReview={viewReview} /> : null}
+      {tab === "reviews" ? (
+        <AppointmentReviewList reviews={reviews} onViewReview={viewReview} periodLabel={periodLabel} />
+      ) : null}
 
       {selectedReview ? (
         <AppointmentReviewDetailModal

@@ -8,11 +8,12 @@ import { formatRating, formatReviewWhen } from "@/lib/appointment-review/display
 type Props = {
   reviews: AppointmentReviewDetail[];
   onViewReview: (id: string) => void;
+  periodLabel?: string;
 };
 
 type CommentFilter = "all" | "with-comments";
 
-export function AppointmentReviewList({ reviews, onViewReview }: Props) {
+export function AppointmentReviewList({ reviews, onViewReview, periodLabel = "All" }: Props) {
   const [commentFilter, setCommentFilter] = useState<CommentFilter>("all");
 
   const filtered = useMemo(() => {
@@ -27,7 +28,7 @@ export function AppointmentReviewList({ reviews, onViewReview }: Props) {
       <span className="dashboard-card-accent" aria-hidden />
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-5">
         <div>
-          <p className="text-sm font-semibold text-foreground">All reviews</p>
+          <p className="text-sm font-semibold text-foreground">{periodLabel} reviews</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {filtered.length} review{filtered.length === 1 ? "" : "s"}
             {commentFilter === "with-comments" ? " with written responses" : ""}

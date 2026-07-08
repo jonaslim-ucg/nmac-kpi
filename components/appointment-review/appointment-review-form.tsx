@@ -309,6 +309,14 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
         void submit();
       }}
     >
+      <section className="rounded-xl border border-accent/30 bg-accent-muted/40 p-4">
+        <p className="text-sm font-semibold text-foreground">Quarterly gift voucher draw</p>
+        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+          Complete this testimonial survey to be automatically entered into our quarterly draw for a chance to win one
+          of two $100 gift vouchers.
+        </p>
+      </section>
+
       <section className="rounded-xl border border-border bg-surface-muted/40 p-4">
         <h2 className="text-sm font-semibold text-foreground">Contact information</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">

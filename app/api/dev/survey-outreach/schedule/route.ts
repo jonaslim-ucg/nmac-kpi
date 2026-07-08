@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { canAccessDev } from "@/lib/auth/types";
-import { isSurveyOutreachSendingEnabled } from "@/lib/survey-outreach/config";
 import {
+  getSurveyOutreachSendingState,
   getSurveyOutreachSchedule,
+  updateSurveyOutreachSendingEnabled,
   updateSurveyOutreachSchedule,
 } from "@/lib/survey-outreach/schedule-settings";
 import {
@@ -27,11 +28,17 @@ export async function GET() {
   if (!session) return unauthorized();
   if (!canAccessDev(session.role)) return forbidden();
 
-  const schedule = await getSurveyOutreachSchedule();
+  const [schedule, sending] = await Promise.all([
+    getSurveyOutreachSchedule(),
+    getSurveyOutreachSendingState(),
+  ]);
   return NextResponse.json({
     schedule,
     summary: formatScheduleSummary(schedule),
-    sendingEnabled: isSurveyOutreachSendingEnabled(),
+    sendingEnabled: sending.effectiveEnabled,
+    sendingAppEnabled: sending.appEnabled,
+    sendingMasterEnabled: sending.masterEnabled,
+    liveStartAt: sending.liveStartAt,
   });
 }
 
@@ -61,13 +68,23 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: validationError }, { status: 400 });
   }
   const next = normalizeSurveyOutreachSchedule(requested);
+  const requestedSendingEnabled =
+    typeof b.sendingEnabled === "boolean" ? b.sendingEnabled : null;
 
   try {
-    const schedule = await updateSurveyOutreachSchedule(next);
+    const [schedule, sending] = await Promise.all([
+      updateSurveyOutreachSchedule(next),
+      requestedSendingEnabled === null
+        ? getSurveyOutreachSendingState()
+        : updateSurveyOutreachSendingEnabled(requestedSendingEnabled),
+    ]);
     return NextResponse.json({
       schedule,
       summary: formatScheduleSummary(schedule),
-      sendingEnabled: isSurveyOutreachSendingEnabled(),
+      sendingEnabled: sending.effectiveEnabled,
+      sendingAppEnabled: sending.appEnabled,
+      sendingMasterEnabled: sending.masterEnabled,
+      liveStartAt: sending.liveStartAt,
     });
   } catch (e) {
     return NextResponse.json(

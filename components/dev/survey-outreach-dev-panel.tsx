@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, Loader2, Mail, RotateCcw, Save, Search, Send, X } from "lucide-react";
+import { CalendarClock, Loader2, Mail, Power, RotateCcw, Save, Search, Send, X } from "lucide-react";
 import type { SurveyOutreachStage } from "@/lib/survey-outreach/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "@/components/auth/session-provider";
@@ -122,8 +122,12 @@ export function SurveyOutreachDevPanel() {
   const [schedule, setSchedule] = useState<ScheduleConfig | null>(null);
   const [summary, setSummary] = useState("");
   const [sendingEnabled, setSendingEnabled] = useState(false);
+  const [sendingAppEnabled, setSendingAppEnabled] = useState(false);
+  const [sendingMasterEnabled, setSendingMasterEnabled] = useState(false);
+  const [liveStartAt, setLiveStartAt] = useState<string | null>(null);
   const [scheduleLoading, setScheduleLoading] = useState(true);
   const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [sendingToggleSaving, setSendingToggleSaving] = useState(false);
   const [scheduleFeedback, setScheduleFeedback] = useState<Feedback>(null);
 
   const [rows, setRows] = useState<SentRow[]>([]);
@@ -179,6 +183,9 @@ export function SurveyOutreachDevPanel() {
         schedule?: ScheduleConfig;
         summary?: string;
         sendingEnabled?: boolean;
+        sendingAppEnabled?: boolean;
+        sendingMasterEnabled?: boolean;
+        liveStartAt?: string | null;
         error?: string;
       };
       if (!r.ok) {
@@ -188,6 +195,9 @@ export function SurveyOutreachDevPanel() {
       if (j.schedule) setSchedule(j.schedule);
       setSummary(j.summary ?? "");
       setSendingEnabled(Boolean(j.sendingEnabled));
+      setSendingAppEnabled(Boolean(j.sendingAppEnabled));
+      setSendingMasterEnabled(Boolean(j.sendingMasterEnabled));
+      setLiveStartAt(j.liveStartAt ?? null);
     } finally {
       setScheduleLoading(false);
     }
@@ -344,6 +354,9 @@ export function SurveyOutreachDevPanel() {
         schedule?: ScheduleConfig;
         summary?: string;
         sendingEnabled?: boolean;
+        sendingAppEnabled?: boolean;
+        sendingMasterEnabled?: boolean;
+        liveStartAt?: string | null;
         error?: string;
       };
       if (!r.ok) {
@@ -353,10 +366,52 @@ export function SurveyOutreachDevPanel() {
       if (j.schedule) setSchedule(j.schedule);
       setSummary(j.summary ?? "");
       setSendingEnabled(Boolean(j.sendingEnabled));
+      setSendingAppEnabled(Boolean(j.sendingAppEnabled));
+      setSendingMasterEnabled(Boolean(j.sendingMasterEnabled));
+      setLiveStartAt(j.liveStartAt ?? null);
       setScheduleFeedback({ tone: "ok", text: "Reminder schedule saved." });
       void loadSent();
     } finally {
       setScheduleSaving(false);
+    }
+  }
+
+  async function toggleSurveySending() {
+    const next = !sendingAppEnabled;
+    setSendingToggleSaving(true);
+    setScheduleFeedback(null);
+    try {
+      const r = await fetch("/api/dev/survey-outreach/schedule", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sendingEnabled: next }),
+      });
+      const j = (await r.json()) as {
+        schedule?: ScheduleConfig;
+        summary?: string;
+        sendingEnabled?: boolean;
+        sendingAppEnabled?: boolean;
+        sendingMasterEnabled?: boolean;
+        liveStartAt?: string | null;
+        error?: string;
+      };
+      if (!r.ok) {
+        setScheduleFeedback({ tone: "err", text: j.error ?? "Could not update survey sending." });
+        return;
+      }
+      if (j.schedule) setSchedule(j.schedule);
+      setSummary(j.summary ?? "");
+      setSendingEnabled(Boolean(j.sendingEnabled));
+      setSendingAppEnabled(Boolean(j.sendingAppEnabled));
+      setSendingMasterEnabled(Boolean(j.sendingMasterEnabled));
+      setLiveStartAt(j.liveStartAt ?? null);
+      setScheduleFeedback({
+        tone: "ok",
+        text: next ? "Survey sending switch turned on." : "Survey sending switch turned off.",
+      });
+    } finally {
+      setSendingToggleSaving(false);
     }
   }
 
@@ -476,9 +531,67 @@ export function SurveyOutreachDevPanel() {
     ? new Date(selectedRow.nextScheduledMessage.dueAt).getTime()
     : null;
   const selectedNextIsDue = selectedNextDueMs !== null && Number.isFinite(selectedNextDueMs) && selectedNextDueMs <= Date.now();
+  const liveSendingReady = sendingEnabled && Boolean(liveStartAt);
+  const sendingStatusLabel = liveSendingReady
+    ? "Live sending active"
+    : sendingAppEnabled && sendingMasterEnabled
+      ? "Needs live-start date"
+      : sendingAppEnabled
+        ? "Ready in app, deployment off"
+        : "Live sending off";
+  const sendingStatusTone = liveSendingReady
+    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+    : "bg-amber-500/15 text-amber-800 dark:text-amber-200";
+  const sendingStatusDetail = !sendingMasterEnabled
+    ? "The deployment master switch is off, so live patient emails cannot send yet."
+    : sendingAppEnabled
+      ? liveStartAt
+        ? `Only visits at or after ${formatWhen(liveStartAt)} can receive live survey emails.`
+        : "Set the live-start timestamp before sending to patients."
+      : "Turn this on only when you are ready for eligible checked-out visits to receive survey emails.";
 
   return (
     <div className="flex flex-col gap-4">
+      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
+        <div className="border-b border-border bg-surface-muted/40 px-4 py-3 sm:px-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Power className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold text-foreground">Survey sending</h2>
+            </div>
+            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${sendingStatusTone}`}>
+              {sendingStatusLabel}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Controls live patient survey emails. Test emails still use the form below.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <div className="min-w-0">
+            <p className="text-sm text-foreground">{sendingStatusDetail}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              App switch: {sendingAppEnabled ? "on" : "off"} · Deployment master:{" "}
+              {sendingMasterEnabled ? "on" : "off"}
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={sendingToggleSaving}
+            onClick={() => void toggleSurveySending()}
+            className={
+              "inline-flex shrink-0 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50 " +
+              (sendingAppEnabled
+                ? "border border-border bg-background text-foreground hover:bg-surface-muted/60"
+                : "bg-accent text-accent-foreground hover:opacity-95")
+            }
+          >
+            {sendingToggleSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Power className="h-4 w-4" />}
+            {sendingAppEnabled ? "Turn off" : "Turn on"}
+          </button>
+        </div>
+      </section>
+
       <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
         <div className="border-b border-border bg-surface-muted/40 px-4 py-3 sm:px-5">
           <div className="flex items-center gap-2">

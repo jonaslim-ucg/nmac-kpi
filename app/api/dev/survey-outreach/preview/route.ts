@@ -4,7 +4,10 @@ import { canAccessDev } from "@/lib/auth/types";
 import { getNextSurveyOutreachActions, stageLabel } from "@/lib/survey-outreach/next-action";
 import { formatScheduleSummary } from "@/lib/survey-outreach/schedule";
 import { getSurveyOutreachSchedule } from "@/lib/survey-outreach/schedule-settings";
-import { isSurveyOutreachSendingEnabled } from "@/lib/survey-outreach/config";
+import {
+  surveyOutreachAppDisabledReason,
+  surveyOutreachLiveStartMissingReason,
+} from "@/lib/survey-outreach/config";
 
 export const dynamic = "force-dynamic";
 
@@ -33,9 +36,12 @@ export async function GET() {
 
     return NextResponse.json({
       sendingEnabled: preview.sendingEnabled,
-      productionSendingEnabled: isSurveyOutreachSendingEnabled(),
+      productionSendingEnabled: preview.sendingEnabled,
+      sendingAppEnabled: preview.sendingAppEnabled,
+      sendingMasterEnabled: preview.sendingMasterEnabled,
       testSendingAllowed: true,
       pendingCount: preview.pendingCount,
+      liveStartAt: preview.liveStartAt,
       scheduleSummary: formatScheduleSummary(schedule),
       nextAction: next
         ? {
@@ -49,8 +55,12 @@ export async function GET() {
         stageLabel: stageLabel(a.stage),
       })),
       note: preview.sendingEnabled
-        ? "Production sending is enabled. Automatic sends still require the deployment cron to be enabled."
-        : "Production sending is off. Test emails can still be sent below. Enable SURVEY_OUTREACH_SEND_EMAILS for live patient emails.",
+        ? preview.liveStartAt
+          ? `Production sending is enabled for visits at or after ${preview.liveStartAt}. Automatic sends still require the deployment cron to be enabled.`
+          : surveyOutreachLiveStartMissingReason()
+        : !preview.sendingMasterEnabled
+          ? "Production sending is off. Test emails can still be sent below. Enable SURVEY_OUTREACH_SEND_EMAILS for live patient emails."
+          : surveyOutreachAppDisabledReason(),
     });
   } catch (e) {
     return NextResponse.json(

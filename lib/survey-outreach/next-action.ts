@@ -3,10 +3,13 @@ import {
   scheduleDelays,
   type SurveyOutreachScheduleConfig,
 } from "@/lib/survey-outreach/schedule";
-import { getSurveyOutreachSchedule } from "@/lib/survey-outreach/schedule-settings";
+import {
+  getSurveyOutreachSchedule,
+  getSurveyOutreachSendingState,
+} from "@/lib/survey-outreach/schedule-settings";
 import { listIncompleteOutreach } from "@/lib/survey-outreach/store";
 import type { SurveyOutreachRow, SurveyOutreachStage } from "@/lib/survey-outreach/types";
-import { isSurveyOutreachSendingEnabled } from "@/lib/survey-outreach/config";
+import { isProductionSurveyOutreachAfterLiveStart } from "@/lib/survey-outreach/config";
 
 export type NextOutreachAction = {
   outreachId: string;
@@ -86,19 +89,36 @@ export function nextActionForRow(
 
 export async function getNextSurveyOutreachActions(): Promise<{
   sendingEnabled: boolean;
+  sendingMasterEnabled: boolean;
+  sendingAppEnabled: boolean;
+  liveStartAt: string | null;
   pendingCount: number;
   next: NextOutreachAction | null;
   upcoming: NextOutreachAction[];
 }> {
+  const sending = await getSurveyOutreachSendingState();
+  const sendingEnabled = sending.effectiveEnabled;
   const schedule = await getSurveyOutreachSchedule();
   const rows = await listIncompleteOutreach();
   const actions = rows
+    .filter(
+      (row) =>
+        !sendingEnabled ||
+        row.is_test ||
+        isProductionSurveyOutreachAfterLiveStart({
+          appointmentAt: row.appointment_at,
+          createdAt: row.created_at,
+        }),
+    )
     .map((row) => nextActionForRow(row, schedule))
     .filter((a): a is NextOutreachAction => a !== null)
     .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
 
   return {
-    sendingEnabled: isSurveyOutreachSendingEnabled(),
+    sendingEnabled,
+    sendingMasterEnabled: sending.masterEnabled,
+    sendingAppEnabled: sending.appEnabled,
+    liveStartAt: sending.liveStartAt,
     pendingCount: actions.length,
     next: actions[0] ?? null,
     upcoming: actions.slice(0, 10),

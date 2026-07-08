@@ -1,13 +1,18 @@
 import { buildSurveyEmail } from "@/lib/survey-outreach/emails";
 import {
-  isSurveyOutreachSendingEnabled,
+  isProductionSurveyOutreachAfterLiveStart,
+  surveyOutreachAppDisabledReason,
+  surveyOutreachBeforeLiveStartReason,
   surveyOutreachSendingDisabledReason,
 } from "@/lib/survey-outreach/config";
 import {
   initialSurveyDueAt,
   isInitialSurveyDue,
 } from "@/lib/survey-outreach/schedule";
-import { getSurveyOutreachSchedule } from "@/lib/survey-outreach/schedule-settings";
+import {
+  getSurveyOutreachSchedule,
+  getSurveyOutreachSendingState,
+} from "@/lib/survey-outreach/schedule-settings";
 import {
   createTestOutreach,
   getActiveTestOutreach,
@@ -104,7 +109,8 @@ export async function sendSurveyStage(input: {
     }
   }
 
-  if (!isSurveyOutreachSendingEnabled() && !row.is_test) {
+  const sending = row.is_test ? null : await getSurveyOutreachSendingState();
+  if (sending && !sending.effectiveEnabled) {
     return {
       ok: true,
       stage,
@@ -112,7 +118,27 @@ export async function sendSurveyStage(input: {
       surveyUrl: buildSurveyUrl(row.survey_token),
       outreachId: row.id,
       skipped: true,
-      reason: surveyOutreachSendingDisabledReason(),
+      reason: sending.masterEnabled
+        ? surveyOutreachAppDisabledReason()
+        : surveyOutreachSendingDisabledReason(),
+    };
+  }
+
+  if (
+    !row.is_test &&
+    !isProductionSurveyOutreachAfterLiveStart({
+      appointmentAt: row.appointment_at,
+      createdAt: row.created_at,
+    })
+  ) {
+    return {
+      ok: true,
+      stage,
+      to: row.patient_email,
+      surveyUrl: buildSurveyUrl(row.survey_token),
+      outreachId: row.id,
+      skipped: true,
+      reason: surveyOutreachBeforeLiveStartReason(),
     };
   }
 

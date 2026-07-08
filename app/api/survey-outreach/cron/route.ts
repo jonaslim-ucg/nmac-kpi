@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { surveyOutreachSendingDisabledReason } from "@/lib/survey-outreach/config";
+import {
+  surveyOutreachAppDisabledReason,
+  surveyOutreachLiveStartMissingReason,
+  surveyOutreachSendingDisabledReason,
+} from "@/lib/survey-outreach/config";
 import { isAuthorizedSurveyOutreachRequest } from "@/lib/survey-outreach/auth";
 import { runSurveyOutreachScheduler } from "@/lib/survey-outreach/run-scheduler";
 import { formatScheduleSummary } from "@/lib/survey-outreach/schedule";
@@ -23,7 +27,13 @@ async function handleCron(req: Request) {
     return NextResponse.json({
       ...result,
       schedule: formatScheduleSummary(schedule),
-      message: result.sendingEnabled ? undefined : surveyOutreachSendingDisabledReason(),
+      message: !result.sendingMasterEnabled
+        ? surveyOutreachSendingDisabledReason()
+        : !result.sendingAppEnabled
+          ? surveyOutreachAppDisabledReason()
+          : result.liveStartAt
+            ? undefined
+            : surveyOutreachLiveStartMissingReason(),
     });
   } catch (e) {
     console.error(e);

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { canAccessDev } from "@/lib/auth/types";
-import { isSurveyOutreachSendingEnabled } from "@/lib/survey-outreach/config";
+import { getSurveyOutreachSendingState } from "@/lib/survey-outreach/schedule-settings";
 import { runSurveyOutreachScheduler } from "@/lib/survey-outreach/run-scheduler";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,8 @@ export async function POST() {
     return forbidden("Local scheduled checks are disabled in production.");
   }
 
-  if (isSurveyOutreachSendingEnabled()) {
+  const sending = await getSurveyOutreachSendingState();
+  if (sending.effectiveEnabled) {
     return NextResponse.json(
       {
         ok: false,

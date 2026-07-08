@@ -4,6 +4,7 @@ create table if not exists public.app_settings (
   id text primary key,
   hide_legacy_nav boolean not null default false,
   use_nmac_test_data boolean not null default true,
+  survey_outreach_sending_enabled boolean not null default false,
   nmac_month_cache_revision bigint not null default 0,
   hidden_nmac_kpi_ids jsonb not null default '["call_answered","call_missed","checkin_checkout","appt_confirm","sop","engage","revenue","net_margin","revenue_trend"]'::jsonb,
   updated_at timestamptz not null default now(),
@@ -12,6 +13,9 @@ create table if not exists public.app_settings (
 
 alter table public.app_settings
   add column if not exists hidden_nmac_kpi_ids jsonb not null default '["call_answered","call_missed","checkin_checkout","appt_confirm","sop","engage","revenue","net_margin","revenue_trend"]'::jsonb;
+
+alter table public.app_settings
+  add column if not exists survey_outreach_sending_enabled boolean not null default false;
 
 insert into public.app_settings (id)
 values ('default')

@@ -1,7 +1,14 @@
 import { fetchCrmAppointments, crmSyncDates, type CrmAppointmentRow } from "@/lib/crm/appointments";
-import { isScheduledTestRecipientAllowed, isSurveyOutreachSendingEnabled } from "@/lib/survey-outreach/config";
+import {
+  isProductionSurveyOutreachAfterLiveStart,
+  isScheduledTestRecipientAllowed,
+  surveyOutreachLiveStartAt,
+} from "@/lib/survey-outreach/config";
 import { parseCrmAppointmentAt } from "@/lib/survey-outreach/parse-appointment";
-import { getSurveyOutreachSchedule } from "@/lib/survey-outreach/schedule-settings";
+import {
+  getSurveyOutreachSchedule,
+  getSurveyOutreachSendingState,
+} from "@/lib/survey-outreach/schedule-settings";
 import { sendSurveyStage } from "@/lib/survey-outreach/send-stage";
 import { nextActionForRow } from "@/lib/survey-outreach/next-action";
 import type { SurveyOutreachScheduleConfig } from "@/lib/survey-outreach/schedule";
@@ -17,8 +24,12 @@ import type { SendStageResult } from "@/lib/survey-outreach/send-stage";
 export type SchedulerResult = {
   ok: true;
   sendingEnabled: boolean;
+  sendingMasterEnabled: boolean;
+  sendingAppEnabled: boolean;
+  liveStartAt: string | null;
   synced: number;
   skippedNoEmail: number;
+  skippedBeforeLiveStart: number;
   sent: SendStageResult[];
   skipped: SendStageResult[];
   errors: { outreachId: string; stage: SurveyOutreachStage; error: string }[];
@@ -53,6 +64,7 @@ function crmRowToOutreach(row: CrmAppointmentRow): {
 export async function syncCheckedOutFromCrm(now = new Date()): Promise<{
   synced: number;
   skippedNoEmail: number;
+  skippedBeforeLiveStart: number;
 }> {
   const dates = crmSyncDates(now);
   const crmRows = (
@@ -61,16 +73,24 @@ export async function syncCheckedOutFromCrm(now = new Date()): Promise<{
 
   const outreachRows: NonNullable<ReturnType<typeof crmRowToOutreach>>[] = [];
   let skippedNoEmail = 0;
+  let skippedBeforeLiveStart = 0;
 
   for (const row of crmRows) {
     const mapped = crmRowToOutreach(row);
-    if (mapped) outreachRows.push(mapped);
-    else skippedNoEmail++;
+    if (!mapped) {
+      skippedNoEmail++;
+      continue;
+    }
+    if (!isProductionSurveyOutreachAfterLiveStart({ appointmentAt: mapped.appointmentAt })) {
+      skippedBeforeLiveStart++;
+      continue;
+    }
+    outreachRows.push(mapped);
   }
 
   const { synced } = await upsertCrmOutreachBatch(outreachRows);
 
-  return { synced, skippedNoEmail };
+  return { synced, skippedNoEmail, skippedBeforeLiveStart };
 }
 
 function dueStageForRow(
@@ -140,20 +160,32 @@ async function sendDueForRow(
 }
 
 export async function runSurveyOutreachScheduler(now = new Date()): Promise<SchedulerResult> {
-  const sendingEnabled = isSurveyOutreachSendingEnabled();
+  const sending = await getSurveyOutreachSendingState();
+  const sendingEnabled = sending.effectiveEnabled;
+  const liveStartAt = sending.liveStartAt ? new Date(sending.liveStartAt) : surveyOutreachLiveStartAt();
   const sent: SendStageResult[] = [];
   const skipped: SendStageResult[] = [];
   const errors: SchedulerResult["errors"] = [];
 
-  const sync = sendingEnabled
+  const sync = sendingEnabled && liveStartAt
     ? await syncCheckedOutFromCrm(now)
-    : { synced: 0, skippedNoEmail: 0 };
+    : { synced: 0, skippedNoEmail: 0, skippedBeforeLiveStart: 0 };
   const schedule = await getSurveyOutreachSchedule();
   const rows = await listIncompleteOutreach();
 
   for (const row of rows) {
     if (!sendingEnabled && !row.is_test) continue;
     if (!sendingEnabled && row.is_test && !isScheduledTestRecipientAllowed(row.patient_email)) continue;
+    if (
+      sendingEnabled &&
+      !row.is_test &&
+      !isProductionSurveyOutreachAfterLiveStart({
+        appointmentAt: row.appointment_at,
+        createdAt: row.created_at,
+      })
+    ) {
+      continue;
+    }
     const dueStage = dueStageForRow(row, now, schedule);
     if (!dueStage) continue;
     try {
@@ -172,8 +204,12 @@ export async function runSurveyOutreachScheduler(now = new Date()): Promise<Sche
   return {
     ok: true,
     sendingEnabled,
+    sendingMasterEnabled: sending.masterEnabled,
+    sendingAppEnabled: sending.appEnabled,
+    liveStartAt: sending.liveStartAt,
     synced: sync.synced,
     skippedNoEmail: sync.skippedNoEmail,
+    skippedBeforeLiveStart: sync.skippedBeforeLiveStart,
     sent,
     skipped,
     errors,

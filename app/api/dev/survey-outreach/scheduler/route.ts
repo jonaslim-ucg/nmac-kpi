@@ -20,16 +20,12 @@ export async function POST() {
   if (!session) return unauthorized();
   if (!canAccessDev(session.role)) return forbidden();
 
-  if (process.env.NODE_ENV === "production") {
-    return forbidden("Local scheduled checks are disabled in production.");
-  }
-
   const sending = await getSurveyOutreachSendingState();
   if (sending.effectiveEnabled) {
     return NextResponse.json(
       {
         ok: false,
-        error: "Local scheduled checks only run while production survey sending is off.",
+        error: "Test scheduled checks only run while live survey sending is off.",
       },
       { status: 409 },
     );
@@ -39,7 +35,7 @@ export async function POST() {
     const result = await runSurveyOutreachScheduler(new Date(), { allowAnyTestRecipient: true });
     return NextResponse.json({
       ...result,
-      localOnly: true,
+      testOnly: true,
       message:
         result.sent.length > 0
           ? `Sent ${result.sent.length} scheduled test email(s).`

@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, Loader2, Mail, Power, RotateCcw, Save, Search, Send, X } from "lucide-react";
+import { CalendarClock, Loader2, Mail, Power, Save, Search, Send, X } from "lucide-react";
 import type { SurveyOutreachStage } from "@/lib/survey-outreach/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "@/components/auth/session-provider";
@@ -55,11 +55,33 @@ type SchedulerCheckResult = {
   error?: string;
 };
 
-const STAGE_OPTIONS: { value: SurveyOutreachStage; label: string }[] = [
-  { value: "initial", label: "Initial survey" },
-  { value: "reminder1", label: "Reminder 1" },
-  { value: "reminder2", label: "Reminder 2" },
-  { value: "final", label: "Final reminder" },
+type PrepScenario = SurveyOutreachStage;
+
+type PreparedTestState = {
+  row: {
+    id: string;
+    patientEmail: string;
+    patientName: string;
+    initialSentAt: string | null;
+    reminder1SentAt: string | null;
+    reminder2SentAt: string | null;
+    finalSentAt: string | null;
+    completedAt: string | null;
+    manualNextScheduledAt: string | null;
+  } | null;
+  nextAction: {
+    stage: SurveyOutreachStage;
+    stageLabel: string;
+    dueAt: string;
+    isManual: boolean;
+  } | null;
+};
+
+const PREP_SCENARIOS: { value: PrepScenario; label: string; hint: string }[] = [
+  { value: "initial", label: "Prepare initial survey", hint: "No email sent yet; next action is the initial survey." },
+  { value: "reminder1", label: "Prepare Reminder 1", hint: "Initial survey already sent; Reminder 1 is next." },
+  { value: "reminder2", label: "Prepare Reminder 2", hint: "Initial and Reminder 1 already sent." },
+  { value: "final", label: "Prepare final reminder", hint: "Initial, Reminder 1, and Reminder 2 already sent." },
 ];
 
 const PAGE_SIZE = 50;
@@ -150,15 +172,13 @@ export function SurveyOutreachDevPanel() {
   const localSchedulerInFlight = useRef(false);
   const [suppressedEmails, setSuppressedEmails] = useState(0);
   const [recalledRows, setRecalledRows] = useState(0);
-  const [recalling, setRecalling] = useState(false);
-  const [recallFeedback, setRecallFeedback] = useState<Feedback>(null);
+  const [prepState, setPrepState] = useState<PreparedTestState | null>(null);
+  const [prepEmail, setPrepEmail] = useState("kim.ramirez@ucg.bm");
+  const [prepName, setPrepName] = useState("Kim Ramirez");
+  const [prepDueInMinutes, setPrepDueInMinutes] = useState(30);
+  const [prepBusy, setPrepBusy] = useState<PrepScenario | null>(null);
+  const [prepFeedback, setPrepFeedback] = useState<Feedback>(null);
 
-  const [testEmail, setTestEmail] = useState("");
-  const [testName, setTestName] = useState("Test Patient");
-  const [testStage, setTestStage] = useState<SurveyOutreachStage>("initial");
-  const [testReset, setTestReset] = useState(true);
-  const [testSending, setTestSending] = useState(false);
-  const [testFeedback, setTestFeedback] = useState<Feedback>(null);
   const selectedRow = selectedRowId ? rows.find((row) => row.id === selectedRowId) ?? null : null;
 
   const loadRecallStats = useCallback(async () => {
@@ -173,6 +193,22 @@ export function SurveyOutreachDevPanel() {
       // non-fatal
     }
   }, []);
+
+  const loadPrepState = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({ email: prepEmail.trim() || "kim.ramirez@ucg.bm" });
+      const r = await fetch(`/api/dev/survey-outreach/prepare?${params}`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      const j = (await r.json()) as PreparedTestState & { error?: string };
+      if (r.ok) {
+        setPrepState({ row: j.row ?? null, nextAction: j.nextAction ?? null });
+      }
+    } catch {
+      // non-fatal
+    }
+  }, [prepEmail]);
 
   const loadSchedule = useCallback(async () => {
     setScheduleLoading(true);
@@ -242,7 +278,8 @@ export function SurveyOutreachDevPanel() {
     if (sessionLoading || !canAccessDev(user?.role)) return;
     void loadSchedule();
     void loadRecallStats();
-  }, [sessionLoading, user?.role, loadSchedule, loadRecallStats]);
+    void loadPrepState();
+  }, [sessionLoading, user?.role, loadSchedule, loadRecallStats, loadPrepState]);
 
   useEffect(() => {
     if (sessionLoading || !canAccessDev(user?.role)) return;
@@ -255,87 +292,40 @@ export function SurveyOutreachDevPanel() {
     setManualScheduleFeedback(null);
   }, [selectedRow?.id, selectedRow?.manualNextScheduledAt, selectedRow?.nextScheduledMessage?.dueAt]);
 
-  async function sendTestEmail() {
-    if (!testEmail.trim()) {
-      setTestFeedback({ tone: "err", text: "Enter a test email address." });
+  async function prepareScenario(scenario: PrepScenario) {
+    if (!prepEmail.trim()) {
+      setPrepFeedback({ tone: "err", text: "Enter a test email address." });
       return;
     }
-    setTestSending(true);
-    setTestFeedback(null);
-    try {
-      const r = await fetch("/api/dev/survey-outreach/test", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: testEmail.trim(),
-          patientName: testName.trim() || "Test Patient",
-          stage: testStage,
-          reset: testReset,
-        }),
-      });
-      const j = (await r.json()) as {
-        ok?: boolean;
-        skipped?: boolean;
-        reason?: string;
-        surveyUrl?: string;
-        error?: string;
-      };
-      if (!r.ok || j.ok === false) {
-        setTestFeedback({ tone: "err", text: j.error ?? j.reason ?? "Test send failed." });
-        return;
-      }
-      if (j.skipped) {
-        setTestFeedback({ tone: "err", text: j.reason ?? "Send was skipped." });
-        return;
-      }
-      setTestFeedback({
-        tone: "ok",
-        text: `Sent ${testStage} to ${testEmail.trim()}.${j.surveyUrl ? ` Link: ${j.surveyUrl}` : ""}`,
-      });
-      void loadSent();
-    } finally {
-      setTestSending(false);
-    }
-  }
 
-  async function recallAllProduction() {
-    if (
-      !window.confirm(
-        "Suppress all production survey emails sent so far? This blocks reminders and future sends to those patients. Emails already in inboxes cannot be deleted.",
-      )
-    ) {
-      return;
-    }
-    setRecalling(true);
-    setRecallFeedback(null);
+    setPrepBusy(scenario);
+    setPrepFeedback(null);
     try {
-      const r = await fetch("/api/dev/survey-outreach/recall", {
+      const r = await fetch("/api/dev/survey-outreach/prepare", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          reason: "Recalled after accidental send before go-live.",
+          scenario,
+          email: prepEmail.trim(),
+          patientName: prepName.trim() || "Kim Ramirez",
+          dueInMinutes: prepDueInMinutes,
         }),
       });
-      const j = (await r.json()) as {
-        rowsRecalled?: number;
-        emailsSuppressed?: number;
-        error?: string;
-      };
+      const j = (await r.json()) as PreparedTestState & { error?: string };
       if (!r.ok) {
-        setRecallFeedback({ tone: "err", text: j.error ?? "Recall failed." });
+        setPrepFeedback({ tone: "err", text: j.error ?? "Could not prepare test scenario." });
         return;
       }
-      setSuppressedEmails(j.emailsSuppressed ?? 0);
-      setRecalledRows(j.rowsRecalled ?? 0);
-      setRecallFeedback({
+
+      setPrepState({ row: j.row ?? null, nextAction: j.nextAction ?? null });
+      setPrepFeedback({
         tone: "ok",
-        text: `Recalled ${j.rowsRecalled ?? 0} outreach row(s) and suppressed ${j.emailsSuppressed ?? 0} email address(es).`,
+        text: `${PREP_SCENARIOS.find((item) => item.value === scenario)?.label ?? "Scenario"} ready.`,
       });
       void loadSent();
     } finally {
-      setRecalling(false);
+      setPrepBusy(null);
     }
   }
 
@@ -464,6 +454,7 @@ export function SurveyOutreachDevPanel() {
     localSchedulerInFlight.current = true;
     setLocalSchedulerChecking(true);
     setLocalSchedulerFeedback(null);
+    setPrepFeedback(null);
     try {
       const r = await fetch("/api/dev/survey-outreach/scheduler", {
         method: "POST",
@@ -485,22 +476,31 @@ export function SurveyOutreachDevPanel() {
           text: `Checked schedule. ${errorCount} email(s) failed.`,
         });
       } else {
+        const prepDueAt = prepState?.nextAction ? new Date(prepState.nextAction.dueAt).getTime() : null;
+        const prepNotDueYet =
+          sentCount === 0 &&
+          prepDueAt !== null &&
+          Number.isFinite(prepDueAt) &&
+          prepDueAt > Date.now();
         setLocalSchedulerFeedback({
           tone: "ok",
           text:
             sentCount > 0
               ? `Sent ${sentCount} scheduled test email(s).`
+              : prepNotDueYet && prepState?.nextAction
+                ? `${prepState.nextAction.stageLabel} is not due yet. Scheduled for ${formatWhen(prepState.nextAction.dueAt)}.`
               : j.message ?? "Checked schedule. No test email is due.",
         });
       }
       void loadSent();
+      void loadPrepState();
     } catch {
       setLocalSchedulerFeedback({ tone: "err", text: "Scheduled check failed." });
     } finally {
       localSchedulerInFlight.current = false;
       setLocalSchedulerChecking(false);
     }
-  }, [loadSent]);
+  }, [loadPrepState, loadSent, prepState?.nextAction]);
 
   useEffect(() => {
     if (sessionLoading || !canAccessDev(user?.role) || !localSchedulerEnabled) return;
@@ -531,6 +531,8 @@ export function SurveyOutreachDevPanel() {
     ? new Date(selectedRow.nextScheduledMessage.dueAt).getTime()
     : null;
   const selectedNextIsDue = selectedNextDueMs !== null && Number.isFinite(selectedNextDueMs) && selectedNextDueMs <= Date.now();
+  const prepNextDueMs = prepState?.nextAction ? new Date(prepState.nextAction.dueAt).getTime() : null;
+  const prepNextIsDue = prepNextDueMs !== null && Number.isFinite(prepNextDueMs) && prepNextDueMs <= Date.now();
   const liveSendingReady = sendingEnabled && Boolean(liveStartAt);
   const sendingStatusLabel = liveSendingReady
     ? "Live sending active"
@@ -592,80 +594,141 @@ export function SurveyOutreachDevPanel() {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
-        <div className="border-b border-border bg-surface-muted/40 px-4 py-3 sm:px-5">
-          <div className="flex items-center gap-2">
-            <Send className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold text-foreground">Send test email</h2>
+      <section className="overflow-hidden rounded-xl border border-amber-400/50 bg-amber-50/80 shadow-sm ring-1 ring-amber-500/10 dark:border-amber-400/30 dark:bg-amber-400/10">
+        <div className="border-b border-amber-400/30 px-4 py-3 sm:px-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <CalendarClock className="h-4 w-4 text-amber-700 dark:text-amber-200" />
+              <h2 className="text-sm font-semibold text-amber-950 dark:text-amber-50">
+                Dev: survey email test prep
+              </h2>
+            </div>
+            <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-900 dark:text-amber-100">
+              Test only
+            </span>
           </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Works while production sending is off. Only sends to addresses you enter here.
+          <p className="mt-1 text-xs text-amber-900/75 dark:text-amber-100/75">
+            Prepare Kim&apos;s test row for cron testing, then run the same scheduled check used by the local cron path.
           </p>
         </div>
         <div className="space-y-4 px-4 py-4 sm:px-5">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
-              <span className="text-sm font-medium text-foreground">Email</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-amber-900/70 dark:text-amber-100/70">
+                Test recipient
+              </span>
               <input
                 type="email"
-                value={testEmail}
-                onChange={(e) => setTestEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                value={prepEmail}
+                onChange={(e) => setPrepEmail(e.target.value)}
+                onBlur={() => void loadPrepState()}
+                className="mt-1 w-full rounded-lg border border-amber-400/40 bg-background px-3 py-2 text-sm text-foreground"
               />
             </label>
             <label className="block">
-              <span className="text-sm font-medium text-foreground">Patient name</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-amber-900/70 dark:text-amber-100/70">
+                Patient name
+              </span>
               <input
                 type="text"
-                value={testName}
-                onChange={(e) => setTestName(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                value={prepName}
+                onChange={(e) => setPrepName(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-amber-400/40 bg-background px-3 py-2 text-sm text-foreground"
               />
             </label>
-            <label className="block">
-              <span className="text-sm font-medium text-foreground">Stage</span>
-              <select
-                value={testStage}
-                onChange={(e) => setTestStage(e.target.value as SurveyOutreachStage)}
-                className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-              >
-                {STAGE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex items-end gap-2 pb-2">
-              <input
-                type="checkbox"
-                checked={testReset}
-                onChange={(e) => setTestReset(e.target.checked)}
-                className="rounded border-border"
-              />
-              <span className="text-sm text-foreground">Reset prior test rows for this email</span>
+            <div className="rounded-lg border border-amber-400/35 bg-background/75 px-3 py-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-900/70 dark:text-amber-100/70">
+                Next action due
+              </p>
+              <p className="mt-1 text-sm font-medium text-foreground">
+                {prepState?.nextAction ? formatWhen(prepState.nextAction.dueAt) : "No test row prepared"}
+              </p>
+              {prepState?.nextAction && (
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {prepState.nextAction.stageLabel}
+                  {prepState.nextAction.isManual ? " · manual" : ""}
+                  {prepNextIsDue ? " · due now" : " · not due yet"}
+                </p>
+              )}
+            </div>
+            <label className="block rounded-lg border border-amber-400/35 bg-background/75 px-3 py-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-amber-900/70 dark:text-amber-100/70">
+                Prep due in
+              </span>
+              <span className="mt-1 flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  max={1440}
+                  value={prepDueInMinutes}
+                  onChange={(e) => setPrepDueInMinutes(Number(e.target.value))}
+                  className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                />
+                <span className="text-sm text-muted-foreground">minutes</span>
+              </span>
+              <span className="mt-1 block text-xs text-muted-foreground">Use 0 for due now, or 30 for a timed test.</span>
             </label>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              disabled={testSending}
-              onClick={() => void sendTestEmail()}
-              className="inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-accent-foreground disabled:opacity-50"
-            >
-              {testSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Send test email
-            </button>
-            {testFeedback && (
-              <p
-                className={
-                  "text-sm " + (testFeedback.tone === "ok" ? "text-emerald-600 dark:text-emerald-400" : "text-destructive")
-                }
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-900/70 dark:text-amber-100/70">
+              Start a scenario
+            </p>
+            <div className="mt-2 grid gap-2">
+              {PREP_SCENARIOS.map((scenario) => (
+                <button
+                  key={scenario.value}
+                  type="button"
+                  disabled={prepBusy !== null}
+                  onClick={() => void prepareScenario(scenario.value)}
+                  className="flex items-center gap-3 rounded-lg border border-amber-400/40 bg-background/80 px-3 py-2 text-left transition hover:bg-background disabled:opacity-50"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-400/20 text-amber-800 dark:text-amber-100">
+                    {prepBusy === scenario.value ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CalendarClock className="h-4 w-4" />
+                    )}
+                  </span>
+                  <span>
+                    <span className="block text-sm font-medium text-foreground">{scenario.label}</span>
+                    <span className="block text-xs text-muted-foreground">{scenario.hint}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-900/70 dark:text-amber-100/70">
+              Step current test row
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                disabled={localSchedulerChecking}
+                onClick={() => void runLocalSchedulerCheck()}
+                className="inline-flex items-center gap-2 rounded-lg border border-amber-500/40 bg-background px-3 py-2 text-sm font-medium text-foreground transition hover:bg-amber-500/10 disabled:opacity-50"
               >
-                {testFeedback.text}
-              </p>
-            )}
+                {localSchedulerChecking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Run cron now
+              </button>
+              {(localSchedulerFeedback || prepFeedback) && (
+                <p
+                  className={
+                    "text-sm " +
+                    ((localSchedulerFeedback ?? prepFeedback)?.tone === "ok"
+                      ? "text-emerald-700 dark:text-emerald-300"
+                      : "text-destructive")
+                  }
+                >
+                  {(localSchedulerFeedback ?? prepFeedback)?.text}
+                </p>
+              )}
+            </div>
+            <p className="mt-2 text-xs text-amber-900/75 dark:text-amber-100/75">
+              Live sending remains controlled by the switches above. This prep area only creates test rows.
+            </p>
           </div>
         </div>
       </section>
@@ -680,35 +743,6 @@ export function SurveyOutreachDevPanel() {
           </p>
         </section>
       )}
-
-      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
-        <div className="border-b border-border bg-surface-muted/40 px-4 py-3 sm:px-5">
-          <h2 className="text-sm font-semibold text-foreground">Recall production sends</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Suppress everyone who received an accidental survey email. Reminders will not go out.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 px-4 py-4 sm:px-5">
-          <button
-            type="button"
-            disabled={recalling}
-            onClick={() => void recallAllProduction()}
-            className="inline-flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive disabled:opacity-50"
-          >
-            {recalling ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
-            Recall all production messages
-          </button>
-          {recallFeedback && (
-            <p
-              className={
-                "text-sm " + (recallFeedback.tone === "ok" ? "text-emerald-600 dark:text-emerald-400" : "text-destructive")
-              }
-            >
-              {recallFeedback.text}
-            </p>
-          )}
-        </div>
-      </section>
 
       <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
         <div className="border-b border-border bg-surface-muted/40 px-4 py-3 sm:px-5">

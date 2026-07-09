@@ -115,12 +115,6 @@ export function DashboardClient() {
     return rateColumn;
   }, [rateColumn, allowTargetRate, allowVsLastYear]);
 
-  useEffect(() => {
-    if (effectiveRateColumn !== rateColumn) {
-      setRateColumn(effectiveRateColumn);
-    }
-  }, [effectiveRateColumn, rateColumn]);
-
   if (loading) {
     return (
       <div className="space-y-4" aria-busy="true">
@@ -193,7 +187,7 @@ export function DashboardClient() {
         onWeekPresetChange={setWeekPreset}
         search={search}
         onSearchChange={setSearch}
-        rateColumn={rateColumn}
+        rateColumn={effectiveRateColumn}
         onRateColumnChange={setRateColumn}
         allowTargetRate={allowTargetRate}
         allowVsLastYear={allowVsLastYear}

@@ -2,6 +2,7 @@ type SendMailInput = {
   to: string;
   subject: string;
   textBody: string;
+  htmlBody?: string;
 };
 
 export async function getGraphAccessToken(): Promise<string> {
@@ -52,8 +53,8 @@ export async function sendMailViaGraph(input: SendMailInput): Promise<void> {
       message: {
         subject: input.subject,
         body: {
-          contentType: "Text",
-          content: input.textBody,
+          contentType: input.htmlBody ? "HTML" : "Text",
+          content: input.htmlBody ?? input.textBody,
         },
         // Both are set: some clients use `sender` for the visible name; Outlook may still prefer the tenant GAL name.
         from: {

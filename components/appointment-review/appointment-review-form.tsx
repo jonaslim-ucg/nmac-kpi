@@ -309,9 +309,9 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
         void submit();
       }}
     >
-      <section className="rounded-xl border border-accent/30 bg-accent-muted/40 p-4">
-        <p className="text-sm font-semibold text-foreground">Quarterly gift voucher draw</p>
-        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+      <section className="rounded-xl border border-amber-400/40 bg-amber-50 px-4 py-3 text-amber-950 shadow-sm dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-50">
+        <p className="text-sm font-semibold">Quarterly gift voucher draw</p>
+        <p className="mt-1 text-sm leading-relaxed text-amber-900/85 dark:text-amber-100/85">
           Complete this testimonial survey to be automatically entered into our quarterly draw for a chance to win one
           of two $100 gift vouchers.
         </p>
@@ -340,7 +340,6 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
               value={form.patientName}
               onChange={(e) => patch({ patientName: e.target.value })}
               disabled={busy}
-              readOnly={Boolean(surveyToken)}
               autoComplete="name"
               placeholder="Your full name"
               className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 read-only:bg-surface-muted/40 focus:ring-2"

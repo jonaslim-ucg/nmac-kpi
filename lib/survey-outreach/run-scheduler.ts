@@ -35,6 +35,10 @@ export type SchedulerResult = {
   errors: { outreachId: string; stage: SurveyOutreachStage; error: string }[];
 };
 
+type SchedulerOptions = {
+  allowAnyTestRecipient?: boolean;
+};
+
 function isValidEmail(email: string | null | undefined): boolean {
   return Boolean(email?.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()));
 }
@@ -159,7 +163,10 @@ async function sendDueForRow(
   }
 }
 
-export async function runSurveyOutreachScheduler(now = new Date()): Promise<SchedulerResult> {
+export async function runSurveyOutreachScheduler(
+  now = new Date(),
+  options: SchedulerOptions = {},
+): Promise<SchedulerResult> {
   const sending = await getSurveyOutreachSendingState();
   const sendingEnabled = sending.effectiveEnabled;
   const liveStartAt = sending.liveStartAt ? new Date(sending.liveStartAt) : surveyOutreachLiveStartAt();
@@ -175,7 +182,14 @@ export async function runSurveyOutreachScheduler(now = new Date()): Promise<Sche
 
   for (const row of rows) {
     if (!sendingEnabled && !row.is_test) continue;
-    if (!sendingEnabled && row.is_test && !isScheduledTestRecipientAllowed(row.patient_email)) continue;
+    if (
+      !sendingEnabled &&
+      row.is_test &&
+      !options.allowAnyTestRecipient &&
+      !isScheduledTestRecipientAllowed(row.patient_email)
+    ) {
+      continue;
+    }
     if (
       sendingEnabled &&
       !row.is_test &&

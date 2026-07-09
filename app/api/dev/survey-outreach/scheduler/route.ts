@@ -36,14 +36,14 @@ export async function POST() {
   }
 
   try {
-    const result = await runSurveyOutreachScheduler();
+    const result = await runSurveyOutreachScheduler(new Date(), { allowAnyTestRecipient: true });
     return NextResponse.json({
       ...result,
       localOnly: true,
       message:
         result.sent.length > 0
           ? `Sent ${result.sent.length} scheduled test email(s).`
-          : "Checked schedule. No allowed test email is due.",
+          : "Checked schedule. No test email is due.",
     });
   } catch (e) {
     console.error(e);

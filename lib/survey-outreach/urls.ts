@@ -4,7 +4,7 @@ export function surveyBaseUrl(): string {
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
   if (fromEnv) return fromEnv.replace(/\/$/, "");
-  return "http://localhost:3000";
+  return "https://kpi.nmac.bm";
 }
 
 export function buildSurveyUrl(token: string): string {

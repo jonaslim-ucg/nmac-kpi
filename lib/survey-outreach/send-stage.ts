@@ -142,8 +142,8 @@ export async function sendSurveyStage(input: {
     };
   }
 
-  const { subject, textBody } = buildSurveyEmail(stage, row.patient_name, row.survey_token);
-  await sendMailViaGraph({ to: row.patient_email, subject, textBody });
+  const { subject, textBody, htmlBody } = buildSurveyEmail(stage, row.patient_name, row.survey_token);
+  await sendMailViaGraph({ to: row.patient_email, subject, textBody, htmlBody });
   await markStageSent(row.id, stage);
 
   return {

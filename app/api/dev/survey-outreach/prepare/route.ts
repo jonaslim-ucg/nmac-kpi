@@ -27,6 +27,13 @@ function safeName(value: unknown): string {
   return typeof value === "string" && value.trim() ? value.trim() : DEFAULT_TEST_NAME;
 }
 
+function safeDueInMinutes(value: unknown): number {
+  const dueInMinutesRaw = Number(value ?? 0);
+  return Number.isFinite(dueInMinutesRaw)
+    ? Math.min(60 * 24, Math.max(0, Math.round(dueInMinutesRaw)))
+    : 0;
+}
+
 function toPreparedState(row: SurveyOutreachRow | null, schedule: Awaited<ReturnType<typeof getSurveyOutreachSchedule>>) {
   const nextAction = row ? nextActionForRow(row, schedule) : null;
   return {
@@ -111,10 +118,7 @@ export async function POST(req: Request) {
 
   const email = safeEmail(b.email);
   const patientName = safeName(b.patientName);
-  const dueInMinutesRaw = Number(b.dueInMinutes ?? 0);
-  const dueInMinutes = Number.isFinite(dueInMinutesRaw)
-    ? Math.min(60 * 24, Math.max(0, Math.round(dueInMinutesRaw)))
-    : 0;
+  const dueInMinutes = safeDueInMinutes(b.dueInMinutes);
 
   const now = new Date();
   const dueAt = new Date(now.getTime() + dueInMinutes * 60 * 1000);
@@ -172,6 +176,66 @@ export async function POST(req: Request) {
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Could not prepare test survey row." },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PATCH(req: Request) {
+  const session = await getSessionFromCookies();
+  if (!session) return unauthorized();
+  if (!canAccessDev(session.role)) return forbidden();
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  const b = body as Record<string, unknown>;
+  const email = safeEmail(b.email);
+  const patientName = safeName(b.patientName);
+  const dueInMinutes = safeDueInMinutes(b.dueInMinutes);
+  const dueAt = new Date(Date.now() + dueInMinutes * 60 * 1000).toISOString();
+
+  try {
+    const current = await latestTestRow(email);
+    if (!current) {
+      return NextResponse.json(
+        { error: "Prepare a test scenario before running the cron." },
+        { status: 404 },
+      );
+    }
+
+    const supabase = createServiceRoleClient();
+    const { data, error } = await supabase
+      .from("survey_outreach")
+      .update({
+        patient_name: patientName,
+        manual_next_scheduled_at: dueAt,
+        send_lock_token: null,
+        send_lock_stage: null,
+        send_lock_until: null,
+      })
+      .eq("id", current.id)
+      .eq("is_test", true)
+      .is("completed_at", null)
+      .select("*")
+      .single();
+
+    if (error || !data) {
+      throw new Error(error?.message ?? "Could not update the current test row.");
+    }
+
+    const schedule = await getSurveyOutreachSchedule();
+    return NextResponse.json({
+      ...toPreparedState(data as SurveyOutreachRow, schedule),
+      updated: true,
+    });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Could not update the current test row." },
       { status: 500 },
     );
   }

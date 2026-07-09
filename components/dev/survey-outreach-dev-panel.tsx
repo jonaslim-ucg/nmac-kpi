@@ -460,6 +460,30 @@ export function SurveyOutreachDevPanel() {
     setLocalSchedulerFeedback(null);
     setPrepFeedback(null);
     try {
+      let currentPrepState = prepState;
+      if (prepState?.row) {
+        const update = await fetch("/api/dev/survey-outreach/prepare", {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: prepEmail.trim(),
+            patientName: prepName.trim() || DEFAULT_PREP_NAME,
+            dueInMinutes: prepDueInMinutes,
+          }),
+        });
+        const updated = (await update.json()) as PreparedTestState & { error?: string };
+        if (!update.ok) {
+          setLocalSchedulerFeedback({
+            tone: "err",
+            text: updated.error ?? "Could not update the current test row.",
+          });
+          return;
+        }
+        currentPrepState = { row: updated.row ?? null, nextAction: updated.nextAction ?? null };
+        setPrepState(currentPrepState);
+      }
+
       const r = await fetch("/api/dev/survey-outreach/scheduler", {
         method: "POST",
         credentials: "include",
@@ -480,7 +504,7 @@ export function SurveyOutreachDevPanel() {
           text: `Checked schedule. ${errorCount} email(s) failed.`,
         });
       } else {
-        const prepDueAt = prepState?.nextAction ? new Date(prepState.nextAction.dueAt).getTime() : null;
+        const prepDueAt = currentPrepState?.nextAction ? new Date(currentPrepState.nextAction.dueAt).getTime() : null;
         const prepNotDueYet =
           sentCount === 0 &&
           prepDueAt !== null &&
@@ -491,20 +515,20 @@ export function SurveyOutreachDevPanel() {
           text:
             sentCount > 0
               ? `Sent ${sentCount} scheduled test email(s).`
-              : prepNotDueYet && prepState?.nextAction
-                ? `${prepState.nextAction.stageLabel} is not due yet. Scheduled for ${formatWhen(prepState.nextAction.dueAt)}.`
+              : prepNotDueYet && currentPrepState?.nextAction
+                ? `${currentPrepState.nextAction.stageLabel} is not due yet. Scheduled for ${formatWhen(currentPrepState.nextAction.dueAt)}.`
               : j.message ?? "Checked schedule. No test email is due.",
         });
       }
       void loadSent();
-      void loadPrepState();
+      void loadPrepState(prepEmailRef.current);
     } catch {
       setLocalSchedulerFeedback({ tone: "err", text: "Scheduled check failed." });
     } finally {
       localSchedulerInFlight.current = false;
       setLocalSchedulerChecking(false);
     }
-  }, [loadPrepState, loadSent, prepState?.nextAction]);
+  }, [loadPrepState, loadSent, prepDueInMinutes, prepEmail, prepName, prepState]);
 
   useEffect(() => {
     if (sessionLoading || !canAccessDev(user?.role) || !localSchedulerEnabled) return;

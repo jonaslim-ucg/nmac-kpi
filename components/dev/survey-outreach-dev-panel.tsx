@@ -85,6 +85,8 @@ const PREP_SCENARIOS: { value: PrepScenario; label: string; hint: string }[] = [
 ];
 
 const PAGE_SIZE = 50;
+const DEFAULT_PREP_EMAIL = "kim.ramirez@ucg.bm";
+const DEFAULT_PREP_NAME = "Kim Ramirez";
 
 function formatWhen(iso: string | null): string {
   if (!iso) return "—";
@@ -173,8 +175,9 @@ export function SurveyOutreachDevPanel() {
   const [suppressedEmails, setSuppressedEmails] = useState(0);
   const [recalledRows, setRecalledRows] = useState(0);
   const [prepState, setPrepState] = useState<PreparedTestState | null>(null);
-  const [prepEmail, setPrepEmail] = useState("kim.ramirez@ucg.bm");
-  const [prepName, setPrepName] = useState("Kim Ramirez");
+  const [prepEmail, setPrepEmail] = useState(DEFAULT_PREP_EMAIL);
+  const prepEmailRef = useRef(DEFAULT_PREP_EMAIL);
+  const [prepName, setPrepName] = useState(DEFAULT_PREP_NAME);
   const [prepDueInMinutes, setPrepDueInMinutes] = useState(30);
   const [prepBusy, setPrepBusy] = useState<PrepScenario | null>(null);
   const [prepFeedback, setPrepFeedback] = useState<Feedback>(null);
@@ -194,9 +197,10 @@ export function SurveyOutreachDevPanel() {
     }
   }, []);
 
-  const loadPrepState = useCallback(async () => {
+  const loadPrepState = useCallback(async (email?: string) => {
     try {
-      const params = new URLSearchParams({ email: prepEmail.trim() || "kim.ramirez@ucg.bm" });
+      const targetEmail = (email ?? prepEmailRef.current).trim() || DEFAULT_PREP_EMAIL;
+      const params = new URLSearchParams({ email: targetEmail });
       const r = await fetch(`/api/dev/survey-outreach/prepare?${params}`, {
         credentials: "include",
         cache: "no-store",
@@ -208,7 +212,7 @@ export function SurveyOutreachDevPanel() {
     } catch {
       // non-fatal
     }
-  }, [prepEmail]);
+  }, []);
 
   const loadSchedule = useCallback(async () => {
     setScheduleLoading(true);
@@ -308,7 +312,7 @@ export function SurveyOutreachDevPanel() {
         body: JSON.stringify({
           scenario,
           email: prepEmail.trim(),
-          patientName: prepName.trim() || "Kim Ramirez",
+          patientName: prepName.trim() || DEFAULT_PREP_NAME,
           dueInMinutes: prepDueInMinutes,
         }),
       });
@@ -620,8 +624,11 @@ export function SurveyOutreachDevPanel() {
               <input
                 type="email"
                 value={prepEmail}
-                onChange={(e) => setPrepEmail(e.target.value)}
-                onBlur={() => void loadPrepState()}
+                onChange={(e) => {
+                  setPrepEmail(e.target.value);
+                  prepEmailRef.current = e.target.value;
+                }}
+                onBlur={(e) => void loadPrepState(e.currentTarget.value)}
                 className="mt-1 w-full rounded-lg border border-amber-400/40 bg-background px-3 py-2 text-sm text-foreground"
               />
             </label>

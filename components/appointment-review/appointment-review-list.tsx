@@ -99,7 +99,7 @@ export function AppointmentReviewList({ reviews, onViewReview, periodLabel = "Al
                     <p className="line-clamp-2 text-foreground">{review.serviceTypeLabel || "—"}</p>
                   </td>
                   <td className="px-3 py-3 font-mono text-foreground">
-                    {review.recommendationRating !== null ? formatRating(review.recommendationRating) : "—"}
+                    {formatRating(review.recommendationRating)}
                   </td>
                   <td className="max-w-[220px] px-3 py-3">
                     {review.commentPreview ? (

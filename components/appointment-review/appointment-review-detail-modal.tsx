@@ -7,7 +7,7 @@ import {
   formatRating,
   formatRatingOrDash,
   formatReviewWhen,
-  formatYesNo,
+  formatYesNoOrDash,
 } from "@/lib/appointment-review/display";
 
 type Props = {
@@ -95,10 +95,16 @@ export function AppointmentReviewDetailModal({
               label="1. Ease of scheduling an appointment"
               value={formatRating(review.appointmentEase)}
             />
-            <Answer label="2. Overall visit with our practice" value={formatRating(review.visitRating)} />
-            <Answer label="3. Provider seen" value={review.serviceTypeLabel} />
-            <Answer label="4. Provider rating" value={formatRatingOrDash(review.providerRating)} />
-            <Answer label="5. Overall health improvement" value={formatRatingOrDash(review.healthRating)} />
+            <Answer
+              label="2. Overall visit with our practice"
+              value={formatRating(review.visitRating)}
+            />
+            <Answer label="3. Which provider did they see?" value={review.serviceTypeLabel} />
+            <Answer label="4. How would you rate your provider?" value={formatRatingOrDash(review.providerRating)} />
+            <Answer
+              label="5. Overall health improvement since receiving care at NMAC"
+              value={formatRatingOrDash(review.healthRating)}
+            />
             <Answer
               label="6. Likelihood to recommend NMAC"
               value={formatRatingOrDash(review.recommendationRating)}
@@ -110,10 +116,13 @@ export function AppointmentReviewDetailModal({
             <Answer label="8. Wait time before exam room" value={review.waitTimeLabel} />
             <Answer
               label="9. Provider spent enough time and answered questions"
-              value={formatYesNo(review.providerTimeAdequate)}
+              value={formatYesNoOrDash(review.providerTimeAdequate)}
             />
-            <Answer label="10. Front desk staff" value={formatRating(review.frontDeskRating)} />
-            <Answer label="11. How long a patient" value={review.patientDurationLabel} />
+            <Answer
+              label="10. Front desk staff were friendly and courteous"
+              value={formatRating(review.frontDeskRating)}
+            />
+            <Answer label="11. How long they have been a patient of this provider" value={review.patientDurationLabel} />
             {review.referralSourcesLabel ? (
               <Answer label="12. How did you hear about NMAC" value={review.referralSourcesLabel} />
             ) : null}

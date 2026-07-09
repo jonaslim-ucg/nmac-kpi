@@ -73,12 +73,13 @@ export type AppointmentReviewStats = {
 };
 
 function avg(values: number[]): number {
-  if (values.length === 0) return 0;
-  return values.reduce((s, v) => s + v, 0) / values.length;
+  const finite = values.filter((v) => Number.isFinite(v));
+  if (finite.length === 0) return 0;
+  return finite.reduce((s, v) => s + v, 0) / finite.length;
 }
 
-function avgNullable(rows: AppointmentReviewRow[], pick: (row: AppointmentReviewRow) => number | null): number {
-  const values = rows.map(pick).filter((v): v is number => v !== null);
+function avgNullable(rows: AppointmentReviewRow[], pick: (row: AppointmentReviewRow) => number | null | undefined): number {
+  const values = rows.map(pick).filter((v): v is number => typeof v === "number" && Number.isFinite(v));
   return Math.round(avg(values) * 10) / 10;
 }
 
@@ -96,9 +97,13 @@ function labelCounts(
     .filter((item) => item.count > 0);
 }
 
-function yesNoCounts(rows: AppointmentReviewRow[], pick: (row: AppointmentReviewRow) => boolean): LabelCount[] {
-  const total = rows.length;
-  const yes = rows.filter((r) => pick(r)).length;
+function yesNoCounts(
+  rows: AppointmentReviewRow[],
+  pick: (row: AppointmentReviewRow) => boolean | null | undefined,
+): LabelCount[] {
+  const values = rows.map(pick).filter((v): v is boolean => typeof v === "boolean");
+  const total = values.length;
+  const yes = values.filter(Boolean).length;
   const no = total - yes;
   return [
     { label: "Yes", count: yes, pct: total ? Math.round((yes / total) * 100) : 0 },
@@ -111,8 +116,8 @@ function groupByDay(rows: AppointmentReviewRow[]): AppointmentReviewStats["ratin
   for (const row of rows) {
     const date = row.created_at.slice(0, 10);
     const bucket = map.get(date) ?? { visit: [], ease: [] };
-    bucket.visit.push(row.visit_rating);
-    bucket.ease.push(row.appointment_ease);
+    if (Number.isFinite(row.visit_rating)) bucket.visit.push(row.visit_rating);
+    if (Number.isFinite(row.appointment_ease)) bucket.ease.push(row.appointment_ease);
     map.set(date, bucket);
   }
   return [...map.entries()]
@@ -127,7 +132,7 @@ function groupByDay(rows: AppointmentReviewRow[]): AppointmentReviewStats["ratin
 
 export function buildAppointmentReviewStats(rows: AppointmentReviewRow[]): AppointmentReviewStats {
   const total = rows.length;
-  const topVisit = rows.filter((r) => r.visit_rating >= APPOINTMENT_REVIEW_MAX_SCORE).length;
+  const topVisit = rows.filter((r) => Number(r.visit_rating) >= APPOINTMENT_REVIEW_MAX_SCORE).length;
 
   const averages = {
     appointmentEase: Math.round(avg(rows.map((r) => r.appointment_ease)) * 10) / 10,

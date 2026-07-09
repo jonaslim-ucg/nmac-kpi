@@ -17,8 +17,8 @@ export type AppointmentReviewDetail = {
   createdAt: string;
   email: string;
   patientName: string;
-  appointmentEase: number;
-  visitRating: number;
+  appointmentEase: number | null;
+  visitRating: number | null;
   serviceTypeLabel: string;
   providerRating: number | null;
   healthRating: number | null;
@@ -28,12 +28,12 @@ export type AppointmentReviewDetail = {
   recommendationRating: number | null;
   wouldEncouragePatient: boolean | null;
   recommendationMessage: string;
-  testimonialPermission: TestimonialPermissionValue;
+  testimonialPermission: TestimonialPermissionValue | null;
   testimonialPermissionLabel: string;
   waitTimeLabel: string;
-  providerTimeAdequate: boolean;
+  providerTimeAdequate: boolean | null;
   providerTimeComment: string;
-  frontDeskRating: number;
+  frontDeskRating: number | null;
   isNewPatient: boolean;
   patientDurationLabel: string;
   referralSources: ReferralSourceValue[];
@@ -46,21 +46,35 @@ export type AppointmentReviewDetail = {
 
 function optionLabel(
   options: readonly { value: string; label: string }[],
-  value: string,
+  value: string | null | undefined,
 ): string {
+  if (!value) return "—";
   return options.find((o) => o.value === value)?.label ?? value;
+}
+
+function text(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function rating(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function bool(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
 }
 
 function resolveServiceTypeLabel(row: AppointmentReviewRow): string {
   if (row.service_type) {
     return serviceTypeLabel(row.service_type, row.service_type_other);
   }
-  return row.provider_and_services.trim();
+  return text(row.provider_and_services) || "—";
 }
 
 function reviewComments(row: AppointmentReviewRow): string[] {
   return [row.exceptional_staff_comment]
-    .map((c) => c.trim())
+    .map(text)
     .filter(Boolean);
 }
 
@@ -69,31 +83,31 @@ export function toAppointmentReviewDetail(row: AppointmentReviewRow): Appointmen
   return {
     id: row.id,
     createdAt: row.created_at,
-    email: row.email.trim(),
-    patientName: row.patient_name.trim(),
-    appointmentEase: row.appointment_ease,
-    visitRating: row.visit_rating,
+    email: text(row.email) || "—",
+    patientName: text(row.patient_name) || "—",
+    appointmentEase: rating(row.appointment_ease),
+    visitRating: rating(row.visit_rating),
     serviceTypeLabel: resolveServiceTypeLabel(row),
-    providerRating: row.provider_rating,
-    healthRating: row.health_rating,
-    confidenceRating: row.confidence_rating,
-    qualityOfLifeRating: row.quality_of_life_rating,
-    healthImprovementComment: row.health_improvement.trim(),
-    recommendationRating: row.recommendation_rating,
-    wouldEncouragePatient: row.would_encourage_patient,
-    recommendationMessage: row.recommendation_message.trim(),
-    testimonialPermission: row.testimonial_permission,
+    providerRating: rating(row.provider_rating),
+    healthRating: rating(row.health_rating),
+    confidenceRating: rating(row.confidence_rating),
+    qualityOfLifeRating: rating(row.quality_of_life_rating),
+    healthImprovementComment: text(row.health_improvement),
+    recommendationRating: rating(row.recommendation_rating),
+    wouldEncouragePatient: bool(row.would_encourage_patient),
+    recommendationMessage: text(row.recommendation_message),
+    testimonialPermission: row.testimonial_permission ?? null,
     testimonialPermissionLabel: formatTestimonialPermission(row.testimonial_permission),
     waitTimeLabel: optionLabel(WAIT_TIME_OPTIONS, row.wait_time),
-    providerTimeAdequate: row.provider_time_adequate,
-    providerTimeComment: row.provider_time_comment.trim(),
-    frontDeskRating: row.front_desk_rating,
+    providerTimeAdequate: bool(row.provider_time_adequate),
+    providerTimeComment: text(row.provider_time_comment),
+    frontDeskRating: rating(row.front_desk_rating),
     isNewPatient: row.is_new_patient,
     patientDurationLabel: optionLabel(PATIENT_DURATION_OPTIONS, row.patient_duration),
-    referralSources: row.referral_sources,
+    referralSources: Array.isArray(row.referral_sources) ? row.referral_sources : [],
     referralSourcesLabel: formatReferralSources(row.referral_sources, row.referral_other),
-    referralOther: row.referral_other.trim(),
-    exceptionalStaffComment: row.exceptional_staff_comment.trim(),
+    referralOther: text(row.referral_other),
+    exceptionalStaffComment: text(row.exceptional_staff_comment),
     hasComments: comments.length > 0,
     commentPreview: comments[0] ?? null,
   };
@@ -114,36 +128,40 @@ export function formatReviewWhen(iso: string): string {
   }
 }
 
-export function formatRating(value: number): string {
+export function formatRating(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return "—";
   return `${value}/${APPOINTMENT_REVIEW_MAX_SCORE}`;
 }
 
-export function formatRatingOrDash(value: number | null): string {
-  return value === null ? "—" : formatRating(value);
+export function formatRatingOrDash(value: number | null | undefined): string {
+  return formatRating(value);
 }
 
 export function formatYesNo(value: boolean): string {
   return value ? "Yes" : "No";
 }
 
-export function formatYesNoOrDash(value: boolean | null): string {
-  return value === null ? "—" : formatYesNo(value);
+export function formatYesNoOrDash(value: boolean | null | undefined): string {
+  return value == null ? "—" : formatYesNo(value);
 }
 
-export function formatTestimonialPermission(value: TestimonialPermissionValue): string {
+export function formatTestimonialPermission(value: TestimonialPermissionValue | null | undefined): string {
+  if (!value) return "—";
   return TESTIMONIAL_PERMISSION_OPTIONS.find((o) => o.value === value)?.label ?? value;
 }
 
 export function formatReferralSources(
-  sources: ReferralSourceValue[],
-  other: string,
+  sources: ReferralSourceValue[] | null | undefined,
+  other: string | null | undefined,
 ): string | null {
-  if (sources.length === 0) return null;
-  const labels: string[] = sources
+  const safeSources = Array.isArray(sources) ? sources : [];
+  if (safeSources.length === 0) return null;
+  const labels: string[] = safeSources
     .filter((value) => value !== "other")
     .map((value) => REFERRAL_SOURCE_OPTIONS.find((o) => o.value === value)?.label ?? value);
-  if (sources.includes("other")) {
-    labels.push(other.trim() ? `Other: ${other.trim()}` : "Other");
+  if (safeSources.includes("other")) {
+    const safeOther = text(other);
+    labels.push(safeOther ? `Other: ${safeOther}` : "Other");
   }
   return labels.join(", ");
 }

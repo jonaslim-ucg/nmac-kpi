@@ -1,6 +1,36 @@
 -- Bring appointment_reviews up to date with the current /appointment-review survey.
 -- Safe to re-run: uses IF NOT EXISTS / conditional alters.
 
+create table if not exists public.appointment_reviews (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  email text,
+  patient_name text,
+  appointment_ease smallint not null check (appointment_ease between 1 and 5),
+  visit_rating smallint not null check (visit_rating between 1 and 5),
+  provider_and_services text,
+  service_type text,
+  service_type_other text not null default '',
+  provider_rating smallint check (provider_rating between 1 and 5),
+  health_improvement text not null default '',
+  health_rating smallint check (health_rating between 1 and 5),
+  confidence_rating smallint check (confidence_rating between 1 and 5),
+  quality_of_life_rating smallint check (quality_of_life_rating between 1 and 5),
+  recommendation_message text not null default '',
+  recommendation_rating smallint check (recommendation_rating between 1 and 5),
+  would_encourage_patient boolean,
+  testimonial_permission text,
+  wait_time text,
+  provider_time_adequate boolean,
+  provider_time_comment text not null default '',
+  front_desk_rating smallint,
+  is_new_patient boolean,
+  patient_duration text,
+  referral_sources text[] not null default '{}',
+  referral_other text not null default '',
+  exceptional_staff_comment text not null default ''
+);
+
 alter table public.appointment_reviews
   add column if not exists email text,
   add column if not exists patient_name text,

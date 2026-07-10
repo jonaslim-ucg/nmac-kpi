@@ -1,7 +1,7 @@
 "use client";
 
-import { Eye, Loader2, MoreVertical, UserPlus, Users } from "lucide-react";
-import { useCallback, useEffect, useState, type FormEvent, type MouseEvent } from "react";
+import { Eye, Loader2, MoreVertical, Search, UserPlus, Users } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type MouseEvent } from "react";
 import { MainShell } from "@/components/dashboard/main-shell";
 import { RoleNmacNavEditor } from "@/components/admin/role-nmac-nav-editor";
 import { useSession } from "@/components/auth/session-provider";
@@ -60,6 +60,7 @@ export default function AdminUsersPage() {
   const [editRole, setEditRole] = useState("viewer");
   const [openMenu, setOpenMenu] = useState<null | { rowId: string; top: number; left: number }>(null);
   const [tab, setTab] = useState<UsersTab>("directory");
+  const [directorySearch, setDirectorySearch] = useState("");
 
   const show = useCallback((text: string, variant: SnackbarVariant) => {
     setSnackbar({ text, variant });
@@ -299,6 +300,23 @@ export default function AdminUsersPage() {
     }
   }
 
+  const filteredRows = useMemo(() => {
+    const q = directorySearch.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((row) => {
+      const haystack = [
+        row.email,
+        row.first_name ?? "",
+        row.last_name ?? "",
+        row.role,
+        formatRoleLabel(row.role, customRoles),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [rows, directorySearch, customRoles]);
+
   if (loading) {
     return (
       <MainShell title="Users" subtitle="Loading">
@@ -346,11 +364,16 @@ export default function AdminUsersPage() {
         onDismiss={() => setSnackbar(null)}
       />
 
-      <div className="mx-auto flex max-w-5xl flex-col gap-6">
+      <div
+        className={
+          "mx-auto flex max-w-5xl flex-col gap-6 " +
+          (tab === "directory" ? "h-[calc(100dvh-7.5rem)] min-h-0" : "")
+        }
+      >
         <div
           role="tablist"
           aria-label="Users sections"
-          className="flex flex-wrap gap-2 rounded-xl border border-border bg-muted/40 p-1.5 shadow-inner"
+          className="flex shrink-0 flex-wrap gap-2 rounded-xl border border-border bg-muted/40 p-1.5 shadow-inner"
         >
           <button
             type="button"
@@ -486,8 +509,8 @@ export default function AdminUsersPage() {
         ) : null}
 
         {tab === "directory" ? (
-        <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
-          <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border bg-surface-muted/40 px-5 py-4">
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
+          <div className="flex shrink-0 flex-wrap items-end justify-between gap-3 border-b border-border bg-surface-muted/40 px-5 py-4">
             <div className="flex items-start gap-3">
               <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-accent">
                 <Users className="h-4 w-4" strokeWidth={2} aria-hidden />
@@ -495,16 +518,32 @@ export default function AdminUsersPage() {
               <div>
                 <h2 className="text-base font-semibold tracking-tight text-foreground">Directory</h2>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {loadingList ? "" : `${rows.length} ${rows.length === 1 ? "person" : "people"}`}
+                  {loadingList
+                    ? ""
+                    : directorySearch.trim()
+                      ? `${filteredRows.length} of ${rows.length} ${rows.length === 1 ? "person" : "people"}`
+                      : `${rows.length} ${rows.length === 1 ? "person" : "people"}`}
                 </p>
               </div>
+            </div>
+            <div className="relative w-full min-w-[12rem] sm:max-w-xs lg:max-w-sm">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="search"
+                value={directorySearch}
+                onChange={(e) => setDirectorySearch(e.target.value)}
+                placeholder="Search name, email, or role…"
+                disabled={loadingList || !!loadError}
+                className="h-10 w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm text-foreground transition placeholder:text-muted-foreground/60 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent disabled:opacity-50"
+                aria-label="Search directory"
+              />
             </div>
           </div>
 
           {loadError ? (
-            <p className="px-5 py-6 text-sm text-red-600 dark:text-red-400">{loadError}</p>
+            <p className="shrink-0 px-5 py-6 text-sm text-red-600 dark:text-red-400">{loadError}</p>
           ) : loadingList ? (
-            <div className="space-y-0 px-5 py-4" aria-busy="true" aria-label="Loading users">
+            <div className="min-h-0 flex-1 space-y-0 overflow-y-auto px-5 py-4" aria-busy="true" aria-label="Loading users">
               {Array.from({ length: 5 }).map((_, i) => (
                 <div
                   key={i}
@@ -518,17 +557,28 @@ export default function AdminUsersPage() {
               ))}
             </div>
           ) : rows.length === 0 ? (
-            <div className="px-5 py-12 text-center">
+            <div className="flex min-h-0 flex-1 items-center justify-center px-5 py-12 text-center">
+              <div>
               <p className="text-sm font-medium text-foreground">No users yet</p>
               <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
                 Use the Add or invite tab to add someone. They will sign in with an email code the first time.
               </p>
+              </div>
+            </div>
+          ) : filteredRows.length === 0 ? (
+            <div className="flex min-h-0 flex-1 items-center justify-center px-5 py-12 text-center">
+              <div>
+                <p className="text-sm font-medium text-foreground">No matches</p>
+                <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
+                  Try a different name, email, or role.
+                </p>
+              </div>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="min-h-0 flex-1 overflow-auto">
               <table className="w-full min-w-[640px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-surface-muted/30">
+                <thead className="sticky top-0 z-10 bg-surface-muted/95 backdrop-blur-sm">
+                  <tr className="border-b border-border">
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Email
                     </th>
@@ -547,7 +597,7 @@ export default function AdminUsersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
+                  {filteredRows.map((row) => (
                     <tr
                       key={`${row.id}-${row.updated_at}`}
                       className="border-b border-border/70 transition-colors hover:bg-surface-muted/25"

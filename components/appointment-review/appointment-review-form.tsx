@@ -17,6 +17,24 @@ import {
 } from "@/lib/appointment-review/types";
 import { isValidEmailFormat } from "@/lib/auth/email-policy";
 
+const APPOINTMENT_REVIEW_SESSION_SUBMITTED_KEY = "nmac-appointment-review-submitted";
+
+function hasSubmittedThisSession(): boolean {
+  try {
+    return window.sessionStorage.getItem(APPOINTMENT_REVIEW_SESSION_SUBMITTED_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function markSubmittedThisSession(): void {
+  try {
+    window.sessionStorage.setItem(APPOINTMENT_REVIEW_SESSION_SUBMITTED_KEY, "true");
+  } catch {
+    // Session storage can be unavailable in private/restricted modes.
+  }
+}
+
 function ScaleInput({
   name,
   value,
@@ -169,6 +187,12 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
   const [alreadyCompleted, setAlreadyCompleted] = useState(false);
 
   useEffect(() => {
+    if (!hasSubmittedThisSession()) return;
+    setSubmitted(true);
+    setLinkLoading(false);
+  }, []);
+
+  useEffect(() => {
     if (!surveyToken) return;
     let cancelled = false;
     (async () => {
@@ -215,6 +239,11 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
 
   const submit = useCallback(async () => {
     setError(null);
+    if (hasSubmittedThisSession()) {
+      setSubmitted(true);
+      return;
+    }
+
     if (!isFormComplete(form)) {
       if (form.email.trim() && !isValidEmailFormat(form.email.trim())) {
         setError("Please enter a valid email address.");
@@ -260,6 +289,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
         setError(j.message ?? j.error ?? "Could not submit your review. Please try again.");
         return;
       }
+      markSubmittedThisSession();
       setSubmitted(true);
     } catch {
       setError("Could not submit your review. Please try again.");

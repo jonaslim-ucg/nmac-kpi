@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, MoreVertical, UserPlus, Users } from "lucide-react";
+import { Eye, Loader2, MoreVertical, UserPlus, Users } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent, type MouseEvent } from "react";
 import { MainShell } from "@/components/dashboard/main-shell";
 import { RoleNmacNavEditor } from "@/components/admin/role-nmac-nav-editor";
@@ -18,6 +18,8 @@ type Row = {
   created_at: string;
   updated_at: string;
 };
+
+type UsersTab = "directory" | "invite" | "access";
 
 function roleSelectDisabled(
   actorRole: string | undefined,
@@ -57,6 +59,7 @@ export default function AdminUsersPage() {
   const [editLast, setEditLast] = useState("");
   const [editRole, setEditRole] = useState("viewer");
   const [openMenu, setOpenMenu] = useState<null | { rowId: string; top: number; left: number }>(null);
+  const [tab, setTab] = useState<UsersTab>("directory");
 
   const show = useCallback((text: string, variant: SnackbarVariant) => {
     setSnackbar({ text, variant });
@@ -163,6 +166,7 @@ export default function AdminUsersPage() {
       setNewFirst("");
       setNewLast("");
       show("User added.", "success");
+      setTab("directory");
       await refresh();
     } catch {
       show("Could not add user.", "error");
@@ -342,7 +346,65 @@ export default function AdminUsersPage() {
         onDismiss={() => setSnackbar(null)}
       />
 
-      <div className="mx-auto flex max-w-5xl flex-col gap-8">
+      <div className="mx-auto flex max-w-5xl flex-col gap-6">
+        <div
+          role="tablist"
+          aria-label="Users sections"
+          className="flex flex-wrap gap-2 rounded-xl border border-border bg-muted/40 p-1.5 shadow-inner"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "directory"}
+            onClick={() => setTab("directory")}
+            className={
+              "inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition sm:flex-initial sm:px-5 " +
+              (tab === "directory"
+                ? "bg-card text-foreground shadow-sm ring-1 ring-border"
+                : "text-muted-foreground hover:bg-background/80 hover:text-foreground")
+            }
+          >
+            <Users className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+            Directory
+            {!loadingList ? (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold tabular-nums text-muted-foreground">
+                {rows.length}
+              </span>
+            ) : null}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "invite"}
+            onClick={() => setTab("invite")}
+            className={
+              "inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition sm:flex-initial sm:px-5 " +
+              (tab === "invite"
+                ? "bg-card text-foreground shadow-sm ring-1 ring-border"
+                : "text-muted-foreground hover:bg-background/80 hover:text-foreground")
+            }
+          >
+            <UserPlus className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+            Add or invite
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "access"}
+            onClick={() => setTab("access")}
+            className={
+              "inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition sm:flex-initial sm:px-5 " +
+              (tab === "access"
+                ? "bg-card text-foreground shadow-sm ring-1 ring-border"
+                : "text-muted-foreground hover:bg-background/80 hover:text-foreground")
+            }
+          >
+            <Eye className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+            KPI access
+          </button>
+        </div>
+
+        {tab === "invite" ? (
         <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
           <div className="flex items-start gap-3 border-b border-border bg-surface-muted/40 px-5 py-4">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-accent">
@@ -351,8 +413,7 @@ export default function AdminUsersPage() {
             <div className="min-w-0 pt-0.5">
               <h2 className="text-base font-semibold tracking-tight text-foreground">Add or invite</h2>
               <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                They appear in the list below with the role you pick. First sign-in still uses a code sent to their
-                email.
+                They appear in the Directory with the role you pick. First sign-in still uses a code sent to their email.
               </p>
             </div>
           </div>
@@ -422,7 +483,9 @@ export default function AdminUsersPage() {
             </div>
           </form>
         </section>
+        ) : null}
 
+        {tab === "directory" ? (
         <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
           <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border bg-surface-muted/40 px-5 py-4">
             <div className="flex items-start gap-3">
@@ -458,7 +521,7 @@ export default function AdminUsersPage() {
             <div className="px-5 py-12 text-center">
               <p className="text-sm font-medium text-foreground">No users yet</p>
               <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
-                Add someone with the form above. They will sign in with an email code the first time.
+                Use the Add or invite tab to add someone. They will sign in with an email code the first time.
               </p>
             </div>
           ) : (
@@ -601,10 +664,13 @@ export default function AdminUsersPage() {
             </div>
           )}
         </section>
+        ) : null}
 
+        {tab === "access" ? (
         <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
           <RoleNmacNavEditor onSaved={(text) => show(text, "success")} onError={(text) => show(text, "error")} />
         </section>
+        ) : null}
       </div>
 
       {openMenu && menuRow ? (

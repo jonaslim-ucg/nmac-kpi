@@ -3,7 +3,7 @@ import { buildAppointmentReviewStats } from "@/lib/appointment-review/analytics"
 import { toAppointmentReviewDetail } from "@/lib/appointment-review/display";
 import { APPOINTMENT_REVIEWS_SETUP_SQL, listAppointmentReviews } from "@/lib/appointment-review/store";
 import { getSessionFromCookies } from "@/lib/auth/session";
-import { canEditKpiData } from "@/lib/auth/types";
+import { isNmacNavViewAllowed, SURVEY_RESULTS_NAV_VIEW_ID } from "@/lib/auth/role-nmac-nav";
 import { getAppDashboardSettings } from "@/lib/auth/app-settings";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +28,7 @@ export async function GET(req: Request) {
   }
 
   const settings = await getAppDashboardSettings();
-  if (!canEditKpiData(session.role, settings?.customRoles ?? [])) {
+  if (!isNmacNavViewAllowed(session.role, SURVEY_RESULTS_NAV_VIEW_ID, settings?.roleNmacNav ?? {})) {
     return unauthorized();
   }
 

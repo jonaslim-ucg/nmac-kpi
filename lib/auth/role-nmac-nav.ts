@@ -7,9 +7,11 @@ import {
 } from "@/lib/auth/custom-roles";
 import { NK26_VIEWS, type Nk26View } from "@/lib/kpi-nmac-2026/views-meta";
 
-export type NmacNavViewId = Nk26View;
+export const SURVEY_RESULTS_NAV_VIEW_ID = "survey-results" as const;
 
-export const NMAC_NAV_VIEW_IDS: readonly NmacNavViewId[] = NK26_VIEWS;
+export type NmacNavViewId = Nk26View | typeof SURVEY_RESULTS_NAV_VIEW_ID;
+
+export const NMAC_NAV_VIEW_IDS: readonly NmacNavViewId[] = [...NK26_VIEWS, SURVEY_RESULTS_NAV_VIEW_ID];
 
 export type RoleNmacNavAccess = Record<string, NmacNavViewId[]>;
 
@@ -23,9 +25,13 @@ export const NMAC_NAV_ITEMS: { id: NmacNavViewId; label: string; href: string }[
   { id: "specialty", label: "Specialty clinics", href: "/nmac-2026/specialty" },
   { id: "compliance", label: "Compliance & quality", href: "/nmac-2026/compliance" },
   { id: "referrals", label: "Referral KPI", href: "/nmac-2026/referrals" },
+  { id: SURVEY_RESULTS_NAV_VIEW_ID, label: "Survey results", href: "/admin/appointment-reviews" },
 ];
 
 export function nmacNavHrefToViewId(href: string): NmacNavViewId | null {
+  if (href === "/admin/appointment-reviews" || href.startsWith("/admin/appointment-reviews/")) {
+    return SURVEY_RESULTS_NAV_VIEW_ID;
+  }
   if (href === "/nmac-2026" || href === "/nmac-2026/") return "overview";
   const match = href.match(/^\/nmac-2026\/([^/]+)$/);
   if (!match) return null;
@@ -34,6 +40,7 @@ export function nmacNavHrefToViewId(href: string): NmacNavViewId | null {
 }
 
 export function nmacNavViewIdToHref(id: NmacNavViewId): string {
+  if (id === SURVEY_RESULTS_NAV_VIEW_ID) return "/admin/appointment-reviews";
   return id === "overview" ? "/nmac-2026" : `/nmac-2026/${id}`;
 }
 

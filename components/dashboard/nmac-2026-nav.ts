@@ -55,6 +55,16 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
     ],
   },
   {
+    title: "Survey Results",
+    items: [
+      {
+        href: "/admin/appointment-reviews",
+        label: "Appointment reviews",
+        icon: ClipboardPenLine,
+      },
+    ],
+  },
+  {
     title: "Practice",
     legacySection: true,
     items: [
@@ -73,12 +83,6 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
         legacy: true,
       },
       { href: "/admin/nmac-master", label: "NMAC master", icon: Database, requireDataEntry: true },
-      {
-        href: "/admin/appointment-reviews",
-        label: "Appointment reviews",
-        icon: ClipboardPenLine,
-        requireDataEntry: true,
-      },
       { href: "/admin/users", label: "Users", icon: Users, requireAdmin: true },
       { href: "/settings", label: "Settings", icon: Settings },
     ],

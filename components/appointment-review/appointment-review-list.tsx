@@ -28,9 +28,9 @@ export function AppointmentReviewList({ reviews, onViewReview, periodLabel = "Al
       <span className="dashboard-card-accent" aria-hidden />
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-5">
         <div>
-          <p className="text-sm font-semibold text-foreground">{periodLabel} reviews</p>
+          <p className="text-sm font-semibold text-foreground">Survey results</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {filtered.length} review{filtered.length === 1 ? "" : "s"}
+            {periodLabel} · {filtered.length} review{filtered.length === 1 ? "" : "s"}
             {commentFilter === "with-comments" ? " with written responses" : ""}
           </p>
         </div>

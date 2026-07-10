@@ -11,7 +11,7 @@ import { useSession } from "@/components/auth/session-provider";
 import type { AppointmentReviewStats } from "@/lib/appointment-review/analytics";
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
 import { APPOINTMENT_REVIEWS_SETUP_SQL } from "@/lib/appointment-review/store";
-import { canEditKpiData } from "@/lib/auth/types";
+import { isNmacNavHrefAllowed } from "@/lib/auth/role-nmac-nav";
 
 type ReviewPeriod = "all" | "quarter" | "30" | "90";
 type Tab = "overview" | "reviews";
@@ -26,7 +26,7 @@ type ApiResponse = {
 
 export default function AdminAppointmentReviewsPage() {
   const { user, loading } = useSession();
-  const { customRoles } = useDashboardPreferences();
+  const { ready: prefsReady, roleNmacNav } = useDashboardPreferences();
   const [stats, setStats] = useState<AppointmentReviewStats | null>(null);
   const [reviews, setReviews] = useState<AppointmentReviewDetail[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -37,7 +37,8 @@ export default function AdminAppointmentReviewsPage() {
   const [tab, setTab] = useState<Tab>("overview");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const allowed = canEditKpiData(user?.role, customRoles);
+  const allowed =
+    !prefsReady || isNmacNavHrefAllowed(user?.role, "/admin/appointment-reviews", roleNmacNav);
 
   const selectedIndex = useMemo(
     () => (selectedId ? reviews.findIndex((r) => r.id === selectedId) : -1),
@@ -102,7 +103,7 @@ export default function AdminAppointmentReviewsPage() {
 
   if (loading || initialLoading) {
     return (
-      <MainShell title="Appointment reviews" subtitle="Loading">
+      <MainShell title="Survey Results" subtitle="Loading">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading results…
@@ -113,23 +114,23 @@ export default function AdminAppointmentReviewsPage() {
 
   if (!allowed) {
     return (
-      <MainShell title="Appointment reviews" subtitle="Restricted">
-        <p className="text-sm text-muted-foreground">You do not have permission to view appointment review results.</p>
+      <MainShell title="Survey Results" subtitle="Restricted">
+        <p className="text-sm text-muted-foreground">You do not have permission to view survey results.</p>
       </MainShell>
     );
   }
 
   return (
     <MainShell
-      title="Appointment reviews"
-      subtitle="Patient questionnaire results from /appointment-review"
+      title="Survey Results"
+      subtitle="Provider experience survey from /appointment-review"
     >
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           {(
             [
               { id: "overview", label: "Overview" },
-              { id: "reviews", label: "All reviews" },
+              { id: "reviews", label: "Survey results" },
             ] as const
           ).map(({ id, label }) => (
             <button

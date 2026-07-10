@@ -38,7 +38,7 @@ function isNavItemVisible(
   }
 
   if (hideLegacyNav && item.legacy) return false;
-  if (item.href.startsWith("/nmac-2026")) {
+  if (item.href.startsWith("/nmac-2026") || item.href === "/admin/appointment-reviews") {
     return isNmacNavHrefAllowed(userRole, item.href, roleNmacNav);
   }
   if ("requireDataEntry" in item && item.requireDataEntry) {

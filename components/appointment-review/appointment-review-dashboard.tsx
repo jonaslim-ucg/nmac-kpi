@@ -53,6 +53,33 @@ function ChartCard({ title, subtitle, children, tall }: { title: string; subtitl
   );
 }
 
+function ChartViewport({
+  children,
+  minWidth = "34rem",
+}: {
+  children: React.ReactNode;
+  minWidth?: string;
+}) {
+  return (
+    <div className="-mx-2 h-full overflow-x-auto overflow-y-hidden px-2 pb-1">
+      <div className="h-full min-w-full" style={{ minWidth }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function shortRatingMetric(metric: string): string {
+  const lower = metric.toLowerCase();
+  if (lower.includes("scheduling")) return "Scheduling";
+  if (lower.includes("overall")) return "Visit";
+  if (lower.includes("provider")) return "Provider";
+  if (lower.includes("health")) return "Health";
+  if (lower.includes("recommend")) return "Recommend";
+  if (lower.includes("front")) return "Front desk";
+  return metric;
+}
+
 function formatDay(iso: string): string {
   try {
     return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(iso + "T12:00:00"));
@@ -108,6 +135,10 @@ type Props = { stats: AppointmentReviewStats; onViewReview?: (id: string) => voi
 
 export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
   const empty = stats.total === 0;
+  const ratingScores = stats.ratingScores.map((score) => ({
+    ...score,
+    shortMetric: shortRatingMetric(score.metric),
+  }));
 
   return (
     <div className="space-y-6">
@@ -154,109 +185,134 @@ export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
         <>
           <div className="grid gap-4 xl:grid-cols-2">
             <ChartCard title="Average ratings" subtitle={`Scale 1 (worst) to ${APPOINTMENT_REVIEW_MAX_SCORE} (best)`} tall>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.ratingScores} margin={{ top: 20, right: 8, left: 0, bottom: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
-                  <XAxis
-                    dataKey="metric"
-                    tick={{ fontSize: 11, fill: "var(--foreground)" }}
-                    stroke="var(--border)"
-                    interval={0}
-                  />
-                  <YAxis domain={[0, APPOINTMENT_REVIEW_MAX_SCORE]} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
-                  <Tooltip {...TOOLTIP_STYLE} formatter={(value) => [`${value}/${APPOINTMENT_REVIEW_MAX_SCORE}`, "Average"]} />
-                  <Bar dataKey="score" radius={[4, 4, 0, 0]}>
-                    {stats.ratingScores.map((_, i) => (
-                      <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                    ))}
-                    <LabelList
-                      dataKey="score"
-                      position="top"
-                      formatter={(v) => `${v}/${APPOINTMENT_REVIEW_MAX_SCORE}`}
-                      fill="var(--foreground)"
-                      fontSize={12}
-                      fontWeight={600}
+              <ChartViewport minWidth="38rem">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={ratingScores} margin={{ top: 20, right: 8, left: 0, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+                    <XAxis
+                      dataKey="shortMetric"
+                      tick={{ fontSize: 11, fill: "var(--foreground)" }}
+                      stroke="var(--border)"
+                      interval={0}
+                      height={32}
                     />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+                    <YAxis
+                      domain={[0, APPOINTMENT_REVIEW_MAX_SCORE]}
+                      tick={{ fontSize: 11, fill: "var(--muted)" }}
+                      stroke="var(--border)"
+                      width={28}
+                    />
+                    <Tooltip
+                      {...TOOLTIP_STYLE}
+                      labelFormatter={(label) =>
+                        ratingScores.find((score) => score.shortMetric === label)?.metric ?? String(label)
+                      }
+                      formatter={(value) => [`${value}/${APPOINTMENT_REVIEW_MAX_SCORE}`, "Average"]}
+                    />
+                    <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                      {ratingScores.map((_, i) => (
+                        <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                      ))}
+                      <LabelList
+                        dataKey="score"
+                        position="top"
+                        formatter={(v) => `${v}/${APPOINTMENT_REVIEW_MAX_SCORE}`}
+                        fill="var(--foreground)"
+                        fontSize={12}
+                        fontWeight={600}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartViewport>
             </ChartCard>
 
             <ChartCard title="Scheduling & visit trend" subtitle="Daily averages when multiple responses exist" tall>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={stats.ratingTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                  <XAxis
-                    dataKey="date"
-                    tickFormatter={formatDay}
-                    tick={{ fontSize: 11, fill: "var(--muted)" }}
-                    stroke="var(--border)"
-                  />
-                  <YAxis domain={[0, APPOINTMENT_REVIEW_MAX_SCORE]} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
-                  <Tooltip
-                    {...TOOLTIP_STYLE}
-                    labelFormatter={(label) => formatDay(String(label ?? ""))}
-                    formatter={(value, name) => [`${value}/${APPOINTMENT_REVIEW_MAX_SCORE}`, String(name)]}
-                  />
-                  <Legend wrapperStyle={{ color: "var(--foreground)", fontSize: 12 }} />
-                  <Line
-                    type="monotone"
-                    dataKey="ease"
-                    name="Scheduling ease"
-                    stroke="var(--chart-this-year)"
-                    strokeWidth={2.5}
-                    dot={{ r: 3 }}
-                    connectNulls
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="visit"
-                    name="Visit rating"
-                    stroke="var(--chart-target)"
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    connectNulls
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <ChartViewport minWidth="34rem">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={stats.ratingTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={formatDay}
+                      tick={{ fontSize: 11, fill: "var(--muted)" }}
+                      stroke="var(--border)"
+                    />
+                    <YAxis
+                      domain={[0, APPOINTMENT_REVIEW_MAX_SCORE]}
+                      tick={{ fontSize: 11, fill: "var(--muted)" }}
+                      stroke="var(--border)"
+                      width={28}
+                    />
+                    <Tooltip
+                      {...TOOLTIP_STYLE}
+                      labelFormatter={(label) => formatDay(String(label ?? ""))}
+                      formatter={(value, name) => [`${value}/${APPOINTMENT_REVIEW_MAX_SCORE}`, String(name)]}
+                    />
+                    <Legend wrapperStyle={{ color: "var(--foreground)", fontSize: 12 }} />
+                    <Line
+                      type="monotone"
+                      dataKey="ease"
+                      name="Scheduling ease"
+                      stroke="var(--chart-this-year)"
+                      strokeWidth={2.5}
+                      dot={{ r: 3 }}
+                      connectNulls
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="visit"
+                      name="Visit rating"
+                      stroke="var(--chart-target)"
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      connectNulls
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartViewport>
             </ChartCard>
           </div>
 
           <div className="grid gap-4 xl:grid-cols-2">
             <ChartCard title="Wait time before exam room">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.waitTime} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--foreground)" }} stroke="var(--border)" interval={0} angle={-12} textAnchor="end" height={52} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
-                  <Tooltip
-                    {...TOOLTIP_STYLE}
-                    formatter={(value, _name, item) => {
-                      const pct = (item.payload as { pct?: number }).pct;
-                      return [`${value} (${pct ?? 0}%)`, "Responses"];
-                    }}
-                  />
-                  <Bar dataKey="count" fill="var(--chart-this-year)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <ChartViewport minWidth="32rem">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.waitTime} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--foreground)" }} stroke="var(--border)" interval={0} angle={-12} textAnchor="end" height={52} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" width={28} />
+                    <Tooltip
+                      {...TOOLTIP_STYLE}
+                      formatter={(value, _name, item) => {
+                        const pct = (item.payload as { pct?: number }).pct;
+                        return [`${value} (${pct ?? 0}%)`, "Responses"];
+                      }}
+                    />
+                    <Bar dataKey="count" fill="var(--chart-this-year)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartViewport>
             </ChartCard>
 
             <ChartCard title="Patient tenure">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.patientDuration} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--foreground)" }} stroke="var(--border)" interval={0} angle={-12} textAnchor="end" height={52} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
-                  <Tooltip
-                    {...TOOLTIP_STYLE}
-                    formatter={(value, _name, item) => {
-                      const pct = (item.payload as { pct?: number }).pct;
-                      return [`${value} (${pct ?? 0}%)`, "Responses"];
-                    }}
-                  />
-                  <Bar dataKey="count" fill="var(--accent-2)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <ChartViewport minWidth="32rem">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.patientDuration} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--foreground)" }} stroke="var(--border)" interval={0} angle={-12} textAnchor="end" height={52} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" width={28} />
+                    <Tooltip
+                      {...TOOLTIP_STYLE}
+                      formatter={(value, _name, item) => {
+                        const pct = (item.payload as { pct?: number }).pct;
+                        return [`${value} (${pct ?? 0}%)`, "Responses"];
+                      }}
+                    />
+                    <Bar dataKey="count" fill="var(--accent-2)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartViewport>
             </ChartCard>
           </div>
 
@@ -264,41 +320,45 @@ export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
 
           {stats.serviceTypes.length > 0 ? (
             <ChartCard title="Providers seen">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.serviceTypes} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--foreground)" }} stroke="var(--border)" interval={0} angle={-12} textAnchor="end" height={52} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
-                  <Tooltip
-                    {...TOOLTIP_STYLE}
-                    formatter={(value, _name, item) => {
-                      const pct = (item.payload as { pct?: number }).pct;
-                      return [`${value} (${pct ?? 0}%)`, "Responses"];
-                    }}
-                  />
-                  <Bar dataKey="count" fill="var(--chart-this-year)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <ChartViewport minWidth="36rem">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.serviceTypes} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--foreground)" }} stroke="var(--border)" interval={0} angle={-12} textAnchor="end" height={52} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" width={28} />
+                    <Tooltip
+                      {...TOOLTIP_STYLE}
+                      formatter={(value, _name, item) => {
+                        const pct = (item.payload as { pct?: number }).pct;
+                        return [`${value} (${pct ?? 0}%)`, "Responses"];
+                      }}
+                    />
+                    <Bar dataKey="count" fill="var(--chart-this-year)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartViewport>
             </ChartCard>
           ) : null}
 
           {stats.referralSources.length > 0 ? (
             <ChartCard title="How new patients heard about NMAC" subtitle="New patients only; check-all-that-apply">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.referralSources} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--foreground)" }} stroke="var(--border)" interval={0} angle={-12} textAnchor="end" height={52} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" />
-                  <Tooltip
-                    {...TOOLTIP_STYLE}
-                    formatter={(value, _name, item) => {
-                      const pct = (item.payload as { pct?: number }).pct;
-                      return [`${value} (${pct ?? 0}%)`, "New patients"];
-                    }}
-                  />
-                  <Bar dataKey="count" fill="var(--chart-target)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <ChartViewport minWidth="36rem">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.referralSources} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--foreground)" }} stroke="var(--border)" interval={0} angle={-12} textAnchor="end" height={52} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted)" }} stroke="var(--border)" width={28} />
+                    <Tooltip
+                      {...TOOLTIP_STYLE}
+                      formatter={(value, _name, item) => {
+                        const pct = (item.payload as { pct?: number }).pct;
+                        return [`${value} (${pct ?? 0}%)`, "New patients"];
+                      }}
+                    />
+                    <Bar dataKey="count" fill="var(--chart-target)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartViewport>
             </ChartCard>
           ) : null}
 

@@ -9,24 +9,24 @@ type Props = { title: string; subtitle?: string };
 export function AppHeader({ title, subtitle }: Props) {
   return (
     <header
-      className="sticky top-0 z-40 flex h-[4.25rem] shrink-0 items-center justify-between border-b border-border px-6 backdrop-blur-md"
+      className="sticky top-0 z-40 flex min-h-[4.25rem] shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3 backdrop-blur-md sm:px-6"
       style={{
         background: `linear-gradient(135deg, var(--header-gradient-start) 0%, var(--header-gradient-end) 100%)`,
       }}
     >
-      <div className="min-w-0">
-        <h1 className="truncate text-lg font-semibold tracking-tight text-foreground">{title}</h1>
+      <div className="min-w-0 flex-1">
+        <h1 className="break-words text-base font-semibold tracking-tight text-foreground sm:text-lg">{title}</h1>
         {subtitle ? (
           <p className="line-clamp-2 max-w-3xl text-sm leading-snug text-muted-foreground">{subtitle}</p>
         ) : null}
       </div>
-      <div className="flex shrink-0 items-center gap-3">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <span className="hidden rounded-full border border-border bg-surface-muted px-3.5 py-1 font-mono text-xs font-medium text-accent sm:inline-block">
           FY 2023-2026
         </span>
         <Link
           href="/settings"
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-muted/50 text-foreground shadow-sm transition hover:border-accent hover:bg-accent-muted/50 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-muted/50 text-foreground shadow-sm transition hover:border-accent hover:bg-accent-muted/50 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:h-10 sm:w-10"
           aria-label="Settings"
           title="Settings"
         >

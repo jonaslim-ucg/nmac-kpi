@@ -125,60 +125,62 @@ export default function AdminAppointmentReviewsPage() {
       title="Survey Results"
       subtitle="Provider experience survey from /appointment-review"
     >
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {(
-            [
-              { id: "overview", label: "Overview" },
-              { id: "reviews", label: "Survey results" },
-            ] as const
-          ).map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              className={
-                "rounded-lg border px-3 py-1.5 text-sm font-medium transition " +
-                (tab === id
-                  ? "border-accent bg-nav-active-bg text-nav-active-fg"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground")
-              }
-            >
-              {label}
-            </button>
-          ))}
-          <span className="mx-1 hidden h-5 w-px bg-border sm:inline" aria-hidden />
-          {(
-            [
-              { id: "all", label: "All time" },
-              { id: "quarter", label: "This quarter" },
-              { id: "30", label: "Last 30 days" },
-              { id: "90", label: "Last 90 days" },
-            ] as const
-          ).map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => {
-                setPeriod(id);
-                setSelectedId(null);
-              }}
-              className={
-                "rounded-lg border px-3 py-1.5 text-sm font-medium transition " +
-                (period === id
-                  ? "border-accent bg-nav-active-bg text-nav-active-fg"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground")
-              }
-            >
-              {label}
-            </button>
-          ))}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="-mx-1 max-w-full overflow-x-auto px-1 pb-1">
+          <div className="flex w-max items-center gap-2">
+            {(
+              [
+                { id: "overview", label: "Overview" },
+                { id: "reviews", label: "Survey results" },
+              ] as const
+            ).map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTab(id)}
+                className={
+                  "shrink-0 rounded-lg border px-3 py-1.5 text-sm font-medium transition " +
+                  (tab === id
+                    ? "border-accent bg-nav-active-bg text-nav-active-fg"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground")
+                }
+              >
+                {label}
+              </button>
+            ))}
+            <span className="mx-1 hidden h-5 w-px bg-border sm:inline" aria-hidden />
+            {(
+              [
+                { id: "all", label: "All time" },
+                { id: "quarter", label: "This quarter" },
+                { id: "30", label: "Last 30 days" },
+                { id: "90", label: "Last 90 days" },
+              ] as const
+            ).map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  setPeriod(id);
+                  setSelectedId(null);
+                }}
+                className={
+                  "shrink-0 rounded-lg border px-3 py-1.5 text-sm font-medium transition " +
+                  (period === id
+                    ? "border-accent bg-nav-active-bg text-nav-active-fg"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground")
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
         <button
           type="button"
           onClick={() => void load(period, true)}
           disabled={refreshing}
-          className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-surface-muted/80 disabled:opacity-50"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-surface-muted/80 disabled:opacity-50 sm:w-auto"
         >
           <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} aria-hidden />
           Refresh

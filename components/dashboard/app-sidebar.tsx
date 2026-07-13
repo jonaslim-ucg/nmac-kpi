@@ -85,7 +85,44 @@ export function AppSidebar() {
   const sections = buildSections(navReady, hideLegacyNav, user?.role ?? null, roleNmacNav, customRoles);
 
   return (
-    <aside className="flex w-[220px] shrink-0 flex-col border-r border-border bg-sidebar">
+    <>
+      <div className="border-b border-border bg-sidebar lg:hidden">
+        <div className="overflow-x-auto px-3 py-2">
+          {!navReady ? (
+            <div className="flex gap-2" aria-busy="true" aria-label="Loading navigation">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-9 w-28 shrink-0 animate-pulse rounded-lg bg-muted-foreground/10" />
+              ))}
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              {sections.flatMap((section) =>
+                section.items.map((item) => {
+                  const Icon = item.icon;
+                  const active = linkActive(pathname, item.href);
+                  return (
+                    <Link
+                      key={item.href + item.label}
+                      href={item.href}
+                      className={
+                        "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition " +
+                        (active
+                          ? "border-accent bg-nav-active-bg text-nav-active-fg"
+                          : "border-border bg-card text-muted-foreground hover:bg-surface-muted/80 hover:text-foreground")
+                      }
+                    >
+                      <Icon className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                      <span className="whitespace-nowrap">{item.label}</span>
+                    </Link>
+                  );
+                }),
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <aside className="hidden w-[220px] shrink-0 flex-col border-r border-border bg-sidebar lg:flex">
       <div className="flex h-[4.25rem] items-center border-b border-border px-3">
         <AppBrand layout="sidebar" />
       </div>
@@ -148,6 +185,7 @@ export function AppSidebar() {
           </p>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

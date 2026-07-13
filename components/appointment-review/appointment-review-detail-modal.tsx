@@ -143,8 +143,8 @@ export function AppointmentReviewDetailModal({
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-2 border-t border-border px-5 py-4">
-          <div className="flex gap-2">
+        <div className="flex flex-col gap-3 border-t border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               disabled={!hasPrev}
@@ -167,7 +167,7 @@ export function AppointmentReviewDetailModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-white transition hover:opacity-95"
+            className="w-full rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-white transition hover:opacity-95 sm:w-auto"
           >
             Close
           </button>

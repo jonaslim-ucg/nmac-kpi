@@ -60,8 +60,8 @@ export async function GET(req: Request) {
   try {
     const data = await fetchArdtsStatusCounts(
       hasMonthParams
-        ? { year: year!, month: month!, itemType: "referral", status }
-        : { range: range!, from, to, itemType: "referral", status },
+        ? { year: year!, month: month!, itemType: "all", status }
+        : { range: range!, from, to, itemType: "all", status },
     );
     return NextResponse.json(data, {
       headers: { "Cache-Control": "private, no-store, max-age=0" },

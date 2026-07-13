@@ -35,7 +35,7 @@ function buildMonthQuery(year: number, monthIndex: number): string {
   return new URLSearchParams({
     year: String(year),
     month: String(monthIndex + 1),
-    item_type: "referral",
+    item_type: "all",
   }).toString();
 }
 
@@ -160,7 +160,7 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
 
       <div className="nk26-referral-meta">
         <p className="nk26-referral-note">
-          Referrals sent in {MONTHS[selectedMonth]} {selectedYear} by <strong>date sent</strong>. KPI rates and
+          Total referrals sent in {MONTHS[selectedMonth]} {selectedYear} by <strong>date sent</strong>. KPI rates and
           pipeline stages are calculated by ARDTS.
         </p>
         {periodLabel ? <p className="nk26-referral-period">{periodLabel}</p> : null}
@@ -186,7 +186,7 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
                   <div className="nk26-slab">{card.label}</div>
                   <div className="nk26-sval">{card.count}</div>
                   <div className="nk26-ssub">
-                    {card.key === "total" ? "Scoped referrals in period" : `${card.percent}% of period total`}
+                    {card.key === "total" ? "Total referrals in period" : `${card.percent}% of period total`}
                   </div>
                 </div>
               );
@@ -198,7 +198,7 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
             <div className="nk26-stat nk26-referral-total">
               <div className="nk26-slab">Sent in period</div>
               <div className="nk26-sval">{summary.sent_in_period}</div>
-              <div className="nk26-ssub">Scoped referrals in selected month</div>
+              <div className="nk26-ssub">Total referrals in selected month</div>
             </div>
             <div className="nk26-stat">
               <div className="nk26-slab">Booking rate</div>

@@ -108,6 +108,7 @@ export async function getNextSurveyOutreachActions(): Promise<{
         isProductionSurveyOutreachAfterLiveStart({
           appointmentAt: row.appointment_at,
           createdAt: row.created_at,
+          liveStartAt: sending.liveStartAt,
         }),
     )
     .map((row) => nextActionForRow(row, schedule))

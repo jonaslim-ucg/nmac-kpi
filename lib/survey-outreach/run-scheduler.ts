@@ -65,7 +65,20 @@ function crmRowToOutreach(row: CrmAppointmentRow): {
   };
 }
 
-export async function syncCheckedOutFromCrm(now = new Date()): Promise<{
+export async function syncCheckedOutFromCrm(now?: Date): Promise<{
+  synced: number;
+  skippedNoEmail: number;
+  skippedBeforeLiveStart: number;
+}>;
+export async function syncCheckedOutFromCrm(now: Date, liveStartAt: Date | string | null): Promise<{
+  synced: number;
+  skippedNoEmail: number;
+  skippedBeforeLiveStart: number;
+}>;
+export async function syncCheckedOutFromCrm(
+  now = new Date(),
+  liveStartAt: Date | string | null = surveyOutreachLiveStartAt(),
+): Promise<{
   synced: number;
   skippedNoEmail: number;
   skippedBeforeLiveStart: number;
@@ -85,7 +98,7 @@ export async function syncCheckedOutFromCrm(now = new Date()): Promise<{
       skippedNoEmail++;
       continue;
     }
-    if (!isProductionSurveyOutreachAfterLiveStart({ appointmentAt: mapped.appointmentAt })) {
+    if (!isProductionSurveyOutreachAfterLiveStart({ appointmentAt: mapped.appointmentAt, liveStartAt })) {
       skippedBeforeLiveStart++;
       continue;
     }
@@ -169,13 +182,13 @@ export async function runSurveyOutreachScheduler(
 ): Promise<SchedulerResult> {
   const sending = await getSurveyOutreachSendingState();
   const sendingEnabled = sending.effectiveEnabled;
-  const liveStartAt = sending.liveStartAt ? new Date(sending.liveStartAt) : surveyOutreachLiveStartAt();
+  const liveStartAt = sending.liveStartAt ? new Date(sending.liveStartAt) : null;
   const sent: SendStageResult[] = [];
   const skipped: SendStageResult[] = [];
   const errors: SchedulerResult["errors"] = [];
 
   const sync = sendingEnabled && liveStartAt
-    ? await syncCheckedOutFromCrm(now)
+    ? await syncCheckedOutFromCrm(now, liveStartAt)
     : { synced: 0, skippedNoEmail: 0, skippedBeforeLiveStart: 0 };
   const schedule = await getSurveyOutreachSchedule();
   const rows = await listIncompleteOutreach();
@@ -196,6 +209,7 @@ export async function runSurveyOutreachScheduler(
       !isProductionSurveyOutreachAfterLiveStart({
         appointmentAt: row.appointment_at,
         createdAt: row.created_at,
+        liveStartAt,
       })
     ) {
       continue;

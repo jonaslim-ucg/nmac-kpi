@@ -39,6 +39,7 @@ export async function GET() {
     sendingAppEnabled: sending.appEnabled,
     sendingMasterEnabled: sending.masterEnabled,
     liveStartAt: sending.liveStartAt,
+    sendingAppEnabledAt: sending.appEnabledAt,
   });
 }
 
@@ -85,6 +86,7 @@ export async function PATCH(req: Request) {
       sendingAppEnabled: sending.appEnabled,
       sendingMasterEnabled: sending.masterEnabled,
       liveStartAt: sending.liveStartAt,
+      sendingAppEnabledAt: sending.appEnabledAt,
     });
   } catch (e) {
     return NextResponse.json(

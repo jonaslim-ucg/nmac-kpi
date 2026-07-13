@@ -129,6 +129,7 @@ export async function sendSurveyStage(input: {
     !isProductionSurveyOutreachAfterLiveStart({
       appointmentAt: row.appointment_at,
       createdAt: row.created_at,
+      liveStartAt: sending?.liveStartAt,
     })
   ) {
     return {
@@ -138,7 +139,7 @@ export async function sendSurveyStage(input: {
       surveyUrl: buildSurveyUrl(row.survey_token),
       outreachId: row.id,
       skipped: true,
-      reason: surveyOutreachBeforeLiveStartReason(),
+      reason: surveyOutreachBeforeLiveStartReason(sending?.liveStartAt),
     };
   }
 

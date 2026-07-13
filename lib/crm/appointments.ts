@@ -27,6 +27,19 @@ export type CrmStatusCountsResponse = {
   appointment_data: CrmAppointmentRow[];
 };
 
+export type CrmAiConfirmationRateResponse = {
+  key: "ai_confirmation_rate";
+  label: string;
+  year: number;
+  month: number;
+  date_from: string;
+  date_to: string;
+  snapshot_days: number;
+  numerator: number;
+  denominator: number;
+  rate_pct: number | null;
+};
+
 export class CrmConfigError extends Error {
   constructor() {
     super("NMAC CRM reports API is not configured.");
@@ -85,6 +98,42 @@ export async function fetchCrmAppointments(
 ): Promise<CrmAppointmentRow[]> {
   const body = await fetchCrmStatusCounts(date, status);
   return body.appointment_data ?? [];
+}
+
+export async function fetchCrmAiConfirmationRate(
+  year: number,
+  month: number,
+): Promise<CrmAiConfirmationRateResponse> {
+  const url = new URL(`${crmBaseUrl()}/api/reports/kpis/ai-confirmation-rate`);
+  url.searchParams.set("year", String(year));
+  url.searchParams.set("month", String(month));
+
+  const res = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${crmToken()}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  let body: CrmAiConfirmationRateResponse | { detail?: string; error?: string };
+  try {
+    body = (await res.json()) as CrmAiConfirmationRateResponse | { detail?: string; error?: string };
+  } catch {
+    throw new Error(`CRM API HTTP ${res.status} (non-JSON response)`);
+  }
+
+  if (!res.ok) {
+    const message =
+      typeof body === "object" && body && "detail" in body && typeof body.detail === "string"
+        ? body.detail
+        : typeof body === "object" && body && "error" in body && typeof body.error === "string"
+          ? body.error
+          : `CRM API HTTP ${res.status}`;
+    throw new Error(message);
+  }
+
+  return body as CrmAiConfirmationRateResponse;
 }
 
 const BERMUDA_TZ = "Atlantic/Bermuda";

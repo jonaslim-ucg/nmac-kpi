@@ -13,11 +13,18 @@ export function surveyOutreachLiveStartAt(): Date | null {
   return Number.isFinite(parsed.getTime()) ? parsed : null;
 }
 
+function normalizeLiveStartAt(value?: Date | string | null): Date | null {
+  if (!value) return surveyOutreachLiveStartAt();
+  const parsed = value instanceof Date ? value : new Date(value);
+  return Number.isFinite(parsed.getTime()) ? parsed : surveyOutreachLiveStartAt();
+}
+
 export function isProductionSurveyOutreachAfterLiveStart(input: {
   appointmentAt: string | null;
   createdAt?: string | null;
+  liveStartAt?: Date | string | null;
 }): boolean {
-  const liveStartAt = surveyOutreachLiveStartAt();
+  const liveStartAt = normalizeLiveStartAt(input.liveStartAt);
   if (!liveStartAt) return false;
 
   const appointmentAt = input.appointmentAt ? new Date(input.appointmentAt) : null;
@@ -55,8 +62,8 @@ export function surveyOutreachLiveStartMissingReason(): string {
   return "Live survey sending requires SURVEY_OUTREACH_LIVE_START_AT so old checked-out visits are not emailed.";
 }
 
-export function surveyOutreachBeforeLiveStartReason(): string {
-  const liveStartAt = surveyOutreachLiveStartAt();
+export function surveyOutreachBeforeLiveStartReason(liveStartAtInput?: Date | string | null): string {
+  const liveStartAt = normalizeLiveStartAt(liveStartAtInput);
   if (!liveStartAt) return surveyOutreachLiveStartMissingReason();
   return `Survey outreach is limited to visits at or after ${liveStartAt.toISOString()}.`;
 }

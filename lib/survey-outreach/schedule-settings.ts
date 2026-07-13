@@ -17,16 +17,33 @@ export type SurveyOutreachSendingState = {
   appEnabled: boolean;
   effectiveEnabled: boolean;
   liveStartAt: string | null;
+  appEnabledAt: string | null;
 };
 
-function sendingState(appEnabled: boolean): SurveyOutreachSendingState {
+function parseDate(value: unknown): Date | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
+function latestDate(...dates: (Date | null)[]): Date | null {
+  return dates.reduce<Date | null>((latest, date) => {
+    if (!date) return latest;
+    if (!latest || date.getTime() > latest.getTime()) return date;
+    return latest;
+  }, null);
+}
+
+function sendingState(appEnabled: boolean, appEnabledAtInput: unknown = null): SurveyOutreachSendingState {
   const masterEnabled = isSurveyOutreachSendingEnabled();
-  const liveStartAt = surveyOutreachLiveStartAt();
+  const appEnabledAt = parseDate(appEnabledAtInput);
+  const liveStartAt = appEnabled ? latestDate(surveyOutreachLiveStartAt(), appEnabledAt) : null;
   return {
     masterEnabled,
     appEnabled,
     effectiveEnabled: masterEnabled && appEnabled,
     liveStartAt: liveStartAt?.toISOString() ?? null,
+    appEnabledAt: appEnabledAt?.toISOString() ?? null,
   };
 }
 
@@ -71,31 +88,64 @@ export async function getSurveyOutreachSendingState(): Promise<SurveyOutreachSen
   const supabase = createServiceRoleClient();
   const { data, error } = await supabase
     .from("app_settings")
-    .select("survey_outreach_sending_enabled")
+    .select("survey_outreach_sending_enabled,survey_outreach_sending_enabled_at")
     .eq("id", APP_SETTINGS_ID)
     .maybeSingle();
 
-  if (error) return sendingState(false);
-  return sendingState(Boolean(data?.survey_outreach_sending_enabled));
+  if (error) {
+    const fallback = await supabase
+      .from("app_settings")
+      .select("survey_outreach_sending_enabled")
+      .eq("id", APP_SETTINGS_ID)
+      .maybeSingle();
+    if (fallback.error) return sendingState(false);
+    return sendingState(Boolean(fallback.data?.survey_outreach_sending_enabled));
+  }
+  return sendingState(
+    Boolean(data?.survey_outreach_sending_enabled),
+    data?.survey_outreach_sending_enabled_at,
+  );
 }
 
 export async function updateSurveyOutreachSendingEnabled(
   enabled: boolean,
 ): Promise<SurveyOutreachSendingState> {
   const supabase = createServiceRoleClient();
+  const current = await getSurveyOutreachSendingState();
+  const enabledAt = enabled
+    ? current.appEnabled && current.appEnabledAt
+      ? current.appEnabledAt
+      : new Date().toISOString()
+    : null;
   const { data, error } = await supabase
     .from("app_settings")
     .update({
       survey_outreach_sending_enabled: enabled,
+      survey_outreach_sending_enabled_at: enabledAt,
       updated_at: new Date().toISOString(),
     })
     .eq("id", APP_SETTINGS_ID)
-    .select("survey_outreach_sending_enabled")
+    .select("survey_outreach_sending_enabled,survey_outreach_sending_enabled_at")
     .single();
 
   if (error || !data) {
-    throw new Error(error?.message ?? "Could not update survey sending setting.");
+    const fallback = await supabase
+      .from("app_settings")
+      .update({
+        survey_outreach_sending_enabled: enabled,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", APP_SETTINGS_ID)
+      .select("survey_outreach_sending_enabled")
+      .single();
+    if (fallback.error || !fallback.data) {
+      throw new Error(error?.message ?? "Could not update survey sending setting.");
+    }
+    return sendingState(Boolean(fallback.data.survey_outreach_sending_enabled));
   }
 
-  return sendingState(Boolean(data.survey_outreach_sending_enabled));
+  return sendingState(
+    Boolean(data.survey_outreach_sending_enabled),
+    data.survey_outreach_sending_enabled_at,
+  );
 }

@@ -80,7 +80,7 @@ type Props = { view: string };
 
 /** KPI ids shown in the month stat row (below month tabs) per section view. */
 const VIEW_MONTH_STATS: Partial<Record<Nk26View, string[]>> = {
-  scheduling: ["util", "noshow", "leads", "appt_confirm", "checkin_checkout", "ph"],
+  scheduling: ["util", "noshow", "leads", "ph", "ai_confirmation_rate", "appt_confirm", "checkin_checkout"],
   finance: ["revenue", "net_margin", "revenue_trend", "copay", "leakage", "shop"],
   calls: ["callrate", "callvol", "call_answered", "call_missed"],
   nursing: ["bp_24hr", "ecg", "random_sugars", "spiro"],
@@ -108,6 +108,10 @@ export function KpiNmac2026Client({ view }: Props) {
   const [selectedYear, setSelectedYear] = useState(DEFAULT_KPI_YEAR);
   const [selectedMonth, setSelectedMonth] = useState(defaultCompletedMonthIndex);
   const [db, setDb] = useState<Db>(() => emptyNmacMonthDbs());
+  const [crmKpiSnapshot, setCrmKpiSnapshot] = useState<{
+    year: number;
+    values: Partial<Record<number, MonthDb>>;
+  }>(() => ({ year: DEFAULT_KPI_YEAR, values: {} }));
   const [fyTargets, setFyTargets] = useState<Record<string, number>>({});
   const [targetsByMonth, setTargetsByMonth] = useState<Partial<Record<number, Record<string, number>>>>({});
   const chartsRef = useRef<Chart[]>([]);
@@ -120,6 +124,21 @@ export function KpiNmac2026Client({ view }: Props) {
   );
 
   const kpisForSelected: readonly KpiRow[] = kpisPerMonth[selectedMonth] ?? kpisPerMonth[0]!;
+  const crmKpiDb = useMemo(
+    () => (crmKpiSnapshot.year === selectedYear ? crmKpiSnapshot.values : {}),
+    [crmKpiSnapshot, selectedYear],
+  );
+
+  const displayDb = useMemo<Db>(() => {
+    if (Object.keys(crmKpiDb).length === 0) return db;
+    const next: Db = { ...db };
+    for (const [month, values] of Object.entries(crmKpiDb)) {
+      const monthIndex = Number(month);
+      if (!Number.isInteger(monthIndex) || monthIndex < 0 || monthIndex > 11) continue;
+      next[monthIndex] = { ...(next[monthIndex] ?? {}), ...values };
+    }
+    return next;
+  }, [crmKpiDb, db]);
 
   const monthLabel = useMemo(
     () => `Showing: ${MONTHS[selectedMonth]} ${selectedYear} data — click a month tab to switch`,
@@ -204,6 +223,51 @@ export function KpiNmac2026Client({ view }: Props) {
   }, [pullNmacFromServer]);
 
   useEffect(() => {
+    if (v !== "overview" && v !== "scheduling") {
+      return;
+    }
+    if (!isNmacKpiVisible("ai_confirmation_rate", hiddenNmacKpiIds)) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void Promise.all(
+      MONTHS.map(async (_, monthIndex) => {
+        const params = new URLSearchParams({
+          year: String(selectedYear),
+          month: String(monthIndex + 1),
+        });
+        try {
+          const res = await fetch(`/api/crm/kpis/ai-confirmation-rate?${params}`, {
+            credentials: "include",
+            cache: "no-store",
+          });
+          const body = (await res.json()) as { rate_pct?: unknown };
+          if (!res.ok) return null;
+          const rate = typeof body.rate_pct === "number" && Number.isFinite(body.rate_pct) ? body.rate_pct : null;
+          return rate === null ? null : ([monthIndex, rate] as const);
+        } catch {
+          return null;
+        }
+      }),
+    ).then((results) => {
+      if (cancelled) return;
+      const next: Partial<Record<number, MonthDb>> = {};
+      results.forEach((result) => {
+        if (!result) return;
+        const [monthIndex, rate] = result;
+        next[monthIndex] = { ai_confirmation_rate: { ty: rate } };
+      });
+      setCrmKpiSnapshot({ year: selectedYear, values: next });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hiddenNmacKpiIds, selectedYear, v]);
+
+  useEffect(() => {
     const gen = ++chartFxGen.current;
     chartsRef.current.forEach((c) => c.destroy());
     chartsRef.current = [];
@@ -222,7 +286,7 @@ export function KpiNmac2026Client({ view }: Props) {
         if (!isNmacKpiVisible(kpiId, hiddenNmacKpiIds)) return;
         const row0 = findKpi(kpiId, kpisPerMonth[0] ?? KPIs);
         const targetsArr = MONTHS.map((_, i) => findKpi(kpiId, kpisPerMonth[i] ?? KPIs).target);
-        const barColors = colorBar(db, kpiId, targetsArr, row0.higher);
+        const barColors = colorBar(displayDb, kpiId, targetsArr, row0.higher);
         mount(
           id,
           barBase(
@@ -230,7 +294,7 @@ export function KpiNmac2026Client({ view }: Props) {
             [
               {
                 label: row0.label,
-                data: MONTHS.map((_, i) => getVal(db, i, kpiId)),
+                data: MONTHS.map((_, i) => getVal(displayDb, i, kpiId)),
                 backgroundColor: emphasizeSelectedMonthBarColors(barColors, highlight),
               },
             ],
@@ -253,7 +317,7 @@ export function KpiNmac2026Client({ view }: Props) {
             [
               {
                 label: row0.label,
-                data: MONTHS.map((_, i) => getVal(db, i, kpiId)),
+                data: MONTHS.map((_, i) => getVal(displayDb, i, kpiId)),
                 borderColor: lineStyle.borderColor,
                 backgroundColor: lineStyle.backgroundColor,
                 fill: true,
@@ -270,7 +334,7 @@ export function KpiNmac2026Client({ view }: Props) {
 
       switch (v) {
         case "overview":
-          mount("nk26-c-trend", lineBase(MONTHS, trendDatasets(db, kpisPerMonth[0] ?? KPIs), 0, "0% vs LY (flat)"));
+          mount("nk26-c-trend", lineBase(MONTHS, trendDatasets(displayDb, kpisPerMonth[0] ?? KPIs), 0, "0% vs LY (flat)"));
           simpleBar("nk26-c-overview-satisfaction", "satisfaction");
           simpleBar("nk26-c-overview-copay", "copay");
           simpleBar("nk26-c-overview-util", "util");
@@ -287,16 +351,17 @@ export function KpiNmac2026Client({ view }: Props) {
           break;
         case "scheduling":
           if (isNmacKpiVisible("util", hiddenNmacKpiIds) && isNmacKpiVisible("noshow", hiddenNmacKpiIds)) {
-            mount("nk26-c-util-noshow", utilNoshowConfig(db, kpisPerMonth, highlight));
+            mount("nk26-c-util-noshow", utilNoshowConfig(displayDb, kpisPerMonth, highlight));
           }
           simpleBar("nk26-c-leads", "leads");
           simpleLine("nk26-c-appt-confirm", "appt_confirm");
           simpleLine("nk26-c-checkin-checkout", "checkin_checkout");
           simpleBar("nk26-c-ph", "ph");
+          simpleLine("nk26-c-ai-confirm", "ai_confirmation_rate");
           break;
         case "finance":
           if (isNmacKpiVisible("revenue", hiddenNmacKpiIds)) {
-            mount("nk26-c-rev2", revenueChartConfig(db, colorBar, kpisPerMonth, highlight));
+            mount("nk26-c-rev2", revenueChartConfig(displayDb, colorBar, kpisPerMonth, highlight));
           }
           simpleLine("nk26-c-net-margin", "net_margin");
           simpleLine("nk26-c-revenue-trend", "revenue_trend");
@@ -316,7 +381,7 @@ export function KpiNmac2026Client({ view }: Props) {
           simpleBar("nk26-c-random-sugars", "random_sugars");
           simpleBar("nk26-c-spiro", "spiro");
           if (isNmacKpiVisible("rn_visits", hiddenNmacKpiIds)) {
-            mount("nk26-c-rn-visits", rnVisitsBarConfig(db, kpisPerMonth, highlight));
+            mount("nk26-c-rn-visits", rnVisitsBarConfig(displayDb, kpisPerMonth, highlight));
           }
           break;
         case "specialty":
@@ -341,12 +406,12 @@ export function KpiNmac2026Client({ view }: Props) {
       chartsRef.current.forEach((c) => c.destroy());
       chartsRef.current = [];
     };
-  }, [v, db, hiddenNmacKpiIds, kpisPerMonth, chartThemeKey, selectedMonth]);
+  }, [v, displayDb, hiddenNmacKpiIds, kpisPerMonth, chartThemeKey, selectedMonth]);
 
   const badge = (kpiId: string) => {
     if (!isNmacKpiVisible(kpiId, hiddenNmacKpiIds)) return null;
     const k = findKpi(kpiId, kpisForSelected);
-    const val = getVal(db, selectedMonth, kpiId);
+    const val = getVal(displayDb, selectedMonth, kpiId);
     const sc = statusColor(k, val);
     return <span className={"nk26-badge " + sc}>{formatVal(k, val)}</span>;
   };
@@ -362,8 +427,8 @@ export function KpiNmac2026Client({ view }: Props) {
       : kpisForSelected.slice(0, 18);
 
   const miniCards = miniCardRows.map((k) => {
-    const val = getVal(db, selectedMonth, k.id);
-    const ly = getLastYearVal(db, selectedMonth, k.id);
+    const val = getVal(displayDb, selectedMonth, k.id);
+    const ly = getLastYearVal(displayDb, selectedMonth, k.id);
     const p = pct(k, val) ?? 0;
     const sc = statusColor(k, val);
     const dispTarget = k.unit === "$" ? "$" + k.target.toLocaleString() : k.target + k.unit;
@@ -388,8 +453,8 @@ export function KpiNmac2026Client({ view }: Props) {
   const monthKpiStats = (ids: string[]) =>
     ids.filter((id) => isNmacKpiVisible(id, hiddenNmacKpiIds)).map((id) => {
       const k = findKpi(id, kpisForSelected);
-      const val = getVal(db, selectedMonth, id);
-      const ly = getLastYearVal(db, selectedMonth, id);
+      const val = getVal(displayDb, selectedMonth, id);
+      const ly = getLastYearVal(displayDb, selectedMonth, id);
       const sc = statusColor(k, val);
       return (
         <div key={id} className={"nk26-stat " + sc}>
@@ -656,7 +721,7 @@ export function KpiNmac2026Client({ view }: Props) {
           <header className="nk26-page-head">
             <div className="nk26-section-title">Scheduling & utilization</div>
             <div className="nk26-section-sub">
-              Doctor utilisation ≥ 90% · no-show ≤ 7% · lead-to-booking conversion ≥ 75% · total population health visits
+              Doctor utilisation ≥ 90% · no-show ≤ 7% · lead-to-booking conversion ≥ 75% · total population health visits · AI confirmation rate
               <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>
@@ -740,6 +805,20 @@ export function KpiNmac2026Client({ view }: Props) {
                 <canvas id="nk26-c-ph" />
               </div>
             </div>
+            ) : null}
+            {kpiVisible("ai_confirmation_rate") ? (
+              <div className="nk26-card">
+                <div className="nk26-chd">
+                  <div>
+                    <div className="nk26-ctitle">AI Confirmation Rate</div>
+                    <div className="nk26-csub">CRM daily snapshots · CONFIRMAI / (CONFIRMAI + CONFPHONE)</div>
+                  </div>
+                  {badge("ai_confirmation_rate")}
+                </div>
+                <div className="nk26-canvas">
+                  <canvas id="nk26-c-ai-confirm" />
+                </div>
+              </div>
             ) : null}
           </div>
           </div>

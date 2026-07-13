@@ -120,7 +120,8 @@ export async function fetchCrmAiConfirmationRate(
   try {
     body = (await res.json()) as CrmAiConfirmationRateResponse | { detail?: string; error?: string };
   } catch {
-    throw new Error(`CRM API HTTP ${res.status} (non-JSON response)`);
+    const contentType = res.headers.get("content-type") ?? "unknown content type";
+    throw new Error(`CRM AI confirmation endpoint returned ${contentType} instead of JSON.`);
   }
 
   if (!res.ok) {

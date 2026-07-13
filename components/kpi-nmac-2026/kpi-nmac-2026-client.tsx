@@ -111,7 +111,8 @@ export function KpiNmac2026Client({ view }: Props) {
   const [crmKpiSnapshot, setCrmKpiSnapshot] = useState<{
     year: number;
     values: Partial<Record<number, MonthDb>>;
-  }>(() => ({ year: DEFAULT_KPI_YEAR, values: {} }));
+    messages: Partial<Record<number, string>>;
+  }>(() => ({ year: DEFAULT_KPI_YEAR, values: {}, messages: {} }));
   const [fyTargets, setFyTargets] = useState<Record<string, number>>({});
   const [targetsByMonth, setTargetsByMonth] = useState<Partial<Record<number, Record<string, number>>>>({});
   const chartsRef = useRef<Chart[]>([]);
@@ -243,23 +244,40 @@ export function KpiNmac2026Client({ view }: Props) {
             credentials: "include",
             cache: "no-store",
           });
-          const body = (await res.json()) as { rate_pct?: unknown };
-          if (!res.ok) return null;
+          const body = (await res.json()) as { rate_pct?: unknown; snapshot_days?: unknown; error?: unknown };
+          if (!res.ok) {
+            const message = typeof body.error === "string" ? body.error : "Could not load CRM AI confirmation rate.";
+            return { monthIndex, message };
+          }
           const rate = typeof body.rate_pct === "number" && Number.isFinite(body.rate_pct) ? body.rate_pct : null;
-          return rate === null ? null : ([monthIndex, rate] as const);
+          if (rate === null) {
+            const snapshotDays = typeof body.snapshot_days === "number" ? body.snapshot_days : null;
+            return {
+              monthIndex,
+              message:
+                snapshotDays === 0
+                  ? "No AI confirmation snapshots for this month."
+                  : "CRM returned no AI confirmation rate for this month.",
+            };
+          }
+          return { monthIndex, rate };
         } catch {
-          return null;
+          return { monthIndex, message: "Could not load CRM AI confirmation rate." };
         }
       }),
     ).then((results) => {
       if (cancelled) return;
       const next: Partial<Record<number, MonthDb>> = {};
+      const messages: Partial<Record<number, string>> = {};
       results.forEach((result) => {
         if (!result) return;
-        const [monthIndex, rate] = result;
-        next[monthIndex] = { ai_confirmation_rate: { ty: rate } };
+        if ("rate" in result) {
+          next[result.monthIndex] = { ai_confirmation_rate: { ty: result.rate } };
+        } else {
+          messages[result.monthIndex] = result.message;
+        }
       });
-      setCrmKpiSnapshot({ year: selectedYear, values: next });
+      setCrmKpiSnapshot({ year: selectedYear, values: next, messages });
     });
 
     return () => {
@@ -456,13 +474,23 @@ export function KpiNmac2026Client({ view }: Props) {
       const val = getVal(displayDb, selectedMonth, id);
       const ly = getLastYearVal(displayDb, selectedMonth, id);
       const sc = statusColor(k, val);
+      const crmMessage =
+        id === "ai_confirmation_rate" && crmKpiSnapshot.year === selectedYear
+          ? crmKpiSnapshot.messages[selectedMonth]
+          : null;
       return (
         <div key={id} className={"nk26-stat " + sc}>
           <div className="nk26-slab">{k.label}</div>
           <div className={"nk26-sval " + sc}>{formatVal(k, val)}</div>
           <div className="nk26-ssub">
-            Target: {k.higher ? "≥" : "≤"} {k.target}
-            {k.unit} · vs LY {rateVsLastYearPct(val, ly)}
+            {crmMessage ? (
+              crmMessage
+            ) : (
+              <>
+                Target: {k.higher ? "≥" : "≤"} {k.target}
+                {k.unit} · vs LY {rateVsLastYearPct(val, ly)}
+              </>
+            )}
           </div>
           <div className="nk26-mwrap">
             <div

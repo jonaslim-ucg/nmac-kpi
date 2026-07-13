@@ -24,6 +24,10 @@ export function defaultCompletedMonthIndex(date = new Date()): number {
   return (date.getMonth() + 11) % 12;
 }
 
+export function currentMonthIndex(date = new Date()): number {
+  return date.getMonth();
+}
+
 /** Listed first in Performance overview “All KPIs” grid — stakeholder reporting priorities. */
 export const OVERVIEW_PRIORITY_KPIS = ["satisfaction", "copay", "util", "feedback"] as const;
 

@@ -20,7 +20,7 @@ import {
 import {
   buildKpisPerMonth,
   colorBar,
-  defaultCompletedMonthIndex,
+  currentMonthIndex,
   emptyNmacMonthDbs,
   formatVal,
   getLastYearVal,
@@ -106,7 +106,7 @@ export function KpiNmac2026Client({ view }: Props) {
     return readDocThemeClass();
   }, [resolvedTheme]);
   const [selectedYear, setSelectedYear] = useState(DEFAULT_KPI_YEAR);
-  const [selectedMonth, setSelectedMonth] = useState(defaultCompletedMonthIndex);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthIndex);
   const [db, setDb] = useState<Db>(() => emptyNmacMonthDbs());
   const [crmKpiSnapshot, setCrmKpiSnapshot] = useState<{
     year: number;

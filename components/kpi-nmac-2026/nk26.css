@@ -466,7 +466,7 @@
 }
 
 .nk26-referral-kpi-row {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .nk26-referral-cards .nk26-stat,
@@ -500,19 +500,7 @@
 
 @media (max-width: 1100px) {
   .nk26-referral-kpi-row {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-  }
-
-  .nk26-referral-kpi-row > .nk26-stat {
-    grid-column: span 2;
-  }
-
-  .nk26-referral-kpi-row > .nk26-stat:nth-child(4) {
-    grid-column: 2 / span 2;
-  }
-
-  .nk26-referral-kpi-row > .nk26-stat:nth-child(5) {
-    grid-column: 4 / span 2;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -535,12 +523,6 @@
     grid-column: auto;
   }
 
-  .nk26-referral-kpi-row > .nk26-stat:nth-child(5) {
-    grid-column: 1 / -1;
-    max-width: 50%;
-    justify-self: center;
-  }
-
   .nk26-referral-funnel {
     grid-template-columns: 1fr;
   }
@@ -552,8 +534,7 @@
     grid-template-columns: 1fr;
   }
 
-  .nk26-referral-cards > .nk26-stat:last-child,
-  .nk26-referral-kpi-row > .nk26-stat:nth-child(5) {
+  .nk26-referral-cards > .nk26-stat:last-child {
     max-width: none;
     justify-self: stretch;
   }

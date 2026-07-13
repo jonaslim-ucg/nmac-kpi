@@ -29,7 +29,7 @@ export async function GET(req: Request) {
     const months = await Promise.all(
       Array.from({ length: 12 }, async (_, monthIndex) => {
         const { from, to } = monthDateBounds(year, monthIndex);
-        const data = await fetchArdtsStatusCounts({ range: "custom", from, to });
+        const data = await fetchArdtsStatusCounts({ range: "custom", from, to, itemType: "referral" });
         const point: ReferralMonthlyPoint = {
           monthIndex,
           from,

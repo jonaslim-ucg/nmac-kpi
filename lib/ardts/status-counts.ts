@@ -1,4 +1,6 @@
+import { loadEnvConfig } from "@next/env";
 import type {
+  ArdtsItemType,
   ArdtsRangePreset,
   ArdtsStatusCountsErrorBody,
   ArdtsStatusCountsResponse,
@@ -12,19 +14,32 @@ export class ArdtsConfigError extends Error {
 }
 
 export type FetchArdtsStatusCountsParams = {
-  range: ArdtsRangePreset;
+  range?: ArdtsRangePreset;
   from?: string;
   to?: string;
+  year?: number;
+  month?: number;
+  itemType?: ArdtsItemType;
   status?: string | string[];
 };
 
+let envLoaded = false;
+
+function ensureLocalEnvLoaded(): void {
+  if (envLoaded || process.env.NODE_ENV === "production") return;
+  envLoaded = true;
+  loadEnvConfig(process.cwd());
+}
+
 function ardtsBaseUrl(): string {
+  ensureLocalEnvLoaded();
   const base = process.env.ARDTS_API_BASE_URL?.trim().replace(/\/$/, "");
   if (!base) throw new ArdtsConfigError();
   return base;
 }
 
 function ardtsToken(): string {
+  ensureLocalEnvLoaded();
   const token = process.env.ARDTS_INTEGRATION_API_TOKEN?.trim();
   if (!token) throw new ArdtsConfigError();
   return token;
@@ -34,14 +49,27 @@ export async function fetchArdtsStatusCounts(
   params: FetchArdtsStatusCountsParams,
 ): Promise<ArdtsStatusCountsResponse> {
   const url = new URL(`${ardtsBaseUrl()}/api/reports/status-counts`);
-  url.searchParams.set("range", params.range);
-
-  if (params.range === "custom") {
-    if (!params.from || !params.to) {
-      throw new Error("Custom range requires from and to (YYYY-MM-DD).");
+  if (params.year !== undefined || params.month !== undefined) {
+    if (!params.year || !params.month) {
+      throw new Error("Month reporting requires year and month.");
     }
-    url.searchParams.set("from", params.from);
-    url.searchParams.set("to", params.to);
+    url.searchParams.set("year", String(params.year));
+    url.searchParams.set("month", String(params.month));
+  } else {
+    const range = params.range ?? "last_7_days";
+    url.searchParams.set("range", range);
+
+    if (range === "custom") {
+      if (!params.from || !params.to) {
+        throw new Error("Custom range requires from and to (YYYY-MM-DD).");
+      }
+      url.searchParams.set("from", params.from);
+      url.searchParams.set("to", params.to);
+    }
+  }
+
+  if (params.itemType) {
+    url.searchParams.set("item_type", params.itemType);
   }
 
   if (params.status) {

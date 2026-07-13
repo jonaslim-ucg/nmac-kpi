@@ -1209,7 +1209,7 @@ export function KpiNmac2026Client({ view }: Props) {
           <header className="nk26-page-head">
             <div className="nk26-section-title">Referral KPI</div>
             <div className="nk26-section-sub">
-              Track referrals sent, booking rate, and pipeline outcomes from ARDTS · business hours Mon–Fri
+              Track referrals sent, booking rate, and pipeline outcomes from ARDTS · scoped by date sent
               <span className="mt-1 block text-foreground/90">{monthLabel}</span>
             </div>
           </header>

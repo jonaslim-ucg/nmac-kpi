@@ -11,6 +11,10 @@ import {
 } from "@/lib/3cx/email-report";
 import { getAppDashboardSettings } from "@/lib/auth/app-settings";
 import {
+  fetchCrmAiConfirmationRate,
+  type CrmAiConfirmationRateResponse,
+} from "@/lib/crm/appointments";
+import {
   buildKpisPerMonth,
   formatVal,
   getVal,
@@ -129,20 +133,61 @@ export function parseThreeCxRangeFromQuestion(question: string): ThreeCxReportRa
   return "month";
 }
 
+const KPI_ALIASES: Partial<Record<KpiRow["id"], readonly string[]>> = {
+  ai_confirmation_rate: ["ai confirmation", "ai confirmations", "ai confirmed appointments"],
+  appt_confirm: ["appointment confirmations", "manual confirmation rate"],
+  callrate: ["call answer rate", "answered call rate", "calls answered rate"],
+  callvol: ["call volume", "calls received"],
+  call_answered: ["answered calls", "serviced calls"],
+  call_missed: ["missed calls", "abandoned calls", "unanswered calls"],
+  copay: ["copay collection"],
+  noshow: ["no show rate", "no shows"],
+  util: ["doctor utilization", "provider utilization", "provider utilisation"],
+  visits: ["patient checkouts"],
+};
+
+function normalizeKpiPhrase(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\bnmack\b/g, "nmac")
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function containsPhrase(text: string, phrase: string): boolean {
+  return ` ${text} `.includes(` ${phrase} `);
+}
+
+function isBroadKpiQuestion(question: string): boolean {
+  const t = normalizeKpiPhrase(question);
+  return (
+    /\b(all|list|overview|summary|dashboard|performance|report|which|missing|gaps?)\b/.test(t) ||
+    /\b(how are we doing|kpi numbers|kpi metrics|all kpis|on target|below target|no data)\b/.test(t) ||
+    /\bnmac kpis?\b/.test(t) && !/\b(rate|score|calls?|visits?|revenue|margin|sales|exams?|tests?|bookings?|productivity|compliance|utilization|utilisation|variances?)\b/.test(t)
+  );
+}
+
 function matchKpisForQuestion(question: string, kpis: readonly KpiRow[]): KpiRow[] {
-  const t = question.toLowerCase();
-  const hits = kpis.filter((k) => {
-    const label = k.label.toLowerCase();
-    const id = k.id.toLowerCase();
-    const domain = k.domain.toLowerCase();
-    return (
-      t.includes(id) ||
-      t.includes(label) ||
-      label.split(/\s+/).some((w) => w.length > 4 && t.includes(w)) ||
-      t.includes(domain)
-    );
+  const t = normalizeKpiPhrase(question);
+  const specificHits = kpis.filter((kpi) => {
+    const phrases = [
+      normalizeKpiPhrase(kpi.id),
+      normalizeKpiPhrase(kpi.label),
+      ...(KPI_ALIASES[kpi.id] ?? []).map(normalizeKpiPhrase),
+    ];
+    return phrases.some((phrase) => phrase.length > 2 && containsPhrase(t, phrase));
   });
-  return hits.length > 0 ? hits : [...kpis];
+  if (specificHits.length > 0) return specificHits;
+
+  const domainHits = kpis.filter((kpi) => {
+    const domain = normalizeKpiPhrase(kpi.domain);
+    return containsPhrase(t, domain) && /\b(kpi|kpis|metric|metrics|performance|dashboard)\b/.test(t);
+  });
+  if (domainHits.length > 0) return domainHits;
+
+  return isBroadKpiQuestion(question) ? [...kpis] : [];
 }
 
 async function loadMonthly(year: number): Promise<Record<number, MonthDb>> {
@@ -298,6 +343,28 @@ export async function buildNmacKpiContextForQuestion(question: string): Promise<
   const kpisPerMonth = buildKpisPerMonth(targetPack.fy, targetPack.byMonth, hiddenIds);
   const visible = kpisPerMonth[focusMonth] ?? [];
   const focusKpis = matchKpisForQuestion(question, visible);
+  const broadKpiQuestion = isBroadKpiQuestion(question);
+  let aiConfirmationSnapshot: CrmAiConfirmationRateResponse | null = null;
+  let aiConfirmationSnapshotUnavailable = false;
+  if (focusKpis.some((kpi) => kpi.id === "ai_confirmation_rate")) {
+    try {
+      aiConfirmationSnapshot = await fetchCrmAiConfirmationRate(year, focusMonth + 1);
+      if (
+        typeof aiConfirmationSnapshot.rate_pct === "number" &&
+        Number.isFinite(aiConfirmationSnapshot.rate_pct)
+      ) {
+        monthly[focusMonth] = {
+          ...monthly[focusMonth],
+          ai_confirmation_rate: {
+            ...monthly[focusMonth]?.ai_confirmation_rate,
+            ty: aiConfirmationSnapshot.rate_pct,
+          },
+        };
+      }
+    } catch {
+      aiConfirmationSnapshotUnavailable = true;
+    }
+  }
   const threeCxRange = parseThreeCxRangeFromQuestion(question);
   const includeThreeCx = wantsThreeCxDetail(question, focusKpis);
   const [threeCxDetail, threeCxImports] = includeThreeCx
@@ -309,38 +376,71 @@ export async function buildNmacKpiContextForQuestion(question: string): Promise<
 
   const lines: string[] = [
     `# NMAC KPI data (${year})`,
-    `Source: NMAC KPI dashboard (kpi.nmac.bm) — NMAC Master monthly actuals.`,
+    aiConfirmationSnapshot
+      ? "Source: NMAC KPI dashboard (kpi.nmac.bm) - NMAC Master monthly actuals with the live CRM AI confirmation snapshot."
+      : "Source: NMAC KPI dashboard (kpi.nmac.bm) - NMAC Master monthly actuals.",
     `Focus month: **${MONTHS[focusMonth]}** (index ${focusMonth}).`,
     "",
     "## Focus KPIs for this question",
   ];
 
-  for (const kpi of focusKpis) {
-    lines.push(formatKpiLine(kpi, focusMonth, monthly));
-  }
-
-  lines.push("", "## All visible KPIs by domain (focus month)");
-  const byDomain = new Map<string, KpiRow[]>();
-  for (const kpi of visible) {
-    const list = byDomain.get(kpi.domain) ?? [];
-    list.push(kpi);
-    byDomain.set(kpi.domain, list);
-  }
-  for (const [domain, rows] of byDomain) {
-    lines.push(`### ${domain}`);
-    for (const kpi of rows) {
+  if (focusKpis.length === 0) {
+    lines.push(
+      "- No visible NMAC KPI label or recognized alias matched the metric in the question.",
+      "- Do not substitute a different KPI. Ask the user to confirm the KPI name.",
+      `- Visible KPI labels: ${visible.map((kpi) => kpi.label).join("; ")}.`,
+    );
+  } else {
+    for (const kpi of focusKpis) {
       lines.push(formatKpiLine(kpi, focusMonth, monthly));
     }
   }
 
-  lines.push("", "## Monthly trend (focus KPIs, Jan–Dec actual TY)");
-  for (const kpi of focusKpis.slice(0, 12)) {
-    const monthVals = MONTHS.map((name, m) => {
-      const monthKpi = kpisPerMonth[m]?.find((candidate) => candidate.id === kpi.id) ?? kpi;
-      const v = getVal(monthly, m, kpi.id);
-      return `${name}: ${formatVal(monthKpi, v)}`;
-    });
-    lines.push(`- **${kpi.label}**: ${monthVals.join("; ")}`);
+  if (aiConfirmationSnapshot) {
+    lines.push(
+      "",
+      "## CRM AI confirmation snapshot",
+      `- Period: ${aiConfirmationSnapshot.date_from} to ${aiConfirmationSnapshot.date_to}`,
+      `- AI-confirmed appointments: ${aiConfirmationSnapshot.numerator.toLocaleString()}`,
+      `- AI + phone-confirmed appointments: ${aiConfirmationSnapshot.denominator.toLocaleString()}`,
+      `- Snapshot days: ${aiConfirmationSnapshot.snapshot_days.toLocaleString()}`,
+      `- Rate: ${aiConfirmationSnapshot.rate_pct == null ? "no data" : `${aiConfirmationSnapshot.rate_pct}%`}`,
+      "- Formula: AI confirmed / (AI confirmed + phone confirmed).",
+    );
+  } else if (aiConfirmationSnapshotUnavailable) {
+    lines.push(
+      "",
+      "## CRM AI confirmation snapshot",
+      "- The live CRM snapshot could not be loaded. Use the monthly actual above if one is recorded; otherwise say the actual is unavailable.",
+    );
+  }
+
+  if (broadKpiQuestion) {
+    lines.push("", "## All visible KPIs by domain (focus month)");
+    const byDomain = new Map<string, KpiRow[]>();
+    for (const kpi of visible) {
+      const list = byDomain.get(kpi.domain) ?? [];
+      list.push(kpi);
+      byDomain.set(kpi.domain, list);
+    }
+    for (const [domain, rows] of byDomain) {
+      lines.push(`### ${domain}`);
+      for (const kpi of rows) {
+        lines.push(formatKpiLine(kpi, focusMonth, monthly));
+      }
+    }
+  }
+
+  if (focusKpis.length > 0) {
+    lines.push("", "## Monthly trend (focus KPIs, Jan-Dec actual TY)");
+    for (const kpi of focusKpis.slice(0, 12)) {
+      const monthVals = MONTHS.map((name, m) => {
+        const monthKpi = kpisPerMonth[m]?.find((candidate) => candidate.id === kpi.id) ?? kpi;
+        const v = getVal(monthly, m, kpi.id);
+        return `${name}: ${formatVal(monthKpi, v)}`;
+      });
+      lines.push(`- **${kpi.label}**: ${monthVals.join("; ")}`);
+    }
   }
 
   if (includeThreeCx) {

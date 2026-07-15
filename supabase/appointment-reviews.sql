@@ -27,7 +27,8 @@ create table if not exists public.appointment_reviews (
   patient_duration text not null check (patient_duration in ('new', 'less-1', '1-4', '5-9', '10-plus')),
   referral_sources text[] not null default '{}',
   referral_other text not null default '',
-  exceptional_staff_comment text not null default ''
+  exceptional_staff_comment text not null default '',
+  survey_token uuid unique
 );
 
 alter table public.appointment_reviews enable row level security;

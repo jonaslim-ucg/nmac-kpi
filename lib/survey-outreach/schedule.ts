@@ -10,6 +10,7 @@ export const INITIAL_SURVEY_MAX_DELAY_HOURS = 24;
 export const REMINDER_1_DAYS_AFTER_INITIAL = 3;
 export const REMINDER_2_DAYS_AFTER_INITIAL = 7;
 export const FINAL_REMINDER_DAY_OPTIONS = [14, 21] as const;
+export const MINIMUM_SURVEY_MESSAGE_GAP_HOURS = 24;
 
 function defaultFinalReminderDays(): number {
   const configured = Number(process.env.SURVEY_FINAL_REMINDER_DAYS ?? "14");
@@ -95,6 +96,17 @@ export function initialSurveyDueAt(
   config: SurveyOutreachScheduleConfig = DEFAULT_SURVEY_OUTREACH_SCHEDULE,
 ): Date {
   return new Date(appointmentAt.getTime() + scheduleDelays(config).initialMs);
+}
+
+export function noEarlierThanMinimumMessageGap(
+  scheduledAt: Date,
+  previousSentAt: Date | null,
+): Date {
+  if (!previousSentAt || !Number.isFinite(previousSentAt.getTime())) return scheduledAt;
+  const minimumAt = new Date(
+    previousSentAt.getTime() + MINIMUM_SURVEY_MESSAGE_GAP_HOURS * 60 * 60 * 1000,
+  );
+  return minimumAt.getTime() > scheduledAt.getTime() ? minimumAt : scheduledAt;
 }
 
 export function isInitialSurveyDue(

@@ -16,7 +16,10 @@ import {
   type TestimonialPermissionValue,
 } from "@/lib/appointment-review/types";
 import { insertAppointmentReview } from "@/lib/appointment-review/store";
-import { markOutreachCompleted } from "@/lib/survey-outreach/store";
+import {
+  lookupOutreachByToken,
+  markOutreachCompleted,
+} from "@/lib/survey-outreach/store";
 
 export const dynamic = "force-dynamic";
 
@@ -159,6 +162,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, message: parsed.error }, { status: 400 });
   }
 
+  if (parsed.surveyToken) {
+    const outreach = await lookupOutreachByToken(parsed.surveyToken);
+    if (!outreach) {
+      return NextResponse.json(
+        { ok: false, message: "This survey link is invalid or has expired." },
+        { status: 400 },
+      );
+    }
+    if (outreach.email.trim().toLowerCase() !== parsed.email) {
+      return NextResponse.json(
+        { ok: false, message: "This survey link does not match the supplied email address." },
+        { status: 400 },
+      );
+    }
+    if (outreach.completed) {
+      return NextResponse.json(
+        { ok: false, message: "This survey has already been submitted." },
+        { status: 409 },
+      );
+    }
+  }
+
   const result = await insertAppointmentReview(parsed);
   if (!result.ok) {
     if (result.setupRequired) {
@@ -171,7 +196,10 @@ export async function POST(req: Request) {
         { status: 503 },
       );
     }
-    return NextResponse.json({ ok: false, message: result.error }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, message: result.error },
+      { status: result.duplicate ? 409 : 500 },
+    );
   }
 
   if (parsed.surveyToken) {

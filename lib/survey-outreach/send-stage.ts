@@ -15,8 +15,12 @@ import {
 } from "@/lib/survey-outreach/schedule-settings";
 import {
   createTestOutreach,
+  extendStageSendClaim,
   getActiveTestOutreach,
+  getClaimedOutreach,
+  getOutreachById,
   getOutreachByToken,
+  markOutreachRecalled,
   markStageSent,
   resetTestOutreach,
 } from "@/lib/survey-outreach/store";
@@ -24,6 +28,35 @@ import type { SurveyOutreachRow, SurveyOutreachStage } from "@/lib/survey-outrea
 import { isSurveyEmailSuppressed } from "@/lib/survey-outreach/recall";
 import { buildSurveyUrl } from "@/lib/survey-outreach/urls";
 import { sendMailViaGraph } from "@/lib/graph/send-mail";
+
+const DELIVERY_UNCERTAINTY_LOCK_MS = 2 * 60 * 60 * 1000;
+
+export class DeliveryStateUncertainError extends Error {
+  readonly deliveryAccepted = true;
+
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "DeliveryStateUncertainError";
+  }
+}
+
+async function persistStageSent(
+  id: string,
+  stage: SurveyOutreachStage,
+  lockToken?: string,
+): Promise<void> {
+  let lastError: unknown;
+  for (const delayMs of [0, 150, 500]) {
+    if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    try {
+      await markStageSent(id, stage, lockToken);
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
 
 export type SendStageResult = {
   ok: true;
@@ -39,8 +72,31 @@ export async function sendSurveyStage(input: {
   row: SurveyOutreachRow;
   stage: SurveyOutreachStage;
   force?: boolean;
+  lockToken?: string;
 }): Promise<SendStageResult> {
-  const { row, stage, force = false } = input;
+  const { stage, force = false, lockToken } = input;
+  let row = input.row;
+
+  if (lockToken) {
+    const current = await getClaimedOutreach(row.id, lockToken, stage);
+    if (!current) {
+      const latest = await getOutreachById(row.id);
+      return {
+        ok: true,
+        stage,
+        to: row.patient_email,
+        surveyUrl: buildSurveyUrl(row.survey_token),
+        outreachId: row.id,
+        skipped: true,
+        reason: latest?.completed_at
+          ? "Survey was completed before delivery."
+          : latest?.recalled_at
+            ? "Survey outreach was recalled before delivery."
+            : "The delivery claim is no longer active.",
+      };
+    }
+    row = current;
+  }
 
   if (row.completed_at) {
     return {
@@ -54,7 +110,14 @@ export async function sendSurveyStage(input: {
     };
   }
 
-  if (row.recalled_at || (!row.is_test && (await isSurveyEmailSuppressed(row.patient_email)))) {
+  const suppressed = !row.is_test && !row.recalled_at
+    ? await isSurveyEmailSuppressed(row.patient_email)
+    : false;
+  if (row.recalled_at || suppressed) {
+    const reason = row.recall_reason ?? "Survey outreach is suppressed for this patient.";
+    if (suppressed) {
+      await markOutreachRecalled(row.id, reason, lockToken);
+    }
     return {
       ok: true,
       stage,
@@ -62,7 +125,7 @@ export async function sendSurveyStage(input: {
       surveyUrl: buildSurveyUrl(row.survey_token),
       outreachId: row.id,
       skipped: true,
-      reason: row.recall_reason ?? "Survey outreach recalled for this patient.",
+      reason,
     };
   }
 
@@ -109,8 +172,20 @@ export async function sendSurveyStage(input: {
     }
   }
 
-  const sending = row.is_test ? null : await getSurveyOutreachSendingState();
-  if (sending && !sending.effectiveEnabled) {
+  const sending = await getSurveyOutreachSendingState();
+  if (!sending.appEnabled) {
+    return {
+      ok: true,
+      stage,
+      to: row.patient_email,
+      surveyUrl: buildSurveyUrl(row.survey_token),
+      outreachId: row.id,
+      skipped: true,
+      reason: surveyOutreachAppDisabledReason(),
+    };
+  }
+
+  if (!row.is_test && !sending.effectiveEnabled) {
     return {
       ok: true,
       stage,
@@ -129,7 +204,7 @@ export async function sendSurveyStage(input: {
     !isProductionSurveyOutreachAfterLiveStart({
       appointmentAt: row.appointment_at,
       createdAt: row.created_at,
-      liveStartAt: sending?.liveStartAt,
+      liveStartAt: sending.liveStartAt,
     })
   ) {
     return {
@@ -139,13 +214,35 @@ export async function sendSurveyStage(input: {
       surveyUrl: buildSurveyUrl(row.survey_token),
       outreachId: row.id,
       skipped: true,
-      reason: surveyOutreachBeforeLiveStartReason(sending?.liveStartAt),
+      reason: surveyOutreachBeforeLiveStartReason(sending.liveStartAt),
     };
   }
 
   const { subject, textBody, htmlBody } = buildSurveyEmail(stage, row.patient_name, row.survey_token);
-  await sendMailViaGraph({ to: row.patient_email, subject, textBody, htmlBody });
-  await markStageSent(row.id, stage);
+  if (lockToken) {
+    await extendStageSendClaim({
+      id: row.id,
+      stage,
+      lockToken,
+      lockUntil: new Date(Date.now() + DELIVERY_UNCERTAINTY_LOCK_MS).toISOString(),
+    });
+  }
+
+  await sendMailViaGraph({
+    to: row.patient_email,
+    subject,
+    textBody,
+    htmlBody,
+    deliveryKey: lockToken ?? crypto.randomUUID(),
+  });
+  try {
+    await persistStageSent(row.id, stage, lockToken);
+  } catch (error) {
+    throw new DeliveryStateUncertainError(
+      "Microsoft Graph accepted the email, but its sent status could not be saved. Automatic retry was stopped to prevent a duplicate.",
+      { cause: error },
+    );
+  }
 
   return {
     ok: true,

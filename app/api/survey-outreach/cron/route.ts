@@ -7,7 +7,10 @@ import {
 import { isAuthorizedSurveyOutreachRequest } from "@/lib/survey-outreach/auth";
 import { runSurveyOutreachScheduler } from "@/lib/survey-outreach/run-scheduler";
 import { formatScheduleSummary } from "@/lib/survey-outreach/schedule";
-import { getSurveyOutreachSchedule } from "@/lib/survey-outreach/schedule-settings";
+import {
+  getSurveyOutreachSchedule,
+  recordSurveyOutreachSchedulerRun,
+} from "@/lib/survey-outreach/schedule-settings";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -27,16 +30,25 @@ async function handleCron(req: Request) {
     return NextResponse.json({
       ...result,
       schedule: formatScheduleSummary(schedule),
-      message: !result.sendingMasterEnabled
-        ? surveyOutreachSendingDisabledReason()
-        : !result.sendingAppEnabled
-          ? surveyOutreachAppDisabledReason()
-          : result.liveStartAt
-            ? undefined
-            : surveyOutreachLiveStartMissingReason(),
+      message:
+        result.configurationErrors[0] ??
+        (!result.sendingMasterEnabled
+          ? surveyOutreachSendingDisabledReason()
+          : !result.sendingAppEnabled
+            ? surveyOutreachAppDisabledReason()
+            : result.liveStartAt
+              ? undefined
+              : surveyOutreachLiveStartMissingReason()),
     });
   } catch (e) {
     console.error(e);
+    const at = new Date().toISOString();
+    await recordSurveyOutreachSchedulerRun({
+      at,
+      successful: false,
+      error: e instanceof Error ? e.message : "Scheduler failed.",
+      result: { sent: 0, skipped: 0, errors: 1, syncErrors: 0, deferredDue: 0 },
+    }).catch(() => undefined);
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : "Scheduler failed." },
       { status: 500 },

@@ -26,7 +26,14 @@ export type SurveyOutreachRow = {
   send_lock_token: string | null;
   send_lock_stage: SurveyOutreachStage | null;
   send_lock_until: string | null;
-  status: "pending" | "sent" | "completed" | "skipped";
+  last_delivery_key: string | null;
+  send_attempt_count: number;
+  last_send_attempt_at: string | null;
+  next_retry_at: string | null;
+  last_send_error: string | null;
+  failed_stage: SurveyOutreachStage | null;
+  permanently_failed_at: string | null;
+  status: "pending" | "sent" | "completed" | "skipped" | "failed";
   recalled_at: string | null;
   recall_reason: string | null;
 };

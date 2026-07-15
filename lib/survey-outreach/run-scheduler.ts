@@ -8,18 +8,32 @@ import { parseCrmAppointmentAt } from "@/lib/survey-outreach/parse-appointment";
 import {
   getSurveyOutreachSchedule,
   getSurveyOutreachSendingState,
+  recordSurveyOutreachSchedulerRun,
 } from "@/lib/survey-outreach/schedule-settings";
-import { sendSurveyStage } from "@/lib/survey-outreach/send-stage";
+import {
+  DeliveryStateUncertainError,
+  sendSurveyStage,
+} from "@/lib/survey-outreach/send-stage";
 import { nextActionForRow } from "@/lib/survey-outreach/next-action";
 import type { SurveyOutreachScheduleConfig } from "@/lib/survey-outreach/schedule";
 import {
   claimStageSend,
   listIncompleteOutreach,
+  markStageDeliveryUncertain,
+  recordStageSendFailure,
   releaseStageSendClaim,
   upsertCrmOutreachBatch,
 } from "@/lib/survey-outreach/store";
 import type { SurveyOutreachRow, SurveyOutreachStage } from "@/lib/survey-outreach/types";
 import type { SendStageResult } from "@/lib/survey-outreach/send-stage";
+import { GraphMailError } from "@/lib/graph/send-mail";
+import {
+  compactSendError,
+  schedulerConfigurationStatus,
+  surveyOutreachMaxSendsPerRun,
+  surveyOutreachScanLimit,
+  surveySendRetryAt,
+} from "@/lib/survey-outreach/reliability";
 
 export type SchedulerResult = {
   ok: true;
@@ -30,14 +44,36 @@ export type SchedulerResult = {
   synced: number;
   skippedNoEmail: number;
   skippedBeforeLiveStart: number;
+  syncErrors: { date: string; error: string }[];
+  configurationErrors: string[];
+  attempted: number;
+  deferredDue: number;
   sent: SendStageResult[];
   skipped: SendStageResult[];
-  errors: { outreachId: string; stage: SurveyOutreachStage; error: string }[];
+  errors: {
+    outreachId: string;
+    stage: SurveyOutreachStage;
+    error: string;
+    retryAt: string | null;
+    permanent: boolean;
+  }[];
 };
 
 type SchedulerOptions = {
   allowAnyTestRecipient?: boolean;
 };
+
+class ScheduledSendFailure extends Error {
+  readonly retryAt: string | null;
+  readonly permanent: boolean;
+
+  constructor(message: string, retryAt: string | null, permanent: boolean) {
+    super(message);
+    this.name = "ScheduledSendFailure";
+    this.retryAt = retryAt;
+    this.permanent = permanent;
+  }
+}
 
 function isValidEmail(email: string | null | undefined): boolean {
   return Boolean(email?.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()));
@@ -69,11 +105,13 @@ export async function syncCheckedOutFromCrm(now?: Date): Promise<{
   synced: number;
   skippedNoEmail: number;
   skippedBeforeLiveStart: number;
+  syncErrors: { date: string; error: string }[];
 }>;
 export async function syncCheckedOutFromCrm(now: Date, liveStartAt: Date | string | null): Promise<{
   synced: number;
   skippedNoEmail: number;
   skippedBeforeLiveStart: number;
+  syncErrors: { date: string; error: string }[];
 }>;
 export async function syncCheckedOutFromCrm(
   now = new Date(),
@@ -82,11 +120,26 @@ export async function syncCheckedOutFromCrm(
   synced: number;
   skippedNoEmail: number;
   skippedBeforeLiveStart: number;
+  syncErrors: { date: string; error: string }[];
 }> {
-  const dates = crmSyncDates(now);
-  const crmRows = (
-    await Promise.all(dates.map((date) => fetchCrmAppointments(date, "CHK")))
-  ).flat();
+  const lookbackDays = now.getUTCMinutes() % 15 === 0 ? 3 : 1;
+  const dates = crmSyncDates(now, lookbackDays);
+  const settled = await Promise.allSettled(
+    dates.map(async (date) => ({ date, rows: await fetchCrmAppointments(date, "CHK") })),
+  );
+  const crmRows: CrmAppointmentRow[] = [];
+  const syncErrors: { date: string; error: string }[] = [];
+
+  settled.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      crmRows.push(...result.value.rows);
+      return;
+    }
+    syncErrors.push({
+      date: dates[index],
+      error: result.reason instanceof Error ? result.reason.message : "CRM sync failed.",
+    });
+  });
 
   const outreachRows: NonNullable<ReturnType<typeof crmRowToOutreach>>[] = [];
   let skippedNoEmail = 0;
@@ -107,7 +160,7 @@ export async function syncCheckedOutFromCrm(
 
   const { synced } = await upsertCrmOutreachBatch(outreachRows);
 
-  return { synced, skippedNoEmail, skippedBeforeLiveStart };
+  return { synced, skippedNoEmail, skippedBeforeLiveStart, syncErrors };
 }
 
 function dueStageForRow(
@@ -115,6 +168,11 @@ function dueStageForRow(
   now: Date,
   config: SurveyOutreachScheduleConfig,
 ): { stage: SurveyOutreachStage; isManual: boolean } | null {
+  if (row.permanently_failed_at) return null;
+  if (row.next_retry_at) {
+    const retryAt = new Date(row.next_retry_at).getTime();
+    if (Number.isFinite(retryAt) && now.getTime() < retryAt) return null;
+  }
   const nextAction = nextActionForRow(row, config);
   if (!nextAction) return null;
 
@@ -125,8 +183,8 @@ function dueStageForRow(
   return { stage: nextAction.stage, isManual: nextAction.isManual };
 }
 
-function markSentInMemory(row: SurveyOutreachRow, stage: SurveyOutreachStage): void {
-  const sentAt = new Date().toISOString();
+function markSentInMemory(row: SurveyOutreachRow, stage: SurveyOutreachStage, now: Date): void {
+  const sentAt = now.toISOString();
   row.manual_next_scheduled_at = null;
   row.status = "sent";
   if (stage === "initial") row.initial_sent_at = sentAt;
@@ -152,6 +210,7 @@ async function sendDueForRow(
     lockToken,
     now: now.toISOString(),
     lockUntil: new Date(now.getTime() + 5 * 60 * 1000).toISOString(),
+    expectedAttemptCount: Math.max(0, row.send_attempt_count ?? 0),
   });
 
   if (!claimed) {
@@ -163,16 +222,52 @@ async function sendDueForRow(
       row: claimed,
       stage: dueStage.stage,
       force: dueStage.isManual && dueStage.stage === "initial",
+      lockToken,
     });
     if (result.skipped) {
-      await releaseStageSendClaim(row.id, lockToken);
+      await releaseStageSendClaim(row.id, lockToken, Math.max(0, row.send_attempt_count ?? 0));
       return { sent: null, skipped: result };
     }
-    markSentInMemory(row, dueStage.stage);
+    markSentInMemory(row, dueStage.stage, now);
     return { sent: result, skipped: null };
   } catch (e) {
-    await releaseStageSendClaim(row.id, lockToken);
-    throw e;
+    const error = compactSendError(e, dueStage.stage);
+    const graphError = e instanceof GraphMailError ? e : null;
+    if (e instanceof DeliveryStateUncertainError || graphError?.deliveryUncertain) {
+      try {
+        await markStageDeliveryUncertain({
+          id: row.id,
+          stage: dueStage.stage,
+          lockToken,
+          error,
+          now: now.toISOString(),
+        });
+      } catch {
+        // The extended claim remains in place if persistence is unavailable.
+      }
+      throw new ScheduledSendFailure(error, null, true);
+    }
+
+    const retryAt = graphError?.retryable === false
+      ? null
+      : surveySendRetryAt({
+          attempt: claimed.send_attempt_count,
+          now,
+          retryAfterMs: graphError?.retryAfterMs,
+        });
+    try {
+      await recordStageSendFailure({
+        id: row.id,
+        stage: dueStage.stage,
+        lockToken,
+        error,
+        retryAt: retryAt?.toISOString() ?? null,
+        now: now.toISOString(),
+      });
+    } catch {
+      await releaseStageSendClaim(row.id, lockToken).catch(() => undefined);
+    }
+    throw new ScheduledSendFailure(error, retryAt?.toISOString() ?? null, !retryAt);
   }
 }
 
@@ -186,14 +281,35 @@ export async function runSurveyOutreachScheduler(
   const sent: SendStageResult[] = [];
   const skipped: SendStageResult[] = [];
   const errors: SchedulerResult["errors"] = [];
+  let attempted = 0;
+  let deferredDue = 0;
+  let sendCircuitOpen = false;
+  const maxSends = surveyOutreachMaxSendsPerRun();
+  const configuration = schedulerConfigurationStatus();
+  const configurationErrors: string[] = [];
+  if (!configuration.mailConfigured) {
+    configurationErrors.push("Microsoft Graph mail settings are incomplete.");
+  }
+  if (!configuration.databaseConfigured) {
+    configurationErrors.push("Supabase settings are incomplete.");
+  }
 
-  const sync = sendingEnabled && liveStartAt
-    ? await syncCheckedOutFromCrm(now, liveStartAt)
-    : { synced: 0, skippedNoEmail: 0, skippedBeforeLiveStart: 0 };
+  let sync = { synced: 0, skippedNoEmail: 0, skippedBeforeLiveStart: 0, syncErrors: [] as { date: string; error: string }[] };
+  if (sendingEnabled && liveStartAt) {
+    try {
+      sync = await syncCheckedOutFromCrm(now, liveStartAt);
+    } catch (error) {
+      sync.syncErrors.push({
+        date: "sync",
+        error: error instanceof Error ? error.message : "CRM sync failed.",
+      });
+    }
+  }
   const schedule = await getSurveyOutreachSchedule();
-  const rows = await listIncompleteOutreach();
+  const rows = await listIncompleteOutreach(surveyOutreachScanLimit());
 
   for (const row of rows) {
+    if (!sending.appEnabled) continue;
     if (!sendingEnabled && !row.is_test) continue;
     if (
       !sendingEnabled &&
@@ -216,20 +332,36 @@ export async function runSurveyOutreachScheduler(
     }
     const dueStage = dueStageForRow(row, now, schedule);
     if (!dueStage) continue;
+    if (configurationErrors.length > 0) {
+      deferredDue++;
+      continue;
+    }
+    if (sendCircuitOpen) {
+      deferredDue++;
+      continue;
+    }
+    if (attempted >= maxSends) {
+      deferredDue++;
+      continue;
+    }
+    attempted++;
     try {
       const result = await sendDueForRow(row, now, schedule);
       if (result.skipped) skipped.push(result.skipped);
       if (result.sent) sent.push(result.sent);
     } catch (e) {
+      sendCircuitOpen = true;
       errors.push({
         outreachId: row.id,
         stage: dueStage.stage,
         error: e instanceof Error ? e.message : "Send failed",
+        retryAt: e instanceof ScheduledSendFailure ? e.retryAt : null,
+        permanent: e instanceof ScheduledSendFailure ? e.permanent : false,
       });
     }
   }
 
-  return {
+  const result: SchedulerResult = {
     ok: true,
     sendingEnabled,
     sendingMasterEnabled: sending.masterEnabled,
@@ -238,8 +370,29 @@ export async function runSurveyOutreachScheduler(
     synced: sync.synced,
     skippedNoEmail: sync.skippedNoEmail,
     skippedBeforeLiveStart: sync.skippedBeforeLiveStart,
+    syncErrors: sync.syncErrors,
+    configurationErrors,
+    attempted,
+    deferredDue,
     sent,
     skipped,
     errors,
   };
+
+  await recordSurveyOutreachSchedulerRun({
+    at: now.toISOString(),
+    successful:
+      configurationErrors.length === 0 && sync.syncErrors.length === 0 && errors.length === 0,
+    error:
+      configurationErrors[0] ?? errors[0]?.error ?? sync.syncErrors[0]?.error ?? null,
+    result: {
+      sent: sent.length,
+      skipped: skipped.length,
+      errors: errors.length + configurationErrors.length,
+      syncErrors: sync.syncErrors.length,
+      deferredDue,
+    },
+  }).catch(() => undefined);
+
+  return result;
 }

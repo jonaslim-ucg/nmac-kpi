@@ -21,6 +21,15 @@ export async function POST() {
   if (!canAccessDev(session.role)) return forbidden();
 
   const sending = await getSurveyOutreachSendingState();
+  if (!sending.appEnabled) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Turn on the Survey sending switch before running a scheduled email test.",
+      },
+      { status: 409 },
+    );
+  }
   if (sending.effectiveEnabled) {
     return NextResponse.json(
       {

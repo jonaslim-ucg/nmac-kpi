@@ -19,6 +19,34 @@ export async function getOutreachByToken(token: string): Promise<SurveyOutreachR
   return data as SurveyOutreachRow;
 }
 
+export async function getOutreachById(id: string): Promise<SurveyOutreachRow | null> {
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from("survey_outreach")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? (data as SurveyOutreachRow) : null;
+}
+
+export async function getClaimedOutreach(
+  id: string,
+  lockToken: string,
+  stage: SurveyOutreachStage,
+): Promise<SurveyOutreachRow | null> {
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from("survey_outreach")
+    .select("*")
+    .eq("id", id)
+    .eq("send_lock_token", lockToken)
+    .eq("send_lock_stage", stage)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? (data as SurveyOutreachRow) : null;
+}
+
 export async function lookupOutreachByToken(token: string): Promise<SurveyOutreachLookup | null> {
   const row = await getOutreachByToken(token);
   if (!row) return null;
@@ -75,10 +103,14 @@ export async function createTestOutreach(input: {
   return data as SurveyOutreachRow;
 }
 
-export async function markStageSent(id: string, stage: SurveyOutreachStage): Promise<void> {
+export async function markStageSent(
+  id: string,
+  stage: SurveyOutreachStage,
+  lockToken?: string,
+): Promise<void> {
   const supabase = createServiceRoleClient();
   const column = STAGE_COLUMN[stage];
-  const { error } = await supabase
+  let query = supabase
     .from("survey_outreach")
     .update({
       [column]: new Date().toISOString(),
@@ -86,10 +118,25 @@ export async function markStageSent(id: string, stage: SurveyOutreachStage): Pro
       send_lock_token: null,
       send_lock_stage: null,
       send_lock_until: null,
+      send_attempt_count: 0,
+      next_retry_at: null,
+      last_send_error: null,
+      failed_stage: null,
+      permanently_failed_at: null,
       status: "sent",
     })
     .eq("id", id);
+
+  if (lockToken) {
+    query = query
+      .eq("send_lock_token", lockToken)
+      .eq("send_lock_stage", stage)
+      .is(column, null);
+  }
+
+  const { data, error } = await query.select("id").maybeSingle();
   if (error) throw new Error(error.message);
+  if (!data) throw new Error("The survey delivery claim is no longer active.");
 }
 
 export async function claimStageSend(input: {
@@ -98,6 +145,7 @@ export async function claimStageSend(input: {
   lockToken: string;
   lockUntil: string;
   now: string;
+  expectedAttemptCount: number;
 }): Promise<SurveyOutreachRow | null> {
   const supabase = createServiceRoleClient();
   const column = STAGE_COLUMN[input.stage];
@@ -107,11 +155,20 @@ export async function claimStageSend(input: {
       send_lock_token: input.lockToken,
       send_lock_stage: input.stage,
       send_lock_until: input.lockUntil,
+      last_delivery_key: input.lockToken,
+      send_attempt_count: input.expectedAttemptCount + 1,
+      last_send_attempt_at: input.now,
+      last_send_error: null,
     })
     .eq("id", input.id)
     .is("completed_at", null)
+    .is("recalled_at", null)
+    .is("permanently_failed_at", null)
+    .in("status", ["pending", "sent"])
     .is(column, null)
+    .eq("send_attempt_count", input.expectedAttemptCount)
     .or(`send_lock_until.is.null,send_lock_until.lt.${input.now}`)
+    .or(`next_retry_at.is.null,next_retry_at.lte.${input.now}`)
     .select("*")
     .maybeSingle();
 
@@ -119,7 +176,90 @@ export async function claimStageSend(input: {
   return data ? (data as SurveyOutreachRow) : null;
 }
 
-export async function releaseStageSendClaim(id: string, lockToken: string): Promise<void> {
+export async function extendStageSendClaim(input: {
+  id: string;
+  stage: SurveyOutreachStage;
+  lockToken: string;
+  lockUntil: string;
+}): Promise<void> {
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from("survey_outreach")
+    .update({ send_lock_until: input.lockUntil })
+    .eq("id", input.id)
+    .eq("send_lock_token", input.lockToken)
+    .eq("send_lock_stage", input.stage)
+    .select("id")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("The survey delivery claim expired before sending.");
+}
+
+export async function recordStageSendFailure(input: {
+  id: string;
+  stage: SurveyOutreachStage;
+  lockToken: string;
+  error: string;
+  retryAt: string | null;
+  now: string;
+}): Promise<void> {
+  const supabase = createServiceRoleClient();
+  const retryable = Boolean(input.retryAt);
+  const { data, error } = await supabase
+    .from("survey_outreach")
+    .update({
+      send_lock_token: null,
+      send_lock_stage: null,
+      send_lock_until: null,
+      next_retry_at: input.retryAt,
+      last_send_error: input.error,
+      failed_stage: input.stage,
+      permanently_failed_at: retryable ? null : input.now,
+      ...(retryable ? {} : { status: "failed" }),
+    })
+    .eq("id", input.id)
+    .eq("send_lock_token", input.lockToken)
+    .eq("send_lock_stage", input.stage)
+    .select("id")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("The survey delivery claim was lost before the failure was saved.");
+}
+
+export async function markStageDeliveryUncertain(input: {
+  id: string;
+  stage: SurveyOutreachStage;
+  lockToken: string;
+  error: string;
+  now: string;
+}): Promise<void> {
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from("survey_outreach")
+    .update({
+      send_lock_token: null,
+      send_lock_stage: null,
+      send_lock_until: null,
+      next_retry_at: null,
+      last_send_error: input.error,
+      failed_stage: input.stage,
+      permanently_failed_at: input.now,
+      status: "failed",
+    })
+    .eq("id", input.id)
+    .eq("send_lock_token", input.lockToken)
+    .eq("send_lock_stage", input.stage)
+    .select("id")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("The survey delivery claim was lost before it could be quarantined.");
+}
+
+export async function releaseStageSendClaim(
+  id: string,
+  lockToken: string,
+  restoreAttemptCount?: number,
+): Promise<void> {
   const supabase = createServiceRoleClient();
   const { error } = await supabase
     .from("survey_outreach")
@@ -127,6 +267,9 @@ export async function releaseStageSendClaim(id: string, lockToken: string): Prom
       send_lock_token: null,
       send_lock_stage: null,
       send_lock_until: null,
+      ...(restoreAttemptCount === undefined
+        ? {}
+        : { send_attempt_count: Math.max(0, restoreAttemptCount) }),
     })
     .eq("id", id)
     .eq("send_lock_token", lockToken);
@@ -171,10 +314,49 @@ export async function markOutreachCompleted(token: string): Promise<void> {
     .update({
       completed_at: new Date().toISOString(),
       status: "completed",
+      manual_next_scheduled_at: null,
+      send_lock_token: null,
+      send_lock_stage: null,
+      send_lock_until: null,
+      next_retry_at: null,
+      last_send_error: null,
+      failed_stage: null,
+      permanently_failed_at: null,
     })
     .eq("survey_token", token)
     .is("completed_at", null);
   if (error) throw new Error(error.message);
+}
+
+export async function markOutreachRecalled(
+  id: string,
+  reason: string,
+  lockToken?: string,
+): Promise<void> {
+  const supabase = createServiceRoleClient();
+  let query = supabase
+    .from("survey_outreach")
+    .update({
+      recalled_at: new Date().toISOString(),
+      recall_reason: reason,
+      status: "skipped",
+      send_lock_token: null,
+      send_lock_stage: null,
+      send_lock_until: null,
+      send_attempt_count: 0,
+      next_retry_at: null,
+      last_send_error: null,
+      failed_stage: null,
+      permanently_failed_at: null,
+    })
+    .eq("id", id)
+    .is("completed_at", null);
+
+  if (lockToken) query = query.eq("send_lock_token", lockToken);
+
+  const { data, error } = await query.select("id").maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("The outreach row changed before suppression could be saved.");
 }
 
 export async function resetTestOutreach(email: string): Promise<number> {
@@ -201,40 +383,28 @@ export async function upsertCrmOutreachBatch(
   if (rows.length === 0) return { synced: 0, exists: 0 };
 
   const supabase = createServiceRoleClient();
-  const ids = rows.map((r) => r.crmAppointmentId);
-  const { data: existingRows, error: existingError } = await supabase
+  const uniqueRows = [...new Map(rows.map((row) => [row.crmAppointmentId, row])).values()];
+  const toInsert = uniqueRows.map((r) => ({
+    crm_appointment_id: r.crmAppointmentId,
+    patient_email: r.patientEmail,
+    patient_name: r.patientName,
+    appointment_date: r.appointmentDate,
+    appointment_at: r.appointmentAt,
+    is_test: false,
+    status: "pending",
+  }));
+
+  const { data, error } = await supabase
     .from("survey_outreach")
-    .select("crm_appointment_id")
-    .in("crm_appointment_id", ids);
+    .upsert(toInsert, {
+      onConflict: "crm_appointment_id",
+      ignoreDuplicates: true,
+    })
+    .select("crm_appointment_id");
+  if (error) throw new Error(error.message);
 
-  if (existingError) throw new Error(existingError.message);
-
-  const existing = new Set((existingRows ?? []).map((r) => r.crm_appointment_id));
-  const toInsert = rows
-    .filter((r) => !existing.has(r.crmAppointmentId))
-    .map((r) => ({
-      crm_appointment_id: r.crmAppointmentId,
-      patient_email: r.patientEmail,
-      patient_name: r.patientName,
-      appointment_date: r.appointmentDate,
-      appointment_at: r.appointmentAt,
-      is_test: false,
-      status: "pending",
-    }));
-
-  if (toInsert.length === 0) {
-    return { synced: 0, exists: rows.length };
-  }
-
-  const { error } = await supabase.from("survey_outreach").insert(toInsert);
-  if (error) {
-    if (/duplicate|unique/i.test(error.message)) {
-      return { synced: 0, exists: rows.length };
-    }
-    throw new Error(error.message);
-  }
-
-  return { synced: toInsert.length, exists: rows.length - toInsert.length };
+  const synced = data?.length ?? 0;
+  return { synced, exists: uniqueRows.length - synced };
 }
 
 export async function upsertCrmOutreach(input: {
@@ -270,13 +440,19 @@ export async function upsertCrmOutreach(input: {
   return "synced";
 }
 
-export async function listIncompleteOutreach(): Promise<SurveyOutreachRow[]> {
+export async function listIncompleteOutreach(limit = 500): Promise<SurveyOutreachRow[]> {
   const supabase = createServiceRoleClient();
   const { data, error } = await supabase
     .from("survey_outreach")
     .select("*")
     .is("completed_at", null)
-    .order("appointment_at", { ascending: true });
+    .is("recalled_at", null)
+    .is("permanently_failed_at", null)
+    .is("final_sent_at", null)
+    .in("status", ["pending", "sent"])
+    .order("next_retry_at", { ascending: true, nullsFirst: true })
+    .order("appointment_at", { ascending: true })
+    .limit(Math.min(Math.max(limit, 1), 2000));
 
   if (error) throw new Error(error.message);
   return (data ?? []) as SurveyOutreachRow[];
@@ -298,6 +474,7 @@ export type SurveyOutreachListResult = {
     withInitialSent: number;
     uniqueRecipients: number;
     testRows: number;
+    failedRows: number;
   };
 };
 
@@ -355,6 +532,11 @@ export async function listSurveyOutreachForDev(
     .eq("is_test", true)
     .not("initial_sent_at", "is", null);
 
+  const { count: failedRows } = await supabase
+    .from("survey_outreach")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "failed");
+
   const { data: uniqueEmails } = await supabase
     .from("survey_outreach")
     .select("patient_email")
@@ -372,6 +554,7 @@ export async function listSurveyOutreachForDev(
       withInitialSent: withInitialSent ?? 0,
       uniqueRecipients,
       testRows: testRows ?? 0,
+      failedRows: failedRows ?? 0,
     },
   };
 }

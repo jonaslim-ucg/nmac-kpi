@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { canAccessDev } from "@/lib/auth/types";
 import {
+  getSurveyOutreachSchedulerHealth,
   getSurveyOutreachSendingState,
   getSurveyOutreachSchedule,
   updateSurveyOutreachSendingEnabled,
@@ -28,9 +29,10 @@ export async function GET() {
   if (!session) return unauthorized();
   if (!canAccessDev(session.role)) return forbidden();
 
-  const [schedule, sending] = await Promise.all([
+  const [schedule, sending, schedulerHealth] = await Promise.all([
     getSurveyOutreachSchedule(),
     getSurveyOutreachSendingState(),
+    getSurveyOutreachSchedulerHealth(),
   ]);
   return NextResponse.json({
     schedule,
@@ -40,6 +42,7 @@ export async function GET() {
     sendingMasterEnabled: sending.masterEnabled,
     liveStartAt: sending.liveStartAt,
     sendingAppEnabledAt: sending.appEnabledAt,
+    schedulerHealth,
   });
 }
 
@@ -79,6 +82,7 @@ export async function PATCH(req: Request) {
         ? getSurveyOutreachSendingState()
         : updateSurveyOutreachSendingEnabled(requestedSendingEnabled),
     ]);
+    const schedulerHealth = await getSurveyOutreachSchedulerHealth();
     return NextResponse.json({
       schedule,
       summary: formatScheduleSummary(schedule),
@@ -87,6 +91,7 @@ export async function PATCH(req: Request) {
       sendingMasterEnabled: sending.masterEnabled,
       liveStartAt: sending.liveStartAt,
       sendingAppEnabledAt: sending.appEnabledAt,
+      schedulerHealth,
     });
   } catch (e) {
     return NextResponse.json(

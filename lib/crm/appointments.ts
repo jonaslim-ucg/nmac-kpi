@@ -72,6 +72,7 @@ export async function fetchCrmStatusCounts(
       Accept: "application/json",
     },
     cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
   });
 
   let body: CrmStatusCountsResponse | { detail?: string };

@@ -22,7 +22,7 @@ cp .env.example .env.local
    - **Auth:** `AUTH_SECRET` — at least 32 characters (e.g. `openssl rand -base64 32`).
    - **Optional:** `AUTH_ALLOWED_EMAIL_DOMAINS` (comma-separated, e.g. `ucg.bm`) to restrict sign-in; `AUTH_BOOTSTRAP_ADMIN_EMAILS` for extra admin grants on first signup (after the first user); `BITRIX_ALLOWED_PORTALS` to restrict Bitrix auto sign-in to specific portal hostnames.
    - **Microsoft Graph (email codes):** `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `GRAPH_SENDER_EMAIL` (mailbox that sends mail), `GRAPH_SENDER_NAME` (e.g. `NMAC KPI`). In Azure Entra ID, the app registration needs **Application** permission **Mail.Send** on Microsoft Graph, with **admin consent**.
-   - **NMAC CRM + survey outreach:** `NMAC_CRM_BASE_URL` (default `https://crm.nmac.bm`), `REPORTS_API_TOKEN`, `APP_BASE_URL=https://kpi.nmac.bm` (public URL for survey links), `SURVEY_OUTREACH_SECRET`, `CRON_SECRET`, optional `SURVEY_FINAL_REMINDER_DAYS` (`14` or `21`), and optional `SURVEY_OUTREACH_TEST_EMAILS` for scheduled test sends. **Patient survey emails are off by default** — set `SURVEY_OUTREACH_LIVE_START_AT` to the approved go-live timestamp before setting the master `SURVEY_OUTREACH_SEND_EMAILS=true`; the in-app **Survey outreach** toggle must also be on. See [`.env.example`](.env.example).
+   - **NMAC CRM + survey outreach:** `NMAC_CRM_BASE_URL` (default `https://crm.nmac.bm`), `REPORTS_API_TOKEN`, `APP_BASE_URL=https://kpi.nmac.bm` (public URL for survey links), `SURVEY_OUTREACH_SECRET`, `CRON_SECRET`, optional `SURVEY_FINAL_REMINDER_DAYS` (`14` or `21`), and optional `SURVEY_OUTREACH_TEST_EMAILS` for scheduled test sends. **Patient survey emails are off by default** — set `SURVEY_OUTREACH_LIVE_START_AT` to the approved go-live timestamp before setting the master `SURVEY_OUTREACH_SEND_EMAILS=true`; the in-app **Survey outreach** toggle must also be on. The in-app switch is a global stop: while it is off, neither live nor test survey emails can send. See [`.env.example`](.env.example).
    - **3CX report email import:** add Microsoft Graph **Application** permission **Mail.Read** with admin consent. Set `GRAPH_3CX_REPORT_MAILBOX` to the mailbox that receives the scheduled 3CX report emails. Optional filters: `GRAPH_3CX_SUBJECT_QUERY` (defaults to `3CX`), `GRAPH_3CX_SENDER`, and `GRAPH_3CX_FOLDER` (defaults to `inbox`). Daily automatic checks use `GRAPH_3CX_POLL_TIME_ZONE=Asia/Manila` for the 9:00–11:59 AM polling window and `GRAPH_3CX_REPORT_TIME_ZONE=Atlantic/Bermuda` when assigning the saved report day.
 
    **If Outlook still shows the wrong sender name (e.g. “NMAC CRM”):** Microsoft 365 often uses the **mailbox / user display name** from the directory, not only the Graph API. In [Microsoft 365 admin](https://admin.microsoft.com) go to **Users** → open the account for `GRAPH_SENDER_EMAIL` → set **Display name** to **NMAC KPI** (or **Exchange admin center** → **Recipients** → **Mailboxes** → same mailbox → edit display name). Redeploy is not required for that change.
@@ -46,6 +46,11 @@ For local survey reminder testing, keep `SURVEY_OUTREACH_SEND_EMAILS=false` and
 `SURVEY_OUTREACH_TEST_EMAILS=kim.ramirez@ucg.bm`. In **Dev → Survey outreach**,
 turn on **Local scheduled checks** while testing a scheduled reminder; local
 development does not run Vercel Cron in the background.
+
+Before deploying the resilient scheduler, apply
+[`supabase/migrations/20260715000000_survey_outreach_reliability.sql`](supabase/migrations/20260715000000_survey_outreach_reliability.sql)
+to the NMAC KPI Supabase database. Keep `SURVEY_OUTREACH_SEND_EMAILS=false` (or
+unset) and leave the in-app live switch off until patient sending is approved.
 
 ## Data model
 

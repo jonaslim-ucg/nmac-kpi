@@ -30,7 +30,8 @@ create table if not exists public.appointment_reviews (
   patient_duration text not null check (patient_duration in ('new', 'less-1', '1-4', '5-9', '10-plus')),
   referral_sources text[] not null default '{}',
   referral_other text not null default '',
-  exceptional_staff_comment text not null default ''
+  exceptional_staff_comment text not null default '',
+  survey_token uuid unique
 );
 
 alter table public.appointment_reviews enable row level security;
@@ -38,7 +39,7 @@ alter table public.appointment_reviews enable row level security;
 
 type InsertResult =
   | { ok: true }
-  | { ok: false; error: string; setupRequired?: boolean };
+  | { ok: false; error: string; setupRequired?: boolean; duplicate?: boolean };
 
 export async function insertAppointmentReview(payload: AppointmentReviewPayload): Promise<InsertResult> {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -75,9 +76,17 @@ export async function insertAppointmentReview(payload: AppointmentReviewPayload)
       referral_sources: payload.referralSources,
       referral_other: payload.referralOther,
       exceptional_staff_comment: payload.exceptionalStaffComment,
+      survey_token: payload.surveyToken,
     });
 
     if (error) {
+      if (/duplicate|unique/i.test(error.message) && /survey_token/i.test(error.message)) {
+        return {
+          ok: false,
+          error: "This survey has already been submitted.",
+          duplicate: true,
+        };
+      }
       if (
         /appointment_reviews/i.test(error.message) &&
         /does not exist|schema cache|could not find/i.test(error.message)

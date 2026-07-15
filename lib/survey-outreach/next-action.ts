@@ -1,5 +1,6 @@
 import {
   initialSurveyDueAt,
+  noEarlierThanMinimumMessageGap,
   scheduleDelays,
   type SurveyOutreachScheduleConfig,
 } from "@/lib/survey-outreach/schedule";
@@ -54,19 +55,32 @@ export function nextActionForRow(
   if (!row.reminder_1_sent_at) {
     candidates.push({
       stage: "reminder1",
-      dueAt: new Date(initialSentAt.getTime() + delays.reminder1Ms),
+      dueAt: noEarlierThanMinimumMessageGap(
+        new Date(initialSentAt.getTime() + delays.reminder1Ms),
+        initialSentAt,
+      ),
     });
   }
   if (!row.reminder_2_sent_at) {
     candidates.push({
       stage: "reminder2",
-      dueAt: new Date(initialSentAt.getTime() + delays.reminder2Ms),
+      dueAt: noEarlierThanMinimumMessageGap(
+        new Date(initialSentAt.getTime() + delays.reminder2Ms),
+        row.reminder_1_sent_at ? new Date(row.reminder_1_sent_at) : initialSentAt,
+      ),
     });
   }
   if (!row.final_sent_at) {
     candidates.push({
       stage: "final",
-      dueAt: new Date(initialSentAt.getTime() + delays.finalMs),
+      dueAt: noEarlierThanMinimumMessageGap(
+        new Date(initialSentAt.getTime() + delays.finalMs),
+        row.reminder_2_sent_at
+          ? new Date(row.reminder_2_sent_at)
+          : row.reminder_1_sent_at
+            ? new Date(row.reminder_1_sent_at)
+            : initialSentAt,
+      ),
     });
   }
 

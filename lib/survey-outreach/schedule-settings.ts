@@ -9,6 +9,7 @@ import {
   normalizeSurveyOutreachSchedule,
   type SurveyOutreachScheduleConfig,
 } from "@/lib/survey-outreach/schedule";
+import { schedulerConfigurationStatus } from "@/lib/survey-outreach/reliability";
 
 export type { SurveyOutreachScheduleConfig };
 
@@ -18,6 +19,20 @@ export type SurveyOutreachSendingState = {
   effectiveEnabled: boolean;
   liveStartAt: string | null;
   appEnabledAt: string | null;
+};
+
+export type SurveyOutreachSchedulerHealth = ReturnType<typeof schedulerConfigurationStatus> & {
+  lastRunAt: string | null;
+  lastSuccessAt: string | null;
+  lastError: string | null;
+  failedRows: number;
+  lastResult: {
+    sent: number;
+    skipped: number;
+    errors: number;
+    syncErrors: number;
+    deferredDue: number;
+  } | null;
 };
 
 function parseDate(value: unknown): Date | null {
@@ -148,4 +163,68 @@ export async function updateSurveyOutreachSendingEnabled(
     Boolean(data.survey_outreach_sending_enabled),
     data.survey_outreach_sending_enabled_at,
   );
+}
+
+export async function getSurveyOutreachSchedulerHealth(): Promise<SurveyOutreachSchedulerHealth> {
+  const configuration = schedulerConfigurationStatus();
+  const supabase = createServiceRoleClient();
+  const [{ data, error }, { count: failedRows }] = await Promise.all([
+    supabase
+      .from("app_settings")
+      .select(
+        "survey_outreach_last_run_at,survey_outreach_last_success_at,survey_outreach_last_error,survey_outreach_last_result",
+      )
+      .eq("id", APP_SETTINGS_ID)
+      .maybeSingle(),
+    supabase
+      .from("survey_outreach")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "failed"),
+  ]);
+
+  if (error || !data) {
+    return {
+      ...configuration,
+      lastRunAt: null,
+      lastSuccessAt: null,
+      lastError: null,
+      failedRows: failedRows ?? 0,
+      lastResult: null,
+    };
+  }
+
+  const result = data.survey_outreach_last_result;
+  return {
+    ...configuration,
+    lastRunAt: parseDate(data.survey_outreach_last_run_at)?.toISOString() ?? null,
+    lastSuccessAt: parseDate(data.survey_outreach_last_success_at)?.toISOString() ?? null,
+    lastError:
+      typeof data.survey_outreach_last_error === "string"
+        ? data.survey_outreach_last_error
+        : null,
+    failedRows: failedRows ?? 0,
+    lastResult:
+      result && typeof result === "object"
+        ? (result as SurveyOutreachSchedulerHealth["lastResult"])
+        : null,
+  };
+}
+
+export async function recordSurveyOutreachSchedulerRun(input: {
+  at: string;
+  successful: boolean;
+  error: string | null;
+  result: NonNullable<SurveyOutreachSchedulerHealth["lastResult"]>;
+}): Promise<void> {
+  const supabase = createServiceRoleClient();
+  const { error } = await supabase
+    .from("app_settings")
+    .update({
+      survey_outreach_last_run_at: input.at,
+      ...(input.successful ? { survey_outreach_last_success_at: input.at } : {}),
+      survey_outreach_last_error: input.error,
+      survey_outreach_last_result: input.result,
+    })
+    .eq("id", APP_SETTINGS_ID);
+  if (error) throw new Error(error.message);
 }

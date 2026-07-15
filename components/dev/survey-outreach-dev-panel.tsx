@@ -1,6 +1,17 @@
 "use client";
 
-import { CalendarClock, Loader2, Mail, Power, Save, Search, Send, X } from "lucide-react";
+import {
+  CalendarClock,
+  CircleCheck,
+  Loader2,
+  Mail,
+  Power,
+  Save,
+  Search,
+  Send,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 import type { SurveyOutreachStage } from "@/lib/survey-outreach/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "@/components/auth/session-provider";
@@ -42,6 +53,27 @@ type SentStats = {
   withInitialSent: number;
   uniqueRecipients: number;
   testRows: number;
+  failedRows: number;
+};
+
+type SchedulerHealth = {
+  ready: boolean;
+  cronAuthConfigured: boolean;
+  crmConfigured: boolean;
+  mailConfigured: boolean;
+  databaseConfigured: boolean;
+  missing: string[];
+  lastRunAt: string | null;
+  lastSuccessAt: string | null;
+  lastError: string | null;
+  failedRows: number;
+  lastResult: {
+    sent: number;
+    skipped: number;
+    errors: number;
+    syncErrors: number;
+    deferredDue: number;
+  } | null;
 };
 
 type Feedback = { tone: "ok" | "err"; text: string } | null;
@@ -51,6 +83,7 @@ type SchedulerCheckResult = {
   sent?: { stage: SurveyOutreachStage; to: string }[];
   skipped?: unknown[];
   errors?: unknown[];
+  configurationErrors?: string[];
   message?: string;
   error?: string;
 };
@@ -149,6 +182,7 @@ export function SurveyOutreachDevPanel() {
   const [sendingAppEnabled, setSendingAppEnabled] = useState(false);
   const [sendingMasterEnabled, setSendingMasterEnabled] = useState(false);
   const [liveStartAt, setLiveStartAt] = useState<string | null>(null);
+  const [schedulerHealth, setSchedulerHealth] = useState<SchedulerHealth | null>(null);
   const [scheduleLoading, setScheduleLoading] = useState(true);
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [sendingToggleSaving, setSendingToggleSaving] = useState(false);
@@ -226,6 +260,7 @@ export function SurveyOutreachDevPanel() {
         sendingAppEnabled?: boolean;
         sendingMasterEnabled?: boolean;
         liveStartAt?: string | null;
+        schedulerHealth?: SchedulerHealth;
         error?: string;
       };
       if (!r.ok) {
@@ -238,6 +273,7 @@ export function SurveyOutreachDevPanel() {
       setSendingAppEnabled(Boolean(j.sendingAppEnabled));
       setSendingMasterEnabled(Boolean(j.sendingMasterEnabled));
       setLiveStartAt(j.liveStartAt ?? null);
+      setSchedulerHealth(j.schedulerHealth ?? null);
     } finally {
       setScheduleLoading(false);
     }
@@ -351,6 +387,7 @@ export function SurveyOutreachDevPanel() {
         sendingAppEnabled?: boolean;
         sendingMasterEnabled?: boolean;
         liveStartAt?: string | null;
+        schedulerHealth?: SchedulerHealth;
         error?: string;
       };
       if (!r.ok) {
@@ -363,6 +400,7 @@ export function SurveyOutreachDevPanel() {
       setSendingAppEnabled(Boolean(j.sendingAppEnabled));
       setSendingMasterEnabled(Boolean(j.sendingMasterEnabled));
       setLiveStartAt(j.liveStartAt ?? null);
+      setSchedulerHealth(j.schedulerHealth ?? null);
       setScheduleFeedback({ tone: "ok", text: "Reminder schedule saved." });
       void loadSent();
     } finally {
@@ -388,6 +426,7 @@ export function SurveyOutreachDevPanel() {
         sendingAppEnabled?: boolean;
         sendingMasterEnabled?: boolean;
         liveStartAt?: string | null;
+        schedulerHealth?: SchedulerHealth;
         error?: string;
       };
       if (!r.ok) {
@@ -400,6 +439,7 @@ export function SurveyOutreachDevPanel() {
       setSendingAppEnabled(Boolean(j.sendingAppEnabled));
       setSendingMasterEnabled(Boolean(j.sendingMasterEnabled));
       setLiveStartAt(j.liveStartAt ?? null);
+      setSchedulerHealth(j.schedulerHealth ?? null);
       setScheduleFeedback({
         tone: "ok",
         text: next ? "Survey sending switch turned on." : "Survey sending switch turned off.",
@@ -497,8 +537,11 @@ export function SurveyOutreachDevPanel() {
 
       const sentCount = j.sent?.length ?? 0;
       const errorCount = j.errors?.length ?? 0;
+      const configurationError = j.configurationErrors?.[0];
       setLocalSchedulerLastRun(new Date().toISOString());
-      if (errorCount > 0) {
+      if (configurationError) {
+        setLocalSchedulerFeedback({ tone: "err", text: configurationError });
+      } else if (errorCount > 0) {
         setLocalSchedulerFeedback({
           tone: "err",
           text: `Checked schedule. ${errorCount} email(s) failed.`,
@@ -579,6 +622,30 @@ export function SurveyOutreachDevPanel() {
         ? `Only visits at or after ${formatWhen(liveStartAt)} can receive live survey emails.`
         : "Set the live-start timestamp before sending to patients."
       : "Turn this on only when you are ready for eligible checked-out visits to receive survey emails.";
+  const schedulerLastRunMs = schedulerHealth?.lastRunAt
+    ? new Date(schedulerHealth.lastRunAt).getTime()
+    : NaN;
+  const schedulerRunFresh = Number.isFinite(schedulerLastRunMs)
+    && Date.now() - schedulerLastRunMs <= 5 * 60 * 1000;
+  const schedulerHealthDetail = !schedulerHealth
+    ? "Scheduler readiness could not be checked."
+    : !schedulerHealth.cronAuthConfigured
+      ? "Scheduler blocked: add CRON_SECRET to Vercel Production, then redeploy."
+      : !schedulerHealth.ready
+        ? `Scheduler setup is incomplete: ${schedulerHealth.missing.join(", ")}.`
+        : schedulerHealth.lastRunAt && !schedulerRunFresh
+          ? `Scheduler has not checked in since ${formatWhen(schedulerHealth.lastRunAt)}.`
+        : schedulerHealth.failedRows > 0
+          ? `${schedulerHealth.failedRows} message(s) need review before they can be retried.`
+          : schedulerHealth.lastSuccessAt
+            ? `Last successful scheduled check: ${formatWhen(schedulerHealth.lastSuccessAt)}.`
+            : "Scheduler configuration is ready. Waiting for the first successful scheduled check.";
+  const schedulerHealthy = Boolean(
+    schedulerHealth?.ready &&
+      schedulerRunFresh &&
+      schedulerHealth.failedRows === 0 &&
+      !schedulerHealth.lastError,
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -594,7 +661,7 @@ export function SurveyOutreachDevPanel() {
             </span>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Controls live patient survey emails. Test emails still use the form below.
+            Global stop for survey emails. When off, neither live nor test messages can send.
           </p>
         </div>
         <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
@@ -619,6 +686,24 @@ export function SurveyOutreachDevPanel() {
             {sendingToggleSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Power className="h-4 w-4" />}
             {sendingAppEnabled ? "Turn off" : "Turn on"}
           </button>
+        </div>
+        <div className="flex items-start gap-2 border-t border-border px-4 py-3 text-sm sm:px-5">
+          {schedulerHealthy ? (
+            <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-300" />
+          ) : (
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" />
+          )}
+          <div className="min-w-0">
+            <p className="font-medium text-foreground">
+              {schedulerHealthy ? "Scheduler healthy" : "Scheduler needs attention"}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{schedulerHealthDetail}</p>
+            {schedulerHealth?.lastError && (
+              <p className="mt-1 break-words text-xs text-destructive">
+                Last issue: {schedulerHealth.lastError}
+              </p>
+            )}
+          </div>
         </div>
       </section>
 
@@ -918,6 +1003,7 @@ export function SurveyOutreachDevPanel() {
                 ["Unique recipients", stats.uniqueRecipients],
                 ["Production sends", stats.withInitialSent - stats.testRows],
                 ["Test sends", stats.testRows],
+                ["Failed messages", stats.failedRows],
               ].map(([label, value]) => (
                 <div key={String(label)} className="rounded-lg border border-border bg-surface-muted/30 px-3 py-2">
                   <p className="text-xs text-muted-foreground">{label}</p>

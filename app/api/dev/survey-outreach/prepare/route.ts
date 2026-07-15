@@ -144,6 +144,13 @@ export async function POST(req: Request) {
     send_lock_token: null,
     send_lock_stage: null,
     send_lock_until: null,
+    last_delivery_key: null,
+    send_attempt_count: 0,
+    last_send_attempt_at: null,
+    next_retry_at: null,
+    last_send_error: null,
+    failed_stage: null,
+    permanently_failed_at: null,
     completed_at: null,
     recalled_at: null,
     recall_reason: null,
@@ -217,6 +224,14 @@ export async function PATCH(req: Request) {
         send_lock_token: null,
         send_lock_stage: null,
         send_lock_until: null,
+        last_delivery_key: null,
+        send_attempt_count: 0,
+        last_send_attempt_at: null,
+        next_retry_at: null,
+        last_send_error: null,
+        failed_stage: null,
+        permanently_failed_at: null,
+        status: current.initial_sent_at ? "sent" : "pending",
       })
       .eq("id", current.id)
       .eq("is_test", true)

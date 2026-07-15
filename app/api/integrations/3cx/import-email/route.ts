@@ -3,9 +3,8 @@ import { getSessionFromCookies } from "@/lib/auth/session";
 import { canAccessDev } from "@/lib/auth/types";
 import { getGraphAccessToken } from "@/lib/graph/send-mail";
 import {
-  normalizeThreeCxRange,
-  reportWindowForMonth,
-  threeCxRangeLabel,
+  reportMonthWindow,
+  threeCxPeriodFromEmailReceivedAt,
 } from "@/lib/3cx/email-report";
 import { logThreeCxImport, saveThreeCxImport } from "@/lib/3cx/import-server";
 import { MONTHS } from "@/lib/kpi-nmac-2026/model";
@@ -56,6 +55,10 @@ function graphSenderNeedle() {
 
 function graphFolder() {
   return (process.env.GRAPH_3CX_FOLDER || process.env.GRAPH_REPORT_FOLDER || "inbox").trim() || "inbox";
+}
+
+function graphReportTimeZone() {
+  return (process.env.GRAPH_3CX_REPORT_TIME_ZONE || "Asia/Manila").trim() || "Asia/Manila";
 }
 
 async function graphJson<T>(token: string, url: string): Promise<T> {
@@ -109,10 +112,9 @@ export async function POST(req: Request) {
   if (!session || !canAccessDev(session.role)) return unauthorized();
   const actor = { email: session.email, role: session.role };
 
-  const body = (await req.json()) as { year?: unknown; monthIndex?: unknown; range?: unknown };
+  const body = (await req.json()) as { year?: unknown; monthIndex?: unknown };
   const year = parseYear(body.year);
   const monthIndex = parseMonthIndex(body.monthIndex);
-  const range = normalizeThreeCxRange(body.range);
   if (year === null || monthIndex === null) {
     return NextResponse.json({ error: "Choose a valid month and year." }, { status: 400 });
   }
@@ -126,9 +128,10 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { start, end } = reportWindowForMonth(year, monthIndex, range);
+    const { start, end } = reportMonthWindow(year, monthIndex);
     const token = await getGraphAccessToken();
     const folder = graphFolder();
+    const reportTimeZone = graphReportTimeZone();
     const params = new URLSearchParams({
       "$top": "50",
       "$select": "id,subject,receivedDateTime,from,bodyPreview,hasAttachments",
@@ -152,12 +155,14 @@ export async function POST(req: Request) {
       for (const attachment of attachments) {
         const text = decodeAttachment(attachment);
         if (!text.trim()) continue;
+        const period = threeCxPeriodFromEmailReceivedAt(message.receivedDateTime, reportTimeZone);
+        if (!period) continue;
         try {
           const result = await saveThreeCxImport({
             actor,
-            year,
-            monthIndex,
-            range,
+            year: period.year,
+            monthIndex: period.monthIndex,
+            range: period.range,
             text,
             source: {
               mode: "email",
@@ -166,6 +171,7 @@ export async function POST(req: Request) {
               from: message.from?.emailAddress?.address ?? "",
               attachmentName: attachment.name ?? "",
               messageId: message.id,
+              receivedLocalDate: period.localDate,
             },
           });
           return NextResponse.json(result);
@@ -175,16 +181,15 @@ export async function POST(req: Request) {
       }
     }
 
-    const error = `No readable 3CX CSV report was found for ${threeCxRangeLabel(range)} of ${MONTHS[monthIndex]} ${year}.`;
+    const error = `No readable 3CX CSV report was found in ${MONTHS[monthIndex]} ${year}.`;
     await logThreeCxImport(actor, "warn", "3CX email import found no readable report", {
       year,
       monthIndex,
       month: MONTHS[monthIndex],
-      range,
-      rangeLabel: threeCxRangeLabel(range),
       mailbox,
       folder,
       messageCount: messages.length,
+      reportTimeZone,
     });
     return NextResponse.json({ error }, { status: 404 });
   } catch (error) {
@@ -193,8 +198,6 @@ export async function POST(req: Request) {
       year,
       monthIndex,
       month: MONTHS[monthIndex],
-      range,
-      rangeLabel: threeCxRangeLabel(range),
       error: message,
     });
     return NextResponse.json({ error: message }, { status: 500 });

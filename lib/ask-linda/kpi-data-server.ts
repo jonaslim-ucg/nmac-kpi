@@ -129,7 +129,9 @@ export function parseThreeCxRangeFromQuestion(question: string): ThreeCxReportRa
   if (/\b(1st|first)\s+week\b|\bweek\s*1\b/.test(t)) return "week1";
   if (/\b(2nd|second)\s+week\b|\bweek\s*2\b/.test(t)) return "week2";
   if (/\b(3rd|third)\s+week\b|\bweek\s*3\b/.test(t)) return "week3";
-  if (/\b(4th|fourth|last)\s+week\b|\bweek\s*4\b|\blast\s+7\s+days\b/.test(t)) return "week4";
+  if (/\b(5th|fifth)\s+week\b|\bweek\s*5\b/.test(t)) return "week5";
+  if (/\b(4th|fourth)\s+week\b|\bweek\s*4\b/.test(t)) return "week4";
+  if (/\blast\s+week\b|\blast\s+7\s+days\b/.test(t)) return "last_week";
   return "month";
 }
 

@@ -1,4 +1,3 @@
-import { loadEnvConfig } from "@next/env";
 import type {
   ArdtsItemType,
   ArdtsRangePreset,
@@ -23,23 +22,13 @@ export type FetchArdtsStatusCountsParams = {
   status?: string | string[];
 };
 
-let envLoaded = false;
-
-function ensureLocalEnvLoaded(): void {
-  if (envLoaded || process.env.NODE_ENV === "production") return;
-  envLoaded = true;
-  loadEnvConfig(process.cwd());
-}
-
 function ardtsBaseUrl(): string {
-  ensureLocalEnvLoaded();
   const base = process.env.ARDTS_API_BASE_URL?.trim().replace(/\/$/, "");
   if (!base) throw new ArdtsConfigError();
   return base;
 }
 
 function ardtsToken(): string {
-  ensureLocalEnvLoaded();
   const token = process.env.ARDTS_INTEGRATION_API_TOKEN?.trim();
   if (!token) throw new ArdtsConfigError();
   return token;

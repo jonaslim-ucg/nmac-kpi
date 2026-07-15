@@ -3,6 +3,7 @@ import {
   parseThreeCxReportText,
   reportDateRangeForMonth,
   threeCxRangeLabel,
+  weeklyReportDateRangesForMonth,
   type ThreeCxCallMetrics,
   type ThreeCxReportRange,
   type ThreeCxReportRow,
@@ -25,6 +26,7 @@ export type ThreeCxImportSource = {
   attachmentName?: string;
   fileName?: string;
   messageId?: string;
+  receivedLocalDate?: string;
 };
 
 export type ThreeCxSavedImport = {
@@ -51,6 +53,11 @@ type SavedQueueRow = {
   missed_calls: number | null;
 };
 
+type SavedMonthlyQueueRow = SavedQueueRow & {
+  report_start_date: string | null;
+  report_end_date: string | null;
+};
+
 type SavedExtensionRow = {
   queue_report_row_id: number;
   queue_number: string;
@@ -65,6 +72,35 @@ type SavedExtensionRow = {
   source_line: number | null;
   sort_order: number | null;
 };
+
+type SavedImportRow = {
+  id: number;
+  source: string;
+  source_filename: string | null;
+  source_message_id: string | null;
+  report_type: string;
+  report_start_date: string | null;
+  report_end_date: string | null;
+  row_count: number;
+  extension_row_count: number;
+};
+
+type ExtensionAggregate = {
+  queueNumber: string;
+  queueName: string;
+  extensionLabel: string;
+  extensionNumber: string | null;
+  extensionName: string;
+  serviced: number;
+  polls: number;
+  talkSeconds: number;
+  weightedAverageTalkSeconds: number;
+  averageWeight: number;
+  sourceLine: number | null;
+  sortOrder: number | null;
+};
+
+const CALL_KPI_IDS = ["callvol", "call_answered", "call_missed", "callrate"] as const;
 
 export function callMetricsFromMonth(values: MonthDb): ThreeCxCallMetrics {
   const received = values.callvol?.ty ?? 0;
@@ -86,6 +122,33 @@ function mergeCallValues(current: MonthDb, imported: MonthDb): MonthDb {
     call_missed: { ...current.call_missed, ...imported.call_missed },
     callrate: { ...current.callrate, ...imported.callrate },
   };
+}
+
+function callValuesFromMetrics(metrics: ThreeCxCallMetrics): MonthDb {
+  return {
+    callvol: { ty: metrics.received },
+    call_answered: { ty: metrics.answered },
+    call_missed: { ty: metrics.missed },
+    callrate: { ty: metrics.answeredRate },
+  };
+}
+
+function applyMonthlyCallMetrics(current: MonthDb, metrics: ThreeCxCallMetrics | null): MonthDb {
+  const next: MonthDb = { ...current };
+  for (const key of CALL_KPI_IDS) {
+    delete next[key];
+  }
+  if (!metrics) return next;
+  return mergeCallValues(next, callValuesFromMetrics(metrics));
+}
+
+function importMonthFromDateKey(value: string | null): { year: number; monthIndex: number } | null {
+  if (!value) return null;
+  const [yearRaw, monthRaw] = value.split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) return null;
+  return { year, monthIndex: month - 1 };
 }
 
 function importHash(input: {
@@ -126,6 +189,23 @@ function numericRaw(row: ThreeCxReportRow, key: string): number | null {
   if (!raw) return null;
   const n = Number(raw.replace(/,/g, ""));
   return Number.isFinite(n) ? n : null;
+}
+
+function durationToSeconds(value: string | null | undefined): number {
+  if (!value) return 0;
+  const parts = value.trim().split(":").map(Number);
+  if (parts.some((part) => !Number.isFinite(part))) return 0;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return 0;
+}
+
+function formatDuration(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, Math.round(totalSeconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = safeSeconds % 60;
+  return [hours, minutes, seconds].map((part) => String(part).padStart(2, "0")).join(":");
 }
 
 export async function logThreeCxImport(
@@ -256,24 +336,151 @@ async function saveDetailedReport(input: {
   return { importId, hash };
 }
 
-export async function readDetailedReport(input: {
+async function readMonthlyDetailedReport(input: {
   year: number;
   monthIndex: number;
-  range: ThreeCxReportRange;
 }): Promise<{ rows: ThreeCxReportRow[]; metrics: ThreeCxCallMetrics | null; error?: string }> {
-  const { startDate, endDate } = reportDateRangeForMonth(input.year, input.monthIndex, input.range);
+  const weeklyRanges = weeklyReportDateRangesForMonth(input.year, input.monthIndex);
+  const weeklyRangeKeys = new Set(weeklyRanges.map((range) => `${range.startDate}|${range.endDate}`));
+  const monthRange = reportDateRangeForMonth(input.year, input.monthIndex, "month");
   const supabase = createServiceRoleClient();
+
   const { data: queues, error: queueError } = await supabase
     .from("threecx_queue_report_rows")
-    .select("id,queue_number,queue_name,total_calls,answered_calls,abandoned_calls,missed_calls")
+    .select(
+      "id,queue_number,queue_name,total_calls,answered_calls,abandoned_calls,missed_calls,report_start_date,report_end_date",
+    )
     .eq("report_type", "queue_performance")
-    .eq("report_start_date", startDate)
-    .eq("report_end_date", endDate)
+    .gte("report_start_date", monthRange.startDate)
+    .lte("report_end_date", monthRange.endDate)
     .order("queue_number", { ascending: true });
   if (queueError) return { rows: [], metrics: null, error: queueError.message };
 
-  const savedQueues = (queues ?? []) as SavedQueueRow[];
-  const queueRows = savedQueues.map<ThreeCxReportRow>((row) => {
+  const weeklyQueues = ((queues ?? []) as SavedMonthlyQueueRow[]).filter((row) =>
+    weeklyRangeKeys.has(`${row.report_start_date}|${row.report_end_date}`),
+  );
+  if (weeklyQueues.length === 0) return { rows: [], metrics: null };
+
+  const queueByNumber = new Map<string, SavedQueueRow>();
+  for (const row of weeklyQueues) {
+    const key = row.queue_number;
+    const current = queueByNumber.get(key);
+    const missed = row.missed_calls ?? row.abandoned_calls ?? 0;
+    if (!current) {
+      queueByNumber.set(key, {
+        id: row.id,
+        queue_number: row.queue_number,
+        queue_name: row.queue_name,
+        total_calls: row.total_calls ?? 0,
+        answered_calls: row.answered_calls ?? 0,
+        abandoned_calls: missed,
+        missed_calls: missed,
+      });
+      continue;
+    }
+    current.total_calls = (current.total_calls ?? 0) + (row.total_calls ?? 0);
+    current.answered_calls = (current.answered_calls ?? 0) + (row.answered_calls ?? 0);
+    current.abandoned_calls = (current.abandoned_calls ?? 0) + missed;
+    current.missed_calls = (current.missed_calls ?? 0) + missed;
+  }
+
+  const queueIds = weeklyQueues.map((row) => row.id);
+  let extensionRows: SavedExtensionRow[] = [];
+  if (queueIds.length > 0) {
+    const { data: exts, error: extError } = await supabase
+      .from("threecx_queue_report_extension_rows")
+      .select(
+        "queue_report_row_id,queue_number,queue_name,extension_label,extension_number,extension_name,extension_serviced_calls,extension_polls,talk_time,average_talk_time,source_line,sort_order",
+      )
+      .in("queue_report_row_id", queueIds)
+      .order("sort_order", { ascending: true });
+    if (extError) {
+      const queueRows = queueRowsFromSavedRows([...queueByNumber.values()]);
+      return { rows: queueRows, metrics: queueMetricsFromRows(queueRows), error: extError.message };
+    }
+    extensionRows = (exts ?? []) as SavedExtensionRow[];
+  }
+
+  const extensionsByQueue = new Map<string, ExtensionAggregate[]>();
+  for (const row of extensionRows) {
+    const queueNumber = row.queue_number;
+    const key = `${queueNumber}|${row.extension_label}`;
+    const existing = extensionsByQueue.get(queueNumber)?.find((item) => `${item.queueNumber}|${item.extensionLabel}` === key);
+    const serviced = row.extension_serviced_calls ?? 0;
+    const averageSeconds = durationToSeconds(row.average_talk_time);
+    if (existing) {
+      existing.serviced += serviced;
+      existing.polls += row.extension_polls ?? 0;
+      existing.talkSeconds += durationToSeconds(row.talk_time);
+      existing.weightedAverageTalkSeconds += averageSeconds * serviced;
+      existing.averageWeight += serviced;
+      existing.sourceLine = existing.sourceLine ?? row.source_line;
+      existing.sortOrder = Math.min(existing.sortOrder ?? row.sort_order ?? 0, row.sort_order ?? existing.sortOrder ?? 0);
+      continue;
+    }
+
+    const aggregate: ExtensionAggregate = {
+      queueNumber,
+      queueName: row.queue_name,
+      extensionLabel: row.extension_label,
+      extensionNumber: row.extension_number,
+      extensionName: row.extension_name,
+      serviced,
+      polls: row.extension_polls ?? 0,
+      talkSeconds: durationToSeconds(row.talk_time),
+      weightedAverageTalkSeconds: averageSeconds * serviced,
+      averageWeight: serviced,
+      sourceLine: row.source_line,
+      sortOrder: row.sort_order,
+    };
+    const list = extensionsByQueue.get(queueNumber) ?? [];
+    list.push(aggregate);
+    extensionsByQueue.set(queueNumber, list);
+  }
+
+  const out: ThreeCxReportRow[] = [];
+  const queueRows = [...queueByNumber.values()].sort((a, b) => a.queue_number.localeCompare(b.queue_number));
+  for (const queue of queueRows) {
+    const queueRow = queueRowsFromSavedRows([queue])[0];
+    if (queueRow) out.push(queueRow);
+    const extensions = (extensionsByQueue.get(queue.queue_number) ?? []).sort(
+      (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.extensionLabel.localeCompare(b.extensionLabel),
+    );
+    for (const ext of extensions) {
+      const averageSeconds =
+        ext.serviced > 0 && ext.talkSeconds > 0
+          ? ext.talkSeconds / ext.serviced
+          : ext.averageWeight > 0
+            ? ext.weightedAverageTalkSeconds / ext.averageWeight
+            : 0;
+      out.push({
+        queue: `${ext.queueNumber} ${ext.queueName}`.trim(),
+        queueNumber: ext.queueNumber,
+        queueName: ext.queueName,
+        extension: ext.extensionLabel,
+        extensionNumber: ext.extensionNumber,
+        extensionName: ext.extensionName,
+        label: ext.extensionLabel,
+        level: "extension",
+        received: null,
+        serviced: ext.serviced,
+        unanswered: null,
+        polls: ext.polls,
+        unansweredLabel: `${ext.polls} - Polls`,
+        talkTime: formatDuration(ext.talkSeconds),
+        averageTalkTime: formatDuration(averageSeconds),
+        rawColumns: {},
+        sourceLine: ext.sourceLine,
+        sortOrder: ext.sortOrder,
+      });
+    }
+  }
+
+  return { rows: out, metrics: queueMetricsFromRows(out) };
+}
+
+function queueRowsFromSavedRows(rows: SavedQueueRow[]): ThreeCxReportRow[] {
+  return rows.map<ThreeCxReportRow>((row) => {
     const missed = row.missed_calls ?? row.abandoned_calls ?? null;
     return {
       queue: `${row.queue_number} ${row.queue_name}`.trim(),
@@ -296,6 +503,30 @@ export async function readDetailedReport(input: {
       sortOrder: null,
     };
   });
+}
+
+export async function readDetailedReport(input: {
+  year: number;
+  monthIndex: number;
+  range: ThreeCxReportRange;
+}): Promise<{ rows: ThreeCxReportRow[]; metrics: ThreeCxCallMetrics | null; error?: string }> {
+  if (input.range === "month") {
+    return readMonthlyDetailedReport(input);
+  }
+
+  const { startDate, endDate } = reportDateRangeForMonth(input.year, input.monthIndex, input.range);
+  const supabase = createServiceRoleClient();
+  const { data: queues, error: queueError } = await supabase
+    .from("threecx_queue_report_rows")
+    .select("id,queue_number,queue_name,total_calls,answered_calls,abandoned_calls,missed_calls")
+    .eq("report_type", "queue_performance")
+    .eq("report_start_date", startDate)
+    .eq("report_end_date", endDate)
+    .order("queue_number", { ascending: true });
+  if (queueError) return { rows: [], metrics: null, error: queueError.message };
+
+  const savedQueues = (queues ?? []) as SavedQueueRow[];
+  const queueRows = queueRowsFromSavedRows(savedQueues);
 
   const queueIds = savedQueues.map((row) => row.id);
   let extensionRows: SavedExtensionRow[] = [];
@@ -349,6 +580,100 @@ export async function readDetailedReport(input: {
   return { rows: out, metrics: out.length > 0 ? queueMetricsFromRows(out) : null };
 }
 
+async function syncMonthlyCallValuesFromWeeklyImports(year: number, monthIndex: number): Promise<{ values: MonthDb; error?: string }> {
+  const [current, detailed] = await Promise.all([
+    readNmacMasterMonth(year, monthIndex),
+    readDetailedReport({ year, monthIndex, range: "month" }),
+  ]);
+  if (current.error) return { values: {}, error: current.error };
+  if (detailed.error) return { values: current.data, error: detailed.error };
+
+  const next = applyMonthlyCallMetrics(current.data, detailed.metrics);
+  const saved = await writeNmacMasterMonth(year, monthIndex, next);
+  if (saved.error) return { values: next, error: saved.error };
+  return { values: next };
+}
+
+export async function deleteThreeCxImport(
+  actor: ImportActor,
+  importId: number,
+): Promise<{
+  ok: boolean;
+  deleted?: { importId: number; queueRows: number; extensionRows: number; fileLabel: string };
+  notFound?: boolean;
+  error?: string;
+}> {
+  const supabase = createServiceRoleClient();
+  const { data: importRow, error: lookupError } = await supabase
+    .from("threecx_queue_report_imports")
+    .select(
+      [
+        "id",
+        "source",
+        "source_filename",
+        "source_message_id",
+        "report_type",
+        "report_start_date",
+        "report_end_date",
+        "row_count",
+        "extension_row_count",
+      ].join(","),
+    )
+    .eq("id", importId)
+    .maybeSingle();
+
+  if (lookupError) return { ok: false, error: lookupError.message };
+  if (!importRow) return { ok: false, notFound: true, error: "3CX import was not found." };
+
+  const row = importRow as unknown as SavedImportRow;
+  const { count: extensionRows, error: extensionError } = await supabase
+    .from("threecx_queue_report_extension_rows")
+    .delete({ count: "exact" })
+    .eq("import_id", importId);
+  if (extensionError) return { ok: false, error: extensionError.message };
+
+  const { count: queueRows, error: queueError } = await supabase
+    .from("threecx_queue_report_rows")
+    .delete({ count: "exact" })
+    .eq("import_id", importId);
+  if (queueError) return { ok: false, error: queueError.message };
+
+  const { error: importError } = await supabase.from("threecx_queue_report_imports").delete().eq("id", importId);
+  if (importError) return { ok: false, error: importError.message };
+
+  const deletedPeriod = importMonthFromDateKey(row.report_start_date);
+  let syncError: string | undefined;
+  if (deletedPeriod) {
+    const synced = await syncMonthlyCallValuesFromWeeklyImports(deletedPeriod.year, deletedPeriod.monthIndex);
+    syncError = synced.error;
+  }
+
+  const fileLabel = row.source_filename || row.source_message_id || `Import #${importId}`;
+  await logThreeCxImport(actor, "info", "Deleted 3CX import", {
+    importId,
+    fileLabel,
+    source: row.source,
+    reportType: row.report_type,
+    reportStartDate: row.report_start_date,
+    reportEndDate: row.report_end_date,
+    queueRows: queueRows ?? 0,
+    extensionRows: extensionRows ?? 0,
+    originalQueueRows: row.row_count,
+    originalExtensionRows: row.extension_row_count,
+    syncError,
+  });
+
+  return {
+    ok: true,
+    deleted: {
+      importId,
+      queueRows: queueRows ?? 0,
+      extensionRows: extensionRows ?? 0,
+      fileLabel,
+    },
+  };
+}
+
 export async function saveThreeCxImport(input: {
   actor: ImportActor;
   year: number;
@@ -370,13 +695,9 @@ export async function saveThreeCxImport(input: {
     rows: parsed.rows,
   });
 
-  const current = await readNmacMasterMonth(input.year, input.monthIndex);
-  if (current.error) throw new Error(current.error);
-  const next = input.range === "month" ? mergeCallValues(current.data, parsed.values) : current.data;
-  if (input.range === "month") {
-    const saved = await writeNmacMasterMonth(input.year, input.monthIndex, next);
-    if (saved.error) throw new Error(saved.error);
-  }
+  const synced = await syncMonthlyCallValuesFromWeeklyImports(input.year, input.monthIndex);
+  if (synced.error) throw new Error(synced.error);
+  const next = synced.values;
 
   const month = MONTHS[input.monthIndex] ?? `Month ${input.monthIndex + 1}`;
   const rangeLabel = threeCxRangeLabel(input.range);

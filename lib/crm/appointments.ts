@@ -1,5 +1,3 @@
-import { loadEnvConfig } from "@next/env";
-
 /** One row from `appointment_data` — see CRM status-counts API docs. */
 export type CrmAppointmentRow = {
   id: number | null;
@@ -49,22 +47,12 @@ export class CrmConfigError extends Error {
   }
 }
 
-let envLoaded = false;
-
-function ensureLocalEnvLoaded(): void {
-  if (envLoaded || process.env.NODE_ENV === "production") return;
-  envLoaded = true;
-  loadEnvConfig(process.cwd());
-}
-
 function crmBaseUrl(): string {
-  ensureLocalEnvLoaded();
   const base = process.env.NMAC_CRM_BASE_URL?.trim().replace(/\/$/, "") || "https://crm.nmac.bm";
   return base;
 }
 
 function crmToken(): string {
-  ensureLocalEnvLoaded();
   const token = process.env.REPORTS_API_TOKEN?.trim();
   if (!token) throw new CrmConfigError();
   return token;

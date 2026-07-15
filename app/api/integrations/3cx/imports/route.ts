@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { reportDateRangeForMonth } from "@/lib/3cx/email-report";
+import { deleteThreeCxImport } from "@/lib/3cx/import-server";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { canAccessDev } from "@/lib/auth/types";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
@@ -26,6 +27,11 @@ function parseMonthIndex(value: string | null): number | null {
   if (value === null) return null;
   const n = Number(value);
   return Number.isInteger(n) && n >= 0 && n <= 11 ? n : null;
+}
+
+function parseImportId(value: unknown): number | null {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isInteger(n) && n > 0 ? n : null;
 }
 
 export async function GET(req: Request) {
@@ -75,4 +81,20 @@ export async function GET(req: Request) {
     { ok: true, imports: data ?? [] },
     { headers: { "Cache-Control": "private, no-store, max-age=0" } },
   );
+}
+
+export async function DELETE(req: Request) {
+  const session = await getSessionFromCookies();
+  if (!session || !canAccessDev(session.role)) return unauthorized();
+
+  const body = (await req.json().catch(() => ({}))) as { id?: unknown };
+  const importId = parseImportId(body.id);
+  if (importId === null) {
+    return NextResponse.json({ error: "Choose a valid saved import to delete." }, { status: 400 });
+  }
+
+  const result = await deleteThreeCxImport({ email: session.email, role: session.role }, importId);
+  if (result.notFound) return NextResponse.json({ error: result.error }, { status: 404 });
+  if (!result.ok) return NextResponse.json({ error: result.error ?? "Could not delete 3CX import." }, { status: 500 });
+  return NextResponse.json(result);
 }

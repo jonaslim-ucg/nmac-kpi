@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, FileUp, Loader2, MailSearch, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronRight, FileUp, Loader2, MailSearch, RefreshCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Snackbar, type SnackbarVariant } from "@/components/ui/snackbar";
 import { useSession } from "@/components/auth/session-provider";
@@ -8,7 +8,7 @@ import { canAccessDev } from "@/lib/auth/types";
 import { DEFAULT_KPI_YEAR, SUPPORTED_KPI_YEARS } from "@/lib/kpi/years";
 import { defaultCompletedMonthIndex, MONTHS } from "@/lib/kpi-nmac-2026/model";
 
-type ThreeCxRange = "month" | "week1" | "week2" | "week3" | "week4";
+type ThreeCxRange = "month" | "week1" | "week2" | "week3" | "week4" | "week5";
 type BusyAction = "email" | "manual" | "logs" | null;
 
 const WEEK_FILTERS: { value: ThreeCxRange; label: string }[] = [
@@ -17,11 +17,17 @@ const WEEK_FILTERS: { value: ThreeCxRange; label: string }[] = [
   { value: "week2", label: "2nd week" },
   { value: "week3", label: "3rd week" },
   { value: "week4", label: "4th week" },
+  { value: "week5", label: "5th week" },
 ];
 
 type ThreeCxImportResponse = {
   ok?: boolean;
   error?: string;
+  month?: string;
+  year?: number;
+  monthIndex?: number;
+  range?: ThreeCxRange;
+  rangeLabel?: string;
   metrics?: {
     received: number;
     answered: number;
@@ -33,6 +39,7 @@ type ThreeCxImportResponse = {
     attachmentName?: string;
   };
   rows?: ThreeCxReportRow[];
+  matchedRows?: number;
 };
 
 type ThreeCxMetrics = NonNullable<ThreeCxImportResponse["metrics"]>;
@@ -94,6 +101,16 @@ type ThreeCxImportsResponse = {
   error?: string;
 };
 
+type DeleteThreeCxImportResponse = {
+  ok?: boolean;
+  error?: string;
+  deleted?: {
+    fileLabel?: string;
+    queueRows?: number;
+    extensionRows?: number;
+  };
+};
+
 function formatLogTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -144,7 +161,11 @@ function dateKey(year: number, monthIndex: number, day: number) {
 function reportRangeDates(year: number, monthIndex: number, value: ThreeCxRange) {
   const lastDay = new Date(year, monthIndex + 1, 0).getDate();
   if (value === "month") return { startDate: dateKey(year, monthIndex, 1), endDate: dateKey(year, monthIndex, lastDay) };
-  if (value === "week4") return { startDate: dateKey(year, monthIndex, 22), endDate: dateKey(year, monthIndex, lastDay) };
+  if (value === "week5") return { startDate: dateKey(year, monthIndex, 29), endDate: dateKey(year, monthIndex, lastDay) };
+  if (value === "week4") {
+    const endDay = lastDay > 28 ? 28 : lastDay;
+    return { startDate: dateKey(year, monthIndex, 22), endDate: dateKey(year, monthIndex, endDay) };
+  }
   const weekNumber = value === "week1" ? 1 : value === "week2" ? 2 : 3;
   const startDay = 1 + (weekNumber - 1) * 7;
   return { startDate: dateKey(year, monthIndex, startDay), endDate: dateKey(year, monthIndex, startDay + 6) };
@@ -272,8 +293,8 @@ export function ThreeCxEmailImportPanel() {
   const [year, setYear] = useState(DEFAULT_KPI_YEAR);
   const [monthIndex, setMonthIndex] = useState(defaultCompletedMonthIndex);
   const [range, setRange] = useState<ThreeCxRange>("month");
-  const [manualRangeDraft, setManualRangeDraft] = useState<ThreeCxRange>("month");
-  const [manualRange, setManualRange] = useState<ThreeCxRange>("month");
+  const [manualRangeDraft, setManualRangeDraft] = useState<ThreeCxRange>("week1");
+  const [manualRange, setManualRange] = useState<ThreeCxRange>("week1");
   const [busy, setBusy] = useState<BusyAction>(null);
   const [manualFile, setManualFile] = useState<File | null>(null);
   const [logs, setLogs] = useState<ThreeCxLogEntry[]>([]);
@@ -286,8 +307,9 @@ export function ThreeCxEmailImportPanel() {
   const [expandedQueues, setExpandedQueues] = useState<Set<string>>(() => new Set());
   const [valuesLoading, setValuesLoading] = useState(false);
   const [valuesError, setValuesError] = useState<string | null>(null);
+  const [deletingImportId, setDeletingImportId] = useState<number | null>(null);
   const [snackbar, setSnackbar] = useState<{ text: string; variant: SnackbarVariant } | null>(null);
-  const disabled = busy !== null;
+  const disabled = busy !== null || deletingImportId !== null;
 
   const showSnackbar = useCallback((text: string, variant: SnackbarVariant) => {
     setSnackbar({ text, variant });
@@ -306,6 +328,14 @@ export function ThreeCxEmailImportPanel() {
     [imports, monthIndex, year],
   );
   const activeRange = visibleWeekFilters.some((filter) => filter.value === range) ? range : "month";
+  const manualRangeFilters = useMemo(() => {
+    const hasFifthWeek = new Date(year, monthIndex + 1, 0).getDate() > 28;
+    return WEEK_FILTERS.filter((filter) => filter.value !== "month" && (filter.value !== "week5" || hasFifthWeek));
+  }, [monthIndex, year]);
+  const selectedManualRange = manualRangeFilters.some((filter) => filter.value === manualRange) ? manualRange : "week1";
+  const selectedManualRangeDraft = manualRangeFilters.some((filter) => filter.value === manualRangeDraft)
+    ? manualRangeDraft
+    : "week1";
 
   const loadLogs = useCallback(async () => {
     if (!canAccessDev(user?.role)) return;
@@ -393,19 +423,53 @@ export function ThreeCxEmailImportPanel() {
     (payload: ThreeCxImportResponse, fallbackSource: string, importedRange: ThreeCxRange) => {
       const metrics = payload.metrics;
       const source = payload.source?.attachmentName || payload.source?.subject || fallbackSource;
+      const resultYear = typeof payload.year === "number" ? payload.year : year;
+      const resultMonthIndex = typeof payload.monthIndex === "number" ? payload.monthIndex : monthIndex;
+      const resultMonth = payload.month ?? MONTHS[resultMonthIndex] ?? MONTHS[monthIndex];
+      const resultRange = payload.range ?? importedRange;
+      const resultRangeLabel = payload.rangeLabel ?? rangeLabel(resultRange);
+      const rows = payload.rows ?? [];
       showSnackbar(
         metrics
-          ? `Imported ${MONTHS[monthIndex]} ${year} ${rangeLabel(importedRange)} from ${source}: ${metrics.received} received, ${metrics.answered} answered, ${metrics.missed} missed.`
-          : `Imported ${MONTHS[monthIndex]} ${year} ${rangeLabel(importedRange)} from ${source}.`,
+          ? `Imported ${resultMonth} ${resultYear} ${resultRangeLabel} from ${source}: ${metrics.received} received, ${metrics.answered} answered, ${metrics.missed} missed.`
+          : `Imported ${resultMonth} ${resultYear} ${resultRangeLabel} from ${source}.`,
         "success",
       );
-      applyReportRows(payload.rows ?? []);
-      setRange(importedRange);
-      void loadCurrentValues(importedRange);
+      applyReportRows(rows);
+      setCurrentMetrics(payload.metrics ?? null);
+      const { startDate, endDate } = reportRangeDates(resultYear, resultMonthIndex, resultRange);
+      const importedRecord: ThreeCxImportRecord = {
+        id: -Date.now(),
+        source: "email",
+        source_filename: source,
+        source_message_id: null,
+        report_type: "queue_performance",
+        report_start_date: startDate,
+        report_end_date: endDate,
+        row_count: rows.filter((row) => row.level === "queue").length || payload.matchedRows || 1,
+        extension_row_count: rows.filter((row) => row.level === "extension").length,
+        imported_by_email: null,
+        imported_at: new Date().toISOString(),
+      };
+      setImports((prev) =>
+        resultYear === year && resultMonthIndex === monthIndex
+          ? [
+              importedRecord,
+              ...prev.filter(
+                (item) => item.report_start_date !== startDate || item.report_end_date !== endDate || item.source !== "email",
+              ),
+            ]
+          : [importedRecord],
+      );
+      setYear(resultYear);
+      setMonthIndex(resultMonthIndex);
+      setRange(resultRange);
       void loadLogs();
-      void loadImports();
+      if (resultYear === year && resultMonthIndex === monthIndex) {
+        void loadImports();
+      }
     },
-    [applyReportRows, loadCurrentValues, loadImports, loadLogs, monthIndex, showSnackbar, year],
+    [applyReportRows, loadImports, loadLogs, monthIndex, showSnackbar, year],
   );
 
   const fetchThreeCxEmail = useCallback(async () => {
@@ -416,7 +480,7 @@ export function ThreeCxEmailImportPanel() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ year, monthIndex, range: activeRange }),
+        body: JSON.stringify({ year, monthIndex }),
       });
       const payload = (await res.json()) as ThreeCxImportResponse;
       if (!res.ok || !payload.ok) {
@@ -424,14 +488,14 @@ export function ThreeCxEmailImportPanel() {
         void loadLogs();
         return;
       }
-      handleImportResult(payload, "3CX email", activeRange);
+      handleImportResult(payload, "3CX email", "month");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not fetch the 3CX report email.";
       showSnackbar(message, "error");
     } finally {
       setBusy(null);
     }
-  }, [activeRange, handleImportResult, loadLogs, monthIndex, showSnackbar, user?.role, year]);
+  }, [handleImportResult, loadLogs, monthIndex, showSnackbar, user?.role, year]);
 
   const rawTableRows = reportRows.length > 0 ? reportRows : fallbackReportRows(currentMetrics);
   const tableRows = dataOnlyReportRows(rawTableRows);
@@ -448,7 +512,7 @@ export function ThreeCxEmailImportPanel() {
       const form = new FormData();
       form.append("year", String(year));
       form.append("monthIndex", String(monthIndex));
-      form.append("range", manualRange);
+      form.append("range", selectedManualRange);
       form.append("file", manualFile);
       const res = await fetch("/api/integrations/3cx/import-manual", {
         method: "POST",
@@ -461,14 +525,52 @@ export function ThreeCxEmailImportPanel() {
         void loadLogs();
         return;
       }
-      handleImportResult(payload, manualFile.name, manualRange);
+      handleImportResult(payload, manualFile.name, selectedManualRange);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not import the CSV file.";
       showSnackbar(message, "error");
     } finally {
       setBusy(null);
     }
-  }, [handleImportResult, loadLogs, manualFile, manualRange, monthIndex, showSnackbar, user?.role, year]);
+  }, [handleImportResult, loadLogs, manualFile, monthIndex, selectedManualRange, showSnackbar, user?.role, year]);
+
+  const deleteImportRecord = useCallback(
+    async (item: ThreeCxImportRecord) => {
+      if (!canAccessDev(user?.role) || item.id <= 0) return;
+      const file = formatImportFile(item);
+      const importRange = formatImportRange(item);
+      const confirmed = window.confirm(`Delete this saved 3CX import?\n\n${file}\n${importRange}`);
+      if (!confirmed) return;
+
+      setDeletingImportId(item.id);
+      try {
+        const res = await fetch("/api/integrations/3cx/imports", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ id: item.id }),
+        });
+        const payload = (await res.json()) as DeleteThreeCxImportResponse;
+        if (!res.ok || !payload.ok) {
+          showSnackbar(payload.error ?? "Could not delete the 3CX import.", "error");
+          return;
+        }
+
+        setImports((prev) => prev.filter((row) => row.id !== item.id));
+        const deletedRows = (payload.deleted?.queueRows ?? 0) + (payload.deleted?.extensionRows ?? 0);
+        showSnackbar(`Deleted ${payload.deleted?.fileLabel ?? file} and ${deletedRows.toLocaleString()} saved row(s).`, "success");
+        void loadCurrentValues();
+        void loadImports();
+        void loadLogs();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Could not delete the 3CX import.";
+        showSnackbar(message, "error");
+      } finally {
+        setDeletingImportId(null);
+      }
+    },
+    [loadCurrentValues, loadImports, loadLogs, showSnackbar, user?.role],
+  );
 
   if (loading) {
     return (
@@ -661,7 +763,7 @@ export function ThreeCxEmailImportPanel() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Fetches the scheduled 3CX email and updates only the NMAC call KPIs for the selected month.
+          Fetches the scheduled 3CX email for the selected month and places it in the week based on when the email was received.
         </p>
         <button
           type="button"
@@ -680,11 +782,11 @@ export function ThreeCxEmailImportPanel() {
             <span>Upload range</span>
             <select
               className="min-h-[40px] rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground"
-              value={manualRangeDraft}
+              value={selectedManualRangeDraft}
               onChange={(e) => setManualRangeDraft(e.target.value as ThreeCxRange)}
               disabled={disabled}
             >
-              {WEEK_FILTERS.map((filter) => (
+              {manualRangeFilters.map((filter) => (
                 <option key={filter.value} value={filter.value}>
                   {filter.label}
                 </option>
@@ -695,15 +797,15 @@ export function ThreeCxEmailImportPanel() {
             type="button"
             className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition hover:bg-accent-muted/40 disabled:opacity-50"
             onClick={() => {
-              setManualRange(manualRangeDraft);
-              showSnackbar(`Manual upload range set to ${rangeLabel(manualRangeDraft)}.`, "success");
+              setManualRange(selectedManualRangeDraft);
+              showSnackbar(`Manual upload range set to ${rangeLabel(selectedManualRangeDraft)}.`, "success");
             }}
-            disabled={disabled || manualRangeDraft === manualRange}
+            disabled={disabled || selectedManualRangeDraft === selectedManualRange}
           >
             Apply range
           </button>
           <p className="pb-2 text-xs text-muted-foreground sm:flex-1">
-            Import will use {rangeLabel(manualRange)} for {MONTHS[monthIndex]} {year}.
+            Import will use {rangeLabel(selectedManualRange)} for {MONTHS[monthIndex]} {year}.
           </p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -755,7 +857,7 @@ export function ThreeCxEmailImportPanel() {
           </p>
         ) : (
           <div className="max-h-72 overflow-auto rounded-lg border border-border bg-background/60">
-            <table className="w-full min-w-[760px] border-collapse text-left text-xs">
+            <table className="w-full min-w-[860px] border-collapse text-left text-xs">
               <thead className="sticky top-0 bg-muted/70 text-muted-foreground">
                 <tr className="border-b border-border">
                   <th className="px-3 py-2 font-semibold">File</th>
@@ -764,21 +866,41 @@ export function ThreeCxEmailImportPanel() {
                   <th className="px-3 py-2 text-right font-semibold">Extensions</th>
                   <th className="px-3 py-2 font-semibold">Source</th>
                   <th className="px-3 py-2 font-semibold">Imported</th>
+                  <th className="px-3 py-2 text-right font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {imports.map((item) => (
-                  <tr key={item.id} className="border-b border-border last:border-0 hover:bg-accent-muted/25">
-                    <td className="max-w-64 truncate px-3 py-2 font-medium text-foreground" title={formatImportFile(item)}>
-                      {formatImportFile(item)}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatImportRange(item)}</td>
-                    <td className="px-3 py-2 text-right text-foreground">{item.row_count.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right text-foreground">{item.extension_row_count.toLocaleString()}</td>
-                    <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatImportSource(item)}</td>
-                    <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatLogTime(item.imported_at)}</td>
-                  </tr>
-                ))}
+                {imports.map((item) => {
+                  const isDeleting = deletingImportId === item.id;
+                  return (
+                    <tr key={item.id} className="border-b border-border last:border-0 hover:bg-accent-muted/25">
+                      <td className="max-w-64 truncate px-3 py-2 font-medium text-foreground" title={formatImportFile(item)}>
+                        {formatImportFile(item)}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatImportRange(item)}</td>
+                      <td className="px-3 py-2 text-right text-foreground">{item.row_count.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right text-foreground">{item.extension_row_count.toLocaleString()}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatImportSource(item)}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatLogTime(item.imported_at)}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-right">
+                        <button
+                          type="button"
+                          className="inline-flex min-h-[30px] items-center justify-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-semibold text-muted-foreground transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-600 disabled:opacity-50 dark:hover:text-red-400"
+                          onClick={() => void deleteImportRecord(item)}
+                          disabled={disabled || item.id <= 0}
+                          title="Delete saved import"
+                        >
+                          {isDeleting ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                          )}
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

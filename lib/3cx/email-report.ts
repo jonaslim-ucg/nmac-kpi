@@ -1,6 +1,6 @@
 import type { MonthDb } from "@/lib/kpi-nmac-2026/model";
 
-export type ThreeCxReportRange = "month" | "week1" | "week2" | "week3" | "week4" | "last_week";
+export type ThreeCxReportRange = "month" | "week1" | "week2" | "week3" | "week4" | "week5" | "last_week";
 
 export type ThreeCxCallMetrics = {
   received: number;
@@ -49,13 +49,17 @@ type ThreeCxTotals = ThreeCxCallMetrics & {
   matchedRows: number;
 };
 
+const EMAIL_RECEIVED_TIME_ZONE = "Asia/Manila";
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 const RANGE_WEEK_LABELS: Record<ThreeCxReportRange, string> = {
   month: "Full month",
   week1: "Week 1",
   week2: "Week 2",
   week3: "Week 3",
-  week4: "Week 4 / Last week",
-  last_week: "Week 4 / Last week",
+  week4: "Week 4",
+  week5: "Week 5 / Last week",
+  last_week: "Last week",
 };
 
 export function threeCxRangeLabel(range: ThreeCxReportRange): string {
@@ -63,8 +67,8 @@ export function threeCxRangeLabel(range: ThreeCxReportRange): string {
 }
 
 export function normalizeThreeCxRange(raw: unknown): ThreeCxReportRange {
-  if (raw === "week1" || raw === "week2" || raw === "week3" || raw === "week4") return raw;
-  if (raw === "last_week") return "week4";
+  if (raw === "week1" || raw === "week2" || raw === "week3" || raw === "week4" || raw === "week5") return raw;
+  if (raw === "last_week") return "last_week";
   return "month";
 }
 
@@ -73,27 +77,90 @@ export function reportWindowForMonth(year: number, monthIndex: number, range: Th
   const monthEnd = new Date(Date.UTC(year, monthIndex + 1, 1, 0, 0, 0));
 
   if (range === "month") return { start: monthStart, end: monthEnd };
-  if (range === "week4" || range === "last_week") {
-    return {
-      start: new Date(Date.UTC(year, monthIndex, 22, 0, 0, 0)),
-      end: monthEnd,
-    };
+  if (range === "last_week") {
+    const lastRange = weeklyReportRangesForMonth(year, monthIndex).at(-1);
+    return lastRange ? { start: lastRange.start, end: lastRange.end } : { start: monthStart, end: monthEnd };
   }
 
-  const weekNumber = range === "week1" ? 1 : range === "week2" ? 2 : 3;
-  const day = 1 + (weekNumber - 1) * 7;
+  const weekNumber = rangeToWeekNumber(range);
+  if (weekNumber === null) return { start: monthStart, end: monthEnd };
+  const startDay = 1 + (weekNumber - 1) * 7;
+  const endDay = weekNumber === 5 || (weekNumber === 4 && !hasFifthReportWeek(year, monthIndex)) ? undefined : startDay + 7;
   return {
-    start: new Date(Date.UTC(year, monthIndex, day, 0, 0, 0)),
-    end: new Date(Date.UTC(year, monthIndex, day + 7, 0, 0, 0)),
+    start: new Date(Date.UTC(year, monthIndex, startDay, 0, 0, 0)),
+    end: endDay ? new Date(Date.UTC(year, monthIndex, endDay, 0, 0, 0)) : monthEnd,
   };
+}
+
+export function weeklyReportRangesForMonth(year: number, monthIndex: number) {
+  const out: { range: Exclude<ThreeCxReportRange, "month" | "last_week">; start: Date; end: Date }[] = [];
+  for (const range of ["week1", "week2", "week3", "week4", "week5"] as const) {
+    if (range === "week5" && !hasFifthReportWeek(year, monthIndex)) continue;
+    const window = reportWindowForMonth(year, monthIndex, range);
+    out.push({ range, start: window.start, end: window.end });
+  }
+  return out;
+}
+
+function hasFifthReportWeek(year: number, monthIndex: number) {
+  return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate() > 28;
+}
+
+function rangeToWeekNumber(range: ThreeCxReportRange): number | null {
+  if (range === "week1") return 1;
+  if (range === "week2") return 2;
+  if (range === "week3") return 3;
+  if (range === "week4") return 4;
+  if (range === "week5") return 5;
+  return null;
 }
 
 export function reportDateRangeForMonth(year: number, monthIndex: number, range: ThreeCxReportRange) {
   const { start, end } = reportWindowForMonth(year, monthIndex, range);
-  const inclusiveEnd = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+  const inclusiveEnd = new Date(end.getTime() - MS_PER_DAY);
   return {
     startDate: dateOnly(start),
     endDate: dateOnly(inclusiveEnd),
+  };
+}
+
+export function weeklyReportDateRangesForMonth(year: number, monthIndex: number) {
+  return weeklyReportRangesForMonth(year, monthIndex).map(({ range, start, end }) => {
+    const inclusiveEnd = new Date(end.getTime() - MS_PER_DAY);
+    return {
+      range,
+      startDate: dateOnly(start),
+      endDate: dateOnly(inclusiveEnd),
+    };
+  });
+}
+
+export function reportMonthWindow(year: number, monthIndex: number) {
+  return {
+    start: new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0)),
+    end: new Date(Date.UTC(year, monthIndex + 1, 1, 0, 0, 0)),
+  };
+}
+
+export function threeCxPeriodFromEmailReceivedAt(
+  receivedDateTime: string | undefined,
+  timeZone = EMAIL_RECEIVED_TIME_ZONE,
+): { year: number; monthIndex: number; range: ThreeCxReportRange; localDate: string } | null {
+  if (!receivedDateTime) return null;
+  const date = new Date(receivedDateTime);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const local = localDateParts(date, timeZone);
+  const firstDayOfMonth = new Date(Date.UTC(local.year, local.monthIndex, 1, 0, 0, 0)).getUTCDay();
+  const weekNumber = Math.min(5, Math.max(1, Math.ceil((local.day + firstDayOfMonth) / 7)));
+  const range =
+    weekNumber === 1 ? "week1" : weekNumber === 2 ? "week2" : weekNumber === 3 ? "week3" : weekNumber === 4 ? "week4" : "week5";
+
+  return {
+    year: local.year,
+    monthIndex: local.monthIndex,
+    range,
+    localDate: dateOnly(new Date(Date.UTC(local.year, local.monthIndex, local.day, 0, 0, 0))),
   };
 }
 
@@ -157,6 +224,23 @@ function parseDelimitedRows(text: string): CsvRow[] {
 
 function dateOnly(value: Date): string {
   return value.toISOString().slice(0, 10);
+}
+
+function localDateParts(value: Date, timeZone: string): { year: number; monthIndex: number; day: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(value);
+  const part = (type: string) => Number(parts.find((item) => item.type === type)?.value);
+  const year = part("year");
+  const month = part("month");
+  const day = part("day");
+  if (!year || !month || !day) {
+    throw new Error(`Could not read 3CX email received date in ${timeZone}.`);
+  }
+  return { year, monthIndex: month - 1, day };
 }
 
 function parseCsv(text: string): string[][] {

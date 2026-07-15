@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { normalizeThreeCxRange } from "@/lib/3cx/email-report";
+import { normalizeThreeCxImportRange } from "@/lib/3cx/email-report";
 import { callMetricsFromMonth, readDetailedReport } from "@/lib/3cx/import-server";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { canAccessDev } from "@/lib/auth/types";
@@ -22,6 +22,18 @@ function parseMonthIndex(value: string | null): number | null {
   return Number.isInteger(n) && n >= 0 && n <= 11 ? n : null;
 }
 
+function parseDay(value: string | null): number | null {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 1 && n <= 31 ? n : null;
+}
+
+const EMPTY_METRICS = {
+  received: 0,
+  answered: 0,
+  missed: 0,
+  answeredRate: 0,
+};
+
 export async function GET(req: Request) {
   const session = await getSessionFromCookies();
   if (!session || !canAccessDev(session.role)) return unauthorized();
@@ -29,12 +41,19 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const year = parseYear(url.searchParams.get("year"));
   const monthIndex = parseMonthIndex(url.searchParams.get("monthIndex"));
-  const range = normalizeThreeCxRange(url.searchParams.get("range"));
+  const range = normalizeThreeCxImportRange(url.searchParams.get("range"));
+  const day = range === "day" ? parseDay(url.searchParams.get("day")) : undefined;
   if (year === null || monthIndex === null) {
     return NextResponse.json({ error: "Choose a valid month and year." }, { status: 400 });
   }
+  if (range === "day" && day === null) {
+    return NextResponse.json({ error: "Choose a valid report day." }, { status: 400 });
+  }
+  if (range === "day" && typeof day === "number" && day > new Date(year, monthIndex + 1, 0).getDate()) {
+    return NextResponse.json({ error: "Choose a valid report day for the selected month." }, { status: 400 });
+  }
 
-  const detailed = await readDetailedReport({ year, monthIndex, range });
+  const detailed = await readDetailedReport({ year, monthIndex, range, day: day ?? undefined });
   if (detailed.error) return NextResponse.json({ error: detailed.error }, { status: 500 });
   if (detailed.metrics && detailed.rows.length > 0) {
     return NextResponse.json({
@@ -45,6 +64,18 @@ export async function GET(req: Request) {
       range,
       metrics: detailed.metrics,
       rows: detailed.rows,
+    });
+  }
+  if (range === "day") {
+    return NextResponse.json({
+      ok: true,
+      year,
+      monthIndex,
+      month: MONTHS[monthIndex],
+      range,
+      day,
+      metrics: EMPTY_METRICS,
+      rows: [],
     });
   }
 

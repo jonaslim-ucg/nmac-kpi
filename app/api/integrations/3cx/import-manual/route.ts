@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { normalizeThreeCxRange, threeCxRangeLabel } from "@/lib/3cx/email-report";
+import { normalizeThreeCxImportRange, threeCxRangeLabel } from "@/lib/3cx/email-report";
 import { logThreeCxImport, saveThreeCxImport } from "@/lib/3cx/import-server";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { canAccessDev } from "@/lib/auth/types";
@@ -21,6 +21,11 @@ function parseMonthIndex(value: FormDataEntryValue | null): number | null {
   return Number.isInteger(n) && n >= 0 && n <= 11 ? n : null;
 }
 
+function parseDay(value: FormDataEntryValue | null): number | null {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 1 && n <= 31 ? n : null;
+}
+
 export async function POST(req: Request) {
   const session = await getSessionFromCookies();
   if (!session || !canAccessDev(session.role)) return unauthorized();
@@ -29,11 +34,18 @@ export async function POST(req: Request) {
   const form = await req.formData();
   const year = parseYear(form.get("year"));
   const monthIndex = parseMonthIndex(form.get("monthIndex"));
-  const range = normalizeThreeCxRange(form.get("range"));
+  const range = normalizeThreeCxImportRange(form.get("range"));
+  const day = range === "day" ? parseDay(form.get("day")) : undefined;
   const file = form.get("file");
 
   if (year === null || monthIndex === null) {
     return NextResponse.json({ error: "Choose a valid month and year." }, { status: 400 });
+  }
+  if (range === "day" && day === null) {
+    return NextResponse.json({ error: "Choose a valid report day." }, { status: 400 });
+  }
+  if (range === "day" && typeof day === "number" && day > new Date(year, monthIndex + 1, 0).getDate()) {
+    return NextResponse.json({ error: "Choose a valid report day for the selected month." }, { status: 400 });
   }
   if (!(file instanceof File) || file.size === 0) {
     return NextResponse.json({ error: "Choose a 3CX CSV file to import." }, { status: 400 });
@@ -46,6 +58,7 @@ export async function POST(req: Request) {
       year,
       monthIndex,
       range,
+      day: day ?? undefined,
       text,
       source: {
         mode: "manual",

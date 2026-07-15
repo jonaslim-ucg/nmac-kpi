@@ -9,6 +9,9 @@ import { DEFAULT_KPI_YEAR, SUPPORTED_KPI_YEARS } from "@/lib/kpi/years";
 import { defaultCompletedMonthIndex, MONTHS } from "@/lib/kpi-nmac-2026/model";
 
 type ThreeCxRange = "month" | "week1" | "week2" | "week3" | "week4" | "week5";
+type ThreeCxImportRange = ThreeCxRange | "day";
+type ThreeCxViewRange = ThreeCxImportRange;
+type ManualUploadRange = Exclude<ThreeCxRange, "month"> | "day";
 type BusyAction = "email" | "manual" | "logs" | null;
 
 const WEEK_FILTERS: { value: ThreeCxRange; label: string }[] = [
@@ -20,14 +23,27 @@ const WEEK_FILTERS: { value: ThreeCxRange; label: string }[] = [
   { value: "week5", label: "5th week" },
 ];
 
+const MANUAL_RANGE_FILTERS: { value: ManualUploadRange; label: string }[] = [
+  { value: "day", label: "Daily report" },
+  { value: "week1", label: "1st week" },
+  { value: "week2", label: "2nd week" },
+  { value: "week3", label: "3rd week" },
+  { value: "week4", label: "4th week" },
+  { value: "week5", label: "5th week" },
+];
+
+const DAILY_FILTER = { value: "day", label: "Daily" } satisfies { value: ThreeCxViewRange; label: string };
+
 type ThreeCxImportResponse = {
   ok?: boolean;
   error?: string;
   month?: string;
   year?: number;
   monthIndex?: number;
-  range?: ThreeCxRange;
+  range?: ThreeCxImportRange;
   rangeLabel?: string;
+  reportStartDate?: string;
+  reportEndDate?: string;
   metrics?: {
     received: number;
     answered: number;
@@ -154,8 +170,38 @@ function rangeLabel(value: ThreeCxRange) {
   return WEEK_FILTERS.find((filter) => filter.value === value)?.label ?? "Whole month";
 }
 
+function importRangeLabel(value: ThreeCxImportRange) {
+  return value === "day" ? "Daily report" : rangeLabel(value);
+}
+
 function dateKey(year: number, monthIndex: number, day: number) {
   return `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function selectedMonthDateBounds(year: number, monthIndex: number) {
+  const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+  return {
+    startDate: dateKey(year, monthIndex, 1),
+    endDate: dateKey(year, monthIndex, lastDay),
+  };
+}
+
+function defaultManualReportDate(year: number, monthIndex: number) {
+  const today = new Date();
+  const isSelectedMonth = today.getFullYear() === year && today.getMonth() === monthIndex;
+  return dateKey(year, monthIndex, isSelectedMonth ? today.getDate() : 1);
+}
+
+function dayFromDateKey(value: string, year: number, monthIndex: number) {
+  const [rawYear, rawMonth, rawDay] = value.split("-").map(Number);
+  if (rawYear !== year || rawMonth !== monthIndex + 1 || !Number.isInteger(rawDay)) return null;
+  const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+  return rawDay >= 1 && rawDay <= lastDay ? rawDay : null;
+}
+
+function manualImportSummary(range: ManualUploadRange, reportDate: string, year: number, monthIndex: number) {
+  if (range === "day") return `Import will use Daily report for ${formatDateOnly(reportDate)}.`;
+  return `Import will use ${rangeLabel(range)} for ${MONTHS[monthIndex]} ${year}.`;
 }
 
 function reportRangeDates(year: number, monthIndex: number, value: ThreeCxRange) {
@@ -175,9 +221,10 @@ function hasImportForRange(imports: ThreeCxImportRecord[], year: number, monthIn
   const { startDate, endDate } = reportRangeDates(year, monthIndex, value);
   return imports.some(
     (item) =>
-      item.report_start_date === startDate &&
-      item.report_end_date === endDate &&
-      item.row_count + item.extension_row_count > 0,
+      item.row_count + item.extension_row_count > 0 &&
+      (item.report_start_date === item.report_end_date
+        ? Boolean(item.report_start_date && item.report_start_date >= startDate && item.report_start_date <= endDate)
+        : item.report_start_date === startDate && item.report_end_date === endDate),
   );
 }
 
@@ -291,10 +338,15 @@ function formatCount(value: number | null) {
 export function ThreeCxEmailImportPanel() {
   const { user, loading } = useSession();
   const [year, setYear] = useState(DEFAULT_KPI_YEAR);
-  const [monthIndex, setMonthIndex] = useState(defaultCompletedMonthIndex);
-  const [range, setRange] = useState<ThreeCxRange>("month");
-  const [manualRangeDraft, setManualRangeDraft] = useState<ThreeCxRange>("week1");
-  const [manualRange, setManualRange] = useState<ThreeCxRange>("week1");
+  const [monthIndex, setMonthIndex] = useState(() => defaultCompletedMonthIndex());
+  const [range, setRange] = useState<ThreeCxViewRange>("month");
+  const [dailyFilterDate, setDailyFilterDate] = useState(() =>
+    defaultManualReportDate(DEFAULT_KPI_YEAR, defaultCompletedMonthIndex()),
+  );
+  const [manualRange, setManualRange] = useState<ManualUploadRange>("week1");
+  const [manualReportDate, setManualReportDate] = useState(() =>
+    defaultManualReportDate(DEFAULT_KPI_YEAR, defaultCompletedMonthIndex()),
+  );
   const [busy, setBusy] = useState<BusyAction>(null);
   const [manualFile, setManualFile] = useState<File | null>(null);
   const [logs, setLogs] = useState<ThreeCxLogEntry[]>([]);
@@ -320,22 +372,21 @@ export function ThreeCxEmailImportPanel() {
     setExpandedQueues(new Set());
   }, []);
 
-  const visibleWeekFilters = useMemo(
-    () =>
-      WEEK_FILTERS.filter(
-        (filter) => filter.value === "month" || hasImportForRange(imports, year, monthIndex, filter.value),
-      ),
+  const visibleRangeFilters = useMemo(
+    () => [
+      WEEK_FILTERS[0],
+      DAILY_FILTER,
+      ...WEEK_FILTERS.slice(1).filter((filter) => hasImportForRange(imports, year, monthIndex, filter.value)),
+    ],
     [imports, monthIndex, year],
   );
-  const activeRange = visibleWeekFilters.some((filter) => filter.value === range) ? range : "month";
+  const activeRange = visibleRangeFilters.some((filter) => filter?.value === range) ? range : "month";
   const manualRangeFilters = useMemo(() => {
     const hasFifthWeek = new Date(year, monthIndex + 1, 0).getDate() > 28;
-    return WEEK_FILTERS.filter((filter) => filter.value !== "month" && (filter.value !== "week5" || hasFifthWeek));
+    return MANUAL_RANGE_FILTERS.filter((filter) => filter.value !== "week5" || hasFifthWeek);
   }, [monthIndex, year]);
   const selectedManualRange = manualRangeFilters.some((filter) => filter.value === manualRange) ? manualRange : "week1";
-  const selectedManualRangeDraft = manualRangeFilters.some((filter) => filter.value === manualRangeDraft)
-    ? manualRangeDraft
-    : "week1";
+  const manualDateBounds = useMemo(() => selectedMonthDateBounds(year, monthIndex), [monthIndex, year]);
 
   const loadLogs = useCallback(async () => {
     if (!canAccessDev(user?.role)) return;
@@ -378,13 +429,23 @@ export function ThreeCxEmailImportPanel() {
     }
   }, [monthIndex, user?.role, year]);
 
-  const loadCurrentValues = useCallback(async (rangeOverride?: ThreeCxRange) => {
+  const loadCurrentValues = useCallback(async (rangeOverride?: ThreeCxViewRange) => {
     if (!canAccessDev(user?.role)) return;
     const requestedRange = rangeOverride ?? activeRange;
     setValuesLoading(true);
     setValuesError(null);
     try {
       const params = new URLSearchParams({ year: String(year), monthIndex: String(monthIndex), range: requestedRange });
+      if (requestedRange === "day") {
+        const day = dayFromDateKey(dailyFilterDate, year, monthIndex);
+        if (day === null) {
+          setValuesError("Choose a valid daily report date.");
+          setCurrentMetrics(null);
+          applyReportRows([]);
+          return;
+        }
+        params.set("day", String(day));
+      }
       const res = await fetch(`/api/integrations/3cx/values?${params.toString()}`, { credentials: "include" });
       const payload = (await res.json()) as ThreeCxValuesResponse;
       if (!res.ok || !payload.ok || !payload.metrics) {
@@ -400,7 +461,7 @@ export function ThreeCxEmailImportPanel() {
     } finally {
       setValuesLoading(false);
     }
-  }, [activeRange, applyReportRows, monthIndex, user?.role, year]);
+  }, [activeRange, applyReportRows, dailyFilterDate, monthIndex, user?.role, year]);
 
   useEffect(() => {
     if (loading || !canAccessDev(user?.role)) return;
@@ -420,14 +481,19 @@ export function ThreeCxEmailImportPanel() {
   }, [loadCurrentValues, loading, user?.role]);
 
   const handleImportResult = useCallback(
-    (payload: ThreeCxImportResponse, fallbackSource: string, importedRange: ThreeCxRange) => {
+    (
+      payload: ThreeCxImportResponse,
+      fallbackSource: string,
+      importedRange: ThreeCxImportRange,
+      importSource: "email" | "manual_upload",
+    ) => {
       const metrics = payload.metrics;
       const source = payload.source?.attachmentName || payload.source?.subject || fallbackSource;
       const resultYear = typeof payload.year === "number" ? payload.year : year;
       const resultMonthIndex = typeof payload.monthIndex === "number" ? payload.monthIndex : monthIndex;
       const resultMonth = payload.month ?? MONTHS[resultMonthIndex] ?? MONTHS[monthIndex];
       const resultRange = payload.range ?? importedRange;
-      const resultRangeLabel = payload.rangeLabel ?? rangeLabel(resultRange);
+      const resultRangeLabel = payload.rangeLabel ?? importRangeLabel(resultRange);
       const rows = payload.rows ?? [];
       showSnackbar(
         metrics
@@ -437,10 +503,12 @@ export function ThreeCxEmailImportPanel() {
       );
       applyReportRows(rows);
       setCurrentMetrics(payload.metrics ?? null);
-      const { startDate, endDate } = reportRangeDates(resultYear, resultMonthIndex, resultRange);
+      const fallbackDates = resultRange === "day" ? null : reportRangeDates(resultYear, resultMonthIndex, resultRange);
+      const startDate = payload.reportStartDate ?? fallbackDates?.startDate ?? dateKey(resultYear, resultMonthIndex, 1);
+      const endDate = payload.reportEndDate ?? fallbackDates?.endDate ?? startDate;
       const importedRecord: ThreeCxImportRecord = {
         id: -Date.now(),
-        source: "email",
+        source: importSource,
         source_filename: source,
         source_message_id: null,
         report_type: "queue_performance",
@@ -456,13 +524,15 @@ export function ThreeCxEmailImportPanel() {
           ? [
               importedRecord,
               ...prev.filter(
-                (item) => item.report_start_date !== startDate || item.report_end_date !== endDate || item.source !== "email",
+                (item) => item.report_start_date !== startDate || item.report_end_date !== endDate || item.source !== importSource,
               ),
             ]
           : [importedRecord],
       );
       setYear(resultYear);
       setMonthIndex(resultMonthIndex);
+      setDailyFilterDate(resultRange === "day" ? startDate : defaultManualReportDate(resultYear, resultMonthIndex));
+      setManualReportDate(resultRange === "day" ? startDate : defaultManualReportDate(resultYear, resultMonthIndex));
       setRange(resultRange);
       void loadLogs();
       if (resultYear === year && resultMonthIndex === monthIndex) {
@@ -488,7 +558,7 @@ export function ThreeCxEmailImportPanel() {
         void loadLogs();
         return;
       }
-      handleImportResult(payload, "3CX email", "month");
+      handleImportResult(payload, "3CX email", "month", "email");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not fetch the 3CX report email.";
       showSnackbar(message, "error");
@@ -507,12 +577,18 @@ export function ThreeCxEmailImportPanel() {
       showSnackbar("Choose a CSV file first.", "error");
       return;
     }
+    const reportDay = selectedManualRange === "day" ? dayFromDateKey(manualReportDate, year, monthIndex) : null;
+    if (selectedManualRange === "day" && reportDay === null) {
+      showSnackbar("Choose a valid daily report date.", "error");
+      return;
+    }
     setBusy("manual");
     try {
       const form = new FormData();
       form.append("year", String(year));
       form.append("monthIndex", String(monthIndex));
       form.append("range", selectedManualRange);
+      if (reportDay !== null) form.append("day", String(reportDay));
       form.append("file", manualFile);
       const res = await fetch("/api/integrations/3cx/import-manual", {
         method: "POST",
@@ -525,14 +601,14 @@ export function ThreeCxEmailImportPanel() {
         void loadLogs();
         return;
       }
-      handleImportResult(payload, manualFile.name, selectedManualRange);
+      handleImportResult(payload, manualFile.name, selectedManualRange, "manual_upload");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not import the CSV file.";
       showSnackbar(message, "error");
     } finally {
       setBusy(null);
     }
-  }, [handleImportResult, loadLogs, manualFile, monthIndex, selectedManualRange, showSnackbar, user?.role, year]);
+  }, [handleImportResult, loadLogs, manualFile, manualReportDate, monthIndex, selectedManualRange, showSnackbar, user?.role, year]);
 
   const deleteImportRecord = useCallback(
     async (item: ThreeCxImportRecord) => {
@@ -595,10 +671,12 @@ export function ThreeCxEmailImportPanel() {
             className="min-h-[34px] rounded-md border border-border bg-background px-2.5 py-1.5 text-sm font-semibold text-foreground"
             value={String(year)}
             onChange={(e) => {
-              setYear(Number(e.target.value));
+              const nextYear = Number(e.target.value);
+              setYear(nextYear);
               setRange("month");
-              setManualRange("month");
-              setManualRangeDraft("month");
+              setManualRange("week1");
+              setDailyFilterDate(defaultManualReportDate(nextYear, monthIndex));
+              setManualReportDate(defaultManualReportDate(nextYear, monthIndex));
             }}
             disabled={disabled}
           >
@@ -619,8 +697,9 @@ export function ThreeCxEmailImportPanel() {
             onClick={() => {
               setMonthIndex(index);
               setRange("month");
-              setManualRange("month");
-              setManualRangeDraft("month");
+              setManualRange("week1");
+              setDailyFilterDate(defaultManualReportDate(year, index));
+              setManualReportDate(defaultManualReportDate(year, index));
             }}
             disabled={disabled}
             className={
@@ -635,8 +714,8 @@ export function ThreeCxEmailImportPanel() {
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-1">
-        {visibleWeekFilters.map((filter) => (
+      <div className="flex flex-wrap items-center gap-2">
+        {visibleRangeFilters.map((filter) => (
           <button
             key={filter.value}
             type="button"
@@ -652,6 +731,20 @@ export function ThreeCxEmailImportPanel() {
             {filter.label}
           </button>
         ))}
+        {activeRange === "day" ? (
+          <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <span>Report date</span>
+            <input
+              type="date"
+              min={manualDateBounds.startDate}
+              max={manualDateBounds.endDate}
+              value={dailyFilterDate}
+              onChange={(e) => setDailyFilterDate(e.target.value)}
+              className="min-h-[30px] rounded-md border border-border bg-background px-2 py-1 text-xs font-semibold text-foreground"
+              disabled={disabled}
+            />
+          </label>
+        ) : null}
       </div>
 
       <div className="overflow-hidden rounded-lg border border-border bg-background/60 shadow-sm">
@@ -782,8 +875,8 @@ export function ThreeCxEmailImportPanel() {
             <span>Upload range</span>
             <select
               className="min-h-[40px] rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground"
-              value={selectedManualRangeDraft}
-              onChange={(e) => setManualRangeDraft(e.target.value as ThreeCxRange)}
+              value={selectedManualRange}
+              onChange={(e) => setManualRange(e.target.value as ManualUploadRange)}
               disabled={disabled}
             >
               {manualRangeFilters.map((filter) => (
@@ -793,19 +886,22 @@ export function ThreeCxEmailImportPanel() {
               ))}
             </select>
           </label>
-          <button
-            type="button"
-            className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition hover:bg-accent-muted/40 disabled:opacity-50"
-            onClick={() => {
-              setManualRange(selectedManualRangeDraft);
-              showSnackbar(`Manual upload range set to ${rangeLabel(selectedManualRangeDraft)}.`, "success");
-            }}
-            disabled={disabled || selectedManualRangeDraft === selectedManualRange}
-          >
-            Apply range
-          </button>
+          {selectedManualRange === "day" ? (
+            <label className="flex w-full flex-col gap-1 text-xs font-medium text-muted-foreground sm:w-44">
+              <span>Report date</span>
+              <input
+                type="date"
+                min={manualDateBounds.startDate}
+                max={manualDateBounds.endDate}
+                value={manualReportDate}
+                onChange={(e) => setManualReportDate(e.target.value)}
+                className="min-h-[40px] rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground"
+                disabled={disabled}
+              />
+            </label>
+          ) : null}
           <p className="pb-2 text-xs text-muted-foreground sm:flex-1">
-            Import will use {rangeLabel(selectedManualRange)} for {MONTHS[monthIndex]} {year}.
+            {manualImportSummary(selectedManualRange, manualReportDate, year, monthIndex)}
           </p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">

@@ -58,7 +58,7 @@ function graphFolder() {
 }
 
 function graphReportTimeZone() {
-  return (process.env.GRAPH_3CX_REPORT_TIME_ZONE || "Asia/Manila").trim() || "Asia/Manila";
+  return (process.env.GRAPH_3CX_REPORT_TIME_ZONE || "Atlantic/Bermuda").trim() || "Atlantic/Bermuda";
 }
 
 async function graphJson<T>(token: string, url: string): Promise<T> {

@@ -1,6 +1,7 @@
 import type { MonthDb } from "@/lib/kpi-nmac-2026/model";
 
 export type ThreeCxReportRange = "month" | "week1" | "week2" | "week3" | "week4" | "week5" | "last_week";
+export type ThreeCxImportRange = ThreeCxReportRange | "day";
 
 export type ThreeCxCallMetrics = {
   received: number;
@@ -50,10 +51,12 @@ type ThreeCxTotals = ThreeCxCallMetrics & {
 };
 
 const EMAIL_RECEIVED_TIME_ZONE = "Asia/Manila";
+const REPORT_DAY_TIME_ZONE = "Atlantic/Bermuda";
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-const RANGE_WEEK_LABELS: Record<ThreeCxReportRange, string> = {
+const RANGE_WEEK_LABELS: Record<ThreeCxImportRange, string> = {
   month: "Full month",
+  day: "Daily report",
   week1: "Week 1",
   week2: "Week 2",
   week3: "Week 3",
@@ -62,7 +65,7 @@ const RANGE_WEEK_LABELS: Record<ThreeCxReportRange, string> = {
   last_week: "Last week",
 };
 
-export function threeCxRangeLabel(range: ThreeCxReportRange): string {
+export function threeCxRangeLabel(range: ThreeCxImportRange): string {
   return RANGE_WEEK_LABELS[range] ?? RANGE_WEEK_LABELS.month;
 }
 
@@ -70,6 +73,10 @@ export function normalizeThreeCxRange(raw: unknown): ThreeCxReportRange {
   if (raw === "week1" || raw === "week2" || raw === "week3" || raw === "week4" || raw === "week5") return raw;
   if (raw === "last_week") return "last_week";
   return "month";
+}
+
+export function normalizeThreeCxImportRange(raw: unknown): ThreeCxImportRange {
+  return raw === "day" ? "day" : normalizeThreeCxRange(raw);
 }
 
 export function reportWindowForMonth(year: number, monthIndex: number, range: ThreeCxReportRange) {
@@ -124,6 +131,15 @@ export function reportDateRangeForMonth(year: number, monthIndex: number, range:
   };
 }
 
+export function reportDateRangeForDate(year: number, monthIndex: number, day: number) {
+  const value = new Date(Date.UTC(year, monthIndex, day, 0, 0, 0));
+  if (Number.isNaN(value.getTime()) || value.getUTCFullYear() !== year || value.getUTCMonth() !== monthIndex) {
+    throw new Error("Choose a valid 3CX report date.");
+  }
+  const date = dateOnly(value);
+  return { startDate: date, endDate: date };
+}
+
 export function weeklyReportDateRangesForMonth(year: number, monthIndex: number) {
   return weeklyReportRangesForMonth(year, monthIndex).map(({ range, start, end }) => {
     const inclusiveEnd = new Date(end.getTime() - MS_PER_DAY);
@@ -161,6 +177,23 @@ export function threeCxPeriodFromEmailReceivedAt(
     monthIndex: local.monthIndex,
     range,
     localDate: dateOnly(new Date(Date.UTC(local.year, local.monthIndex, local.day, 0, 0, 0))),
+  };
+}
+
+export function threeCxDailyPeriodFromEmailReceivedAt(
+  receivedDateTime: string | undefined,
+  timeZone = REPORT_DAY_TIME_ZONE,
+): { year: number; monthIndex: number; day: number; date: string } | null {
+  if (!receivedDateTime) return null;
+  const date = new Date(receivedDateTime);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const local = localDateParts(date, timeZone);
+  return {
+    year: local.year,
+    monthIndex: local.monthIndex,
+    day: local.day,
+    date: dateOnly(new Date(Date.UTC(local.year, local.monthIndex, local.day, 0, 0, 0))),
   };
 }
 

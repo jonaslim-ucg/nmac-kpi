@@ -6,6 +6,10 @@ import {
 } from "@/lib/survey-outreach/config";
 import { parseCrmAppointmentAt } from "@/lib/survey-outreach/parse-appointment";
 import {
+  groupDailyOutreachAppointments,
+  type DailyOutreachAppointment,
+} from "@/lib/survey-outreach/daily-group";
+import {
   getSurveyOutreachSchedule,
   getSurveyOutreachSendingState,
   recordSurveyOutreachSchedulerRun,
@@ -79,13 +83,7 @@ function isValidEmail(email: string | null | undefined): boolean {
   return Boolean(email?.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()));
 }
 
-function crmRowToOutreach(row: CrmAppointmentRow): {
-  crmAppointmentId: string;
-  patientEmail: string;
-  patientName: string;
-  appointmentDate: string;
-  appointmentAt: string;
-} | null {
+function crmRowToOutreach(row: CrmAppointmentRow): DailyOutreachAppointment | null {
   if (!row.id) return null;
   if (!isValidEmail(row.patient_email)) return null;
 
@@ -94,10 +92,13 @@ function crmRowToOutreach(row: CrmAppointmentRow): {
 
   return {
     crmAppointmentId: String(row.id),
+    patientAccNumber: row.patient_acc_number?.trim() || null,
     patientEmail: row.patient_email!.trim().toLowerCase(),
     patientName: (row.patient_name ?? "Patient").trim(),
     appointmentDate: (row.appointment_date ?? "").slice(0, 10),
     appointmentAt: appointmentAt.toISOString(),
+    providerName: row.appointment_provider_name?.trim() || null,
+    visitType: row.visit_type?.trim() || null,
   };
 }
 
@@ -158,7 +159,8 @@ export async function syncCheckedOutFromCrm(
     outreachRows.push(mapped);
   }
 
-  const { synced } = await upsertCrmOutreachBatch(outreachRows);
+  const dailyGroups = groupDailyOutreachAppointments(outreachRows);
+  const { synced } = await upsertCrmOutreachBatch(dailyGroups);
 
   return { synced, skippedNoEmail, skippedBeforeLiveStart, syncErrors };
 }
@@ -307,10 +309,15 @@ export async function runSurveyOutreachScheduler(
   }
   const schedule = await getSurveyOutreachSchedule();
   const rows = await listIncompleteOutreach(surveyOutreachScanLimit());
+  const productionSyncHealthy = sync.syncErrors.length === 0;
 
   for (const row of rows) {
     if (!sending.appEnabled) continue;
     if (!sendingEnabled && !row.is_test) continue;
+    if (!row.is_test && !productionSyncHealthy) {
+      if (dueStageForRow(row, now, schedule)) deferredDue++;
+      continue;
+    }
     if (
       !sendingEnabled &&
       row.is_test &&

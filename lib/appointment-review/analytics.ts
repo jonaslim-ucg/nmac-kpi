@@ -5,6 +5,7 @@ import {
   SERVICE_TYPE_OPTIONS,
   WAIT_TIME_OPTIONS,
   type PatientDurationValue,
+  type ProviderRatings,
   type ReferralSourceValue,
   type ServiceTypeValue,
   type TestimonialPermissionValue,
@@ -20,8 +21,10 @@ export type AppointmentReviewRow = {
   visit_rating: number;
   provider_and_services: string;
   service_type: ServiceTypeValue | null;
+  service_types: ServiceTypeValue[];
   service_type_other: string;
   provider_rating: number | null;
+  provider_ratings: ProviderRatings | null;
   health_improvement: string;
   health_rating: number | null;
   confidence_rating: number | null;
@@ -83,6 +86,24 @@ function avgNullable(rows: AppointmentReviewRow[], pick: (row: AppointmentReview
   return Math.round(avg(values) * 10) / 10;
 }
 
+function providerRatingValues(rows: AppointmentReviewRow[]): number[] {
+  return rows.flatMap((row) => {
+    const ratings = row.provider_ratings && typeof row.provider_ratings === "object"
+      ? Object.values(row.provider_ratings).filter(
+          (score): score is number =>
+            typeof score === "number" &&
+            Number.isFinite(score) &&
+            score >= 1 &&
+            score <= APPOINTMENT_REVIEW_MAX_SCORE,
+        )
+      : [];
+    if (ratings.length > 0) return ratings;
+    return typeof row.provider_rating === "number" && Number.isFinite(row.provider_rating)
+      ? [row.provider_rating]
+      : [];
+  });
+}
+
 function labelCounts(
   rows: AppointmentReviewRow[],
   options: readonly { value: string; label: string }[],
@@ -92,6 +113,20 @@ function labelCounts(
   return options
     .map(({ value, label }) => {
       const count = rows.filter((r) => pick(r) === value).length;
+      return { label, count, pct: total ? Math.round((count / total) * 100) : 0 };
+    })
+    .filter((item) => item.count > 0);
+}
+
+function multiLabelCounts(
+  rows: AppointmentReviewRow[],
+  options: readonly { value: string; label: string }[],
+  pick: (row: AppointmentReviewRow) => string[],
+): LabelCount[] {
+  const total = rows.length;
+  return options
+    .map(({ value, label }) => {
+      const count = rows.filter((row) => pick(row).includes(value)).length;
       return { label, count, pct: total ? Math.round((count / total) * 100) : 0 };
     })
     .filter((item) => item.count > 0);
@@ -137,7 +172,7 @@ export function buildAppointmentReviewStats(rows: AppointmentReviewRow[]): Appoi
   const averages = {
     appointmentEase: Math.round(avg(rows.map((r) => r.appointment_ease)) * 10) / 10,
     visitRating: Math.round(avg(rows.map((r) => r.visit_rating)) * 10) / 10,
-    providerRating: avgNullable(rows, (r) => r.provider_rating),
+    providerRating: Math.round(avg(providerRatingValues(rows)) * 10) / 10,
     healthRating: avgNullable(rows, (r) => r.health_rating),
     confidenceRating: avgNullable(rows, (r) => r.confidence_rating),
     qualityOfLifeRating: avgNullable(rows, (r) => r.quality_of_life_rating),
@@ -175,7 +210,10 @@ export function buildAppointmentReviewStats(rows: AppointmentReviewRow[]): Appoi
     return { label, count, pct: referralTotal ? Math.round((count / referralTotal) * 100) : 0 };
   }).filter((item) => item.count > 0);
 
-  const serviceTypes = labelCounts(rows, SERVICE_TYPE_OPTIONS, (r) => r.service_type);
+  const serviceTypes = multiLabelCounts(rows, SERVICE_TYPE_OPTIONS, (row) => {
+    if (Array.isArray(row.service_types) && row.service_types.length > 0) return row.service_types;
+    return row.service_type ? [row.service_type] : [];
+  });
 
   const wouldEncourageRows = rows.filter((r) => r.would_encourage_patient !== null);
   const wouldEncouragePatient = yesNoCounts(

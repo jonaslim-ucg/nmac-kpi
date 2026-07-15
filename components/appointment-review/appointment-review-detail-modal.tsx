@@ -99,8 +99,24 @@ export function AppointmentReviewDetailModal({
               label="2. Overall visit with our practice"
               value={formatRating(review.visitRating)}
             />
-            <Answer label="3. Which provider did they see?" value={review.serviceTypeLabel} />
-            <Answer label="4. How would you rate your provider?" value={formatRatingOrDash(review.providerRating)} />
+            <Answer label="3. Which provider(s) did they see?" value={review.serviceTypeLabel} />
+            <Answer
+              label="4. Provider ratings"
+              value={
+                review.providerRatings.length > 0 ? (
+                  <span className="block space-y-1">
+                    {review.providerRatings.map(({ providerLabel, rating }) => (
+                      <span key={providerLabel} className="flex items-center justify-between gap-4">
+                        <span>{providerLabel}</span>
+                        <span className="shrink-0 font-medium tabular-nums">{formatRating(rating)}</span>
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  formatRatingOrDash(review.providerRating)
+                )
+              }
+            />
             <Answer
               label="5. Overall health improvement since receiving care at NMAC"
               value={formatRatingOrDash(review.healthRating)}
@@ -115,14 +131,14 @@ export function AppointmentReviewDetailModal({
             />
             <Answer label="8. Wait time before exam room" value={review.waitTimeLabel} />
             <Answer
-              label="9. Provider spent enough time and answered questions"
+              label="9. Provider(s) spent enough time and answered questions"
               value={formatYesNoOrDash(review.providerTimeAdequate)}
             />
             <Answer
               label="10. Front desk staff were friendly and courteous"
               value={formatRating(review.frontDeskRating)}
             />
-            <Answer label="11. How long they have been a patient of this provider" value={review.patientDurationLabel} />
+            <Answer label="11. How long they have been a patient at NMAC" value={review.patientDurationLabel} />
             {review.referralSourcesLabel ? (
               <Answer label="12. How did you hear about NMAC" value={review.referralSourcesLabel} />
             ) : null}

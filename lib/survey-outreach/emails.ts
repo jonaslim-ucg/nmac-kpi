@@ -77,18 +77,26 @@ export function buildSurveyEmail(
   stage: SurveyOutreachStage,
   patientName: string,
   surveyToken: string,
+  appointmentCount = 1,
 ): EmailContent {
   const link = buildSurveyUrl(surveyToken);
+  const hasMultipleAppointments = appointmentCount > 1;
 
   switch (stage) {
     case "initial":
       return buildContent({
-        subject: "How was your recent visit to NMAC?",
+        subject: hasMultipleAppointments
+          ? "How were your recent visits to NMAC?"
+          : "How was your recent visit to NMAC?",
         patientName,
         link,
         intro: [
-          "Thank you for visiting Northshore Medical & Aesthetics Center. We hope your appointment went well.",
-          "Please take a few minutes to share feedback about your experience. Your responses help us improve care and service for all patients.",
+          hasMultipleAppointments
+            ? "Thank you for visiting Northshore Medical & Aesthetics Center. We hope your appointments went well."
+            : "Thank you for visiting Northshore Medical & Aesthetics Center. We hope your appointment went well.",
+          hasMultipleAppointments
+            ? "Please take a few minutes to share feedback about your experience. You can select all the providers you saw that day."
+            : "Please take a few minutes to share feedback about your experience. Your responses help us improve care and service for all patients.",
         ],
       });
     case "reminder1":
@@ -97,7 +105,9 @@ export function buildSurveyEmail(
         patientName,
         link,
         intro: [
-          "We recently invited you to complete a short survey about your visit to NMAC. We have not received your response yet.",
+          hasMultipleAppointments
+            ? "We recently invited you to complete a short survey about your visits to NMAC. We have not received your response yet."
+            : "We recently invited you to complete a short survey about your visit to NMAC. We have not received your response yet.",
           "It only takes a few minutes and your feedback makes a real difference.",
         ],
       });
@@ -107,7 +117,9 @@ export function buildSurveyEmail(
         patientName,
         link,
         intro: [
-          "This is a friendly reminder to share your feedback about your recent visit to NMAC.",
+          hasMultipleAppointments
+            ? "This is a friendly reminder to share your feedback about your recent visits to NMAC."
+            : "This is a friendly reminder to share your feedback about your recent visit to NMAC.",
         ],
       });
     case "final":
@@ -116,7 +128,9 @@ export function buildSurveyEmail(
         patientName,
         link,
         intro: [
-          "This is our final reminder to complete the brief survey about your recent visit to NMAC.",
+          hasMultipleAppointments
+            ? "This is our final reminder to complete the brief survey about your recent visits to NMAC."
+            : "This is our final reminder to complete the brief survey about your recent visit to NMAC.",
         ],
       });
   }

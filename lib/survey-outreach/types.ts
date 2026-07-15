@@ -12,10 +12,16 @@ export type SurveyOutreachRow = {
   created_at: string;
   survey_token: string;
   crm_appointment_id: string | null;
+  crm_appointment_ids: string[];
+  patient_acc_number: string | null;
+  outreach_group_key: string | null;
+  merged_into_outreach_id: string | null;
   patient_email: string;
   patient_name: string;
   appointment_date: string | null;
   appointment_at: string | null;
+  provider_names: string[];
+  visit_types: string[];
   is_test: boolean;
   initial_sent_at: string | null;
   reminder_1_sent_at: string | null;
@@ -42,4 +48,6 @@ export type SurveyOutreachLookup = {
   email: string;
   patientName: string;
   completed: boolean;
+  appointmentCount: number;
+  providerNames: string[];
 };

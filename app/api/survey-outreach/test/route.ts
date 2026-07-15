@@ -88,7 +88,7 @@ export async function GET() {
       },
     },
     schedule: {
-      initial: "2-24 hours after consultation",
+      initial: "2-24 hours after the patient's last appointment of the day",
       reminder1: "3 days after initial survey, only if incomplete",
       reminder2: "7 days after initial survey, only if incomplete",
       final: "14 or 21 days after initial survey, only if incomplete",

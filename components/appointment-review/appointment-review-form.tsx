@@ -9,9 +9,11 @@ import {
   SERVICE_TYPE_OPTIONS,
   TESTIMONIAL_PERMISSION_OPTIONS,
   WAIT_TIME_OPTIONS,
+  areProviderRatingsComplete,
   isNewPatientDuration,
   isReferralSourceComplete,
-  isServiceTypeComplete,
+  areServiceTypesComplete,
+  serviceTypeLabel,
   type AppointmentReviewFormState,
   type AppointmentReviewPayload,
 } from "@/lib/appointment-review/types";
@@ -162,8 +164,8 @@ function isFormComplete(form: AppointmentReviewFormState): form is AppointmentRe
     form.patientName.trim().length > 0 &&
     form.appointmentEase !== null &&
     form.visitRating !== null &&
-    isServiceTypeComplete(form.serviceType, form.serviceTypeOther) &&
-    form.providerRating !== null &&
+    areServiceTypesComplete(form.serviceTypes, form.serviceTypeOther) &&
+    areProviderRatingsComplete(form.serviceTypes, form.providerRatings) &&
     form.healthRating !== null &&
     form.recommendationRating !== null &&
     form.testimonialPermission !== null &&
@@ -185,6 +187,8 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
   const [submitted, setSubmitted] = useState(false);
   const [linkLoading, setLinkLoading] = useState(Boolean(surveyToken));
   const [alreadyCompleted, setAlreadyCompleted] = useState(false);
+  const [linkedAppointmentCount, setLinkedAppointmentCount] = useState(1);
+  const [linkedProviderNames, setLinkedProviderNames] = useState<string[]>([]);
 
   useEffect(() => {
     if (!hasSubmittedThisSession()) return;
@@ -205,6 +209,8 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
           email?: string;
           patientName?: string;
           completed?: boolean;
+          appointmentCount?: number;
+          providerNames?: string[];
           error?: string;
         };
         if (cancelled) return;
@@ -216,6 +222,8 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
           setAlreadyCompleted(true);
           return;
         }
+        setLinkedAppointmentCount(Math.max(Number(j.appointmentCount ?? 1), 1));
+        setLinkedProviderNames(Array.isArray(j.providerNames) ? j.providerNames : []);
         setForm((prev) => ({
           ...prev,
           email: j.email ?? prev.email,
@@ -249,12 +257,16 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
         setError("Please enter a valid email address.");
         return;
       }
-      if (!isServiceTypeComplete(form.serviceType, form.serviceTypeOther)) {
+      if (!areServiceTypesComplete(form.serviceTypes, form.serviceTypeOther)) {
         setError(
-          form.serviceType === "other" && !form.serviceTypeOther.trim()
-            ? "Please specify the provider you saw."
-            : "Please select the provider you saw.",
+          form.serviceTypes.includes("other") && !form.serviceTypeOther.trim()
+            ? "Please specify the other provider or providers you saw."
+            : "Please select at least one provider you saw.",
         );
+        return;
+      }
+      if (!areProviderRatingsComplete(form.serviceTypes, form.providerRatings)) {
+        setError("Please rate each provider you selected.");
         return;
       }
       if (
@@ -408,56 +420,85 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
         />
       </QuestionBlock>
 
-      <QuestionBlock number={3} title="Which provider did they see?" required>
-        <div className="space-y-2" role="radiogroup" aria-label="Provider seen">
-          {SERVICE_TYPE_OPTIONS.map(({ value, label }) => (
-            <label
-              key={value}
-              className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-sm transition ${
-                form.serviceType === value
-                  ? "border-accent bg-accent-muted/60"
-                  : "border-border bg-background hover:border-accent/40"
-              } ${busy ? "cursor-not-allowed opacity-50" : ""}`}
-            >
-              <input
-                type="radio"
-                name="provider-seen"
-                value={value}
-                checked={form.serviceType === value}
-                onChange={() =>
-                  patch({
-                    serviceType: value,
-                    ...(value !== "other" ? { serviceTypeOther: "" } : {}),
-                  })
-                }
-                disabled={busy}
-                className="h-4 w-4 accent-accent"
-              />
-              {label}
-            </label>
-          ))}
+      <QuestionBlock number={3} title="Which provider(s) did they see? (Select all that apply)" required>
+        {linkedAppointmentCount > 1 ? (
+          <div className="mb-3 rounded-lg border border-border bg-surface-muted/40 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+            This survey covers {linkedAppointmentCount} appointments from that day.
+            {linkedProviderNames.length > 0 ? ` Providers listed: ${linkedProviderNames.join(", ")}.` : ""}
+          </div>
+        ) : null}
+        <div className="space-y-2" role="group" aria-label="Providers seen">
+          {SERVICE_TYPE_OPTIONS.map(({ value, label }) => {
+            const checked = form.serviceTypes.includes(value);
+            return (
+              <label
+                key={value}
+                className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-sm transition ${
+                  checked
+                    ? "border-accent bg-accent-muted/60"
+                    : "border-border bg-background hover:border-accent/40"
+                } ${busy ? "cursor-not-allowed opacity-50" : ""}`}
+              >
+                <input
+                  type="checkbox"
+                  value={value}
+                  checked={checked}
+                  onChange={() => {
+                    const serviceTypes = checked
+                      ? form.serviceTypes.filter((provider) => provider !== value)
+                      : [...form.serviceTypes, value];
+                    const providerRatings = { ...form.providerRatings };
+                    if (checked) delete providerRatings[value];
+                    patch({
+                      serviceTypes,
+                      providerRatings,
+                      ...(value === "other" && checked ? { serviceTypeOther: "" } : {}),
+                    });
+                  }}
+                  disabled={busy}
+                  className="h-4 w-4 accent-accent"
+                />
+                {label}
+              </label>
+            );
+          })}
         </div>
-        {form.serviceType === "other" ? (
+        {form.serviceTypes.includes("other") ? (
           <input
             type="text"
             value={form.serviceTypeOther}
             onChange={(e) => patch({ serviceTypeOther: e.target.value })}
             disabled={busy}
-            placeholder="Please specify the provider…"
+            placeholder="Please specify the other provider(s)…"
             className="mt-3 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
           />
         ) : null}
       </QuestionBlock>
 
-      <QuestionBlock number={4} title="How would you rate your provider?" required>
-        <ScaleInput
-          name="provider-rating"
-          value={form.providerRating}
-          onChange={(n) => patch({ providerRating: n })}
-          minLabel="poor"
-          maxLabel="excellent"
-          disabled={busy}
-        />
+      <QuestionBlock number={4} title="How would you rate each provider?" required>
+        {form.serviceTypes.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Select your provider or providers in question 3 first.</p>
+        ) : (
+          <div className="divide-y divide-border border-y border-border">
+            {form.serviceTypes.map((serviceType) => (
+              <div key={serviceType} className="py-4 first:pt-0 last:pb-0">
+                <p className="mb-2 text-sm font-medium text-foreground">
+                  {serviceTypeLabel(serviceType, serviceType === "other" ? form.serviceTypeOther : "")}
+                </p>
+                <ScaleInput
+                  name={`provider-rating-${serviceType}`}
+                  value={form.providerRatings[serviceType] ?? null}
+                  onChange={(score) =>
+                    patch({ providerRatings: { ...form.providerRatings, [serviceType]: score } })
+                  }
+                  minLabel="poor"
+                  maxLabel="excellent"
+                  disabled={busy}
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </QuestionBlock>
 
       <p className="border-t border-border pt-8 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -564,7 +605,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
 
       <QuestionBlock
         number={9}
-        title="My provider spent enough time with me to address my needs and answered all my questions."
+        title="The provider(s) I saw spent enough time with me to address my needs and answered all my questions."
         required
       >
         <YesNoInput
@@ -588,7 +629,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
 
       <QuestionBlock
         number={11}
-        title="How long have you been a patient of this provider?"
+        title="How long have you been a patient at NMAC?"
         required
       >
         <div className="space-y-2" role="radiogroup" aria-label="Patient duration">

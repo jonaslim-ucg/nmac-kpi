@@ -8,9 +8,10 @@ import {
   TESTIMONIAL_PERMISSION_OPTIONS,
   WAIT_TIME_OPTIONS,
   isReferralSourceComplete,
-  isServiceTypeComplete,
+  areServiceTypesComplete,
   type AppointmentReviewPayload,
   type PatientDurationValue,
+  type ProviderRatings,
   type ReferralSourceValue,
   type ServiceTypeValue,
   type TestimonialPermissionValue,
@@ -53,6 +54,43 @@ function parseReferralSources(v: unknown): ReferralSourceValue[] {
   );
 }
 
+function parseServiceTypes(value: unknown, legacyValue: unknown): ServiceTypeValue[] | null {
+  const raw = Array.isArray(value)
+    ? value
+    : typeof legacyValue === "string"
+      ? [legacyValue]
+      : [];
+  if (
+    raw.length === 0 ||
+    raw.length > SERVICE_TYPE_OPTIONS.length ||
+    raw.some((item) => typeof item !== "string" || !SERVICE_TYPE_VALUES.has(item as ServiceTypeValue))
+  ) {
+    return null;
+  }
+  return [...new Set(raw as ServiceTypeValue[])];
+}
+
+function parseProviderRatings(
+  value: unknown,
+  legacyValue: unknown,
+  serviceTypes: ServiceTypeValue[],
+): ProviderRatings | null {
+  const source =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : null;
+  const legacyRating = scale(legacyValue);
+  const ratings: ProviderRatings = {};
+
+  for (const serviceType of serviceTypes) {
+    const score = source ? scale(source[serviceType]) : legacyRating;
+    if (score === null) return null;
+    ratings[serviceType] = score;
+  }
+
+  return ratings;
+}
+
 function parsePayload(body: unknown): AppointmentReviewPayload | { error: string } {
   if (!body || typeof body !== "object") {
     return { error: "Invalid request body." };
@@ -61,7 +99,6 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
 
   const appointmentEase = scale(b.appointmentEase);
   const visitRating = scale(b.visitRating);
-  const providerRating = scale(b.providerRating);
   const healthRating = scale(b.healthRating);
   const confidenceRating = scale(b.confidenceRating);
   const qualityOfLifeRating = scale(b.qualityOfLifeRating);
@@ -69,10 +106,10 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
   const frontDeskRating = scale(b.frontDeskRating);
   const email = str(b.email, 320).toLowerCase();
   const patientName = str(b.patientName, 200);
-  const serviceType =
-    typeof b.serviceType === "string" && SERVICE_TYPE_VALUES.has(b.serviceType as ServiceTypeValue)
-      ? (b.serviceType as ServiceTypeValue)
-      : null;
+  const serviceTypes = parseServiceTypes(b.serviceTypes, b.serviceType);
+  const providerRatings = serviceTypes
+    ? parseProviderRatings(b.providerRatings, b.providerRating, serviceTypes)
+    : null;
   const serviceTypeOther = str(b.serviceTypeOther, 500);
   const testimonialPermission =
     typeof b.testimonialPermission === "string" &&
@@ -94,12 +131,12 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
     !patientName ||
     appointmentEase === null ||
     visitRating === null ||
-    providerRating === null ||
+    !providerRatings ||
     healthRating === null ||
     recommendationRating === null ||
     frontDeskRating === null ||
-    !serviceType ||
-    !isServiceTypeComplete(serviceType, serviceTypeOther) ||
+    !serviceTypes ||
+    !areServiceTypesComplete(serviceTypes, serviceTypeOther) ||
     !testimonialPermission ||
     !waitTime ||
     !patientDuration ||
@@ -126,9 +163,9 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
     patientName,
     appointmentEase,
     visitRating,
-    serviceType,
+    serviceTypes,
     serviceTypeOther,
-    providerRating,
+    providerRatings,
     healthRating,
     confidenceRating,
     qualityOfLifeRating,

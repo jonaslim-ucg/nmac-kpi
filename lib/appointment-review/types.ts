@@ -64,6 +64,7 @@ export const REFERRAL_SOURCE_OPTIONS = [
 
 export type ReferralSourceValue = (typeof REFERRAL_SOURCE_OPTIONS)[number]["value"];
 export type ServiceTypeValue = (typeof SERVICE_TYPE_OPTIONS)[number]["value"];
+export type ProviderRatings = Partial<Record<ServiceTypeValue, number>>;
 
 export type WaitTimeValue = (typeof WAIT_TIME_OPTIONS)[number]["value"];
 export type PatientDurationValue = (typeof PATIENT_DURATION_OPTIONS)[number]["value"];
@@ -74,9 +75,9 @@ export type AppointmentReviewPayload = {
   patientName: string;
   appointmentEase: number;
   visitRating: number;
-  serviceType: ServiceTypeValue;
+  serviceTypes: ServiceTypeValue[];
   serviceTypeOther: string;
-  providerRating: number;
+  providerRatings: ProviderRatings;
   healthRating: number;
   confidenceRating: number | null;
   qualityOfLifeRating: number | null;
@@ -101,9 +102,9 @@ export type AppointmentReviewFormState = {
   patientName: string;
   appointmentEase: number | null;
   visitRating: number | null;
-  serviceType: ServiceTypeValue | null;
+  serviceTypes: ServiceTypeValue[];
   serviceTypeOther: string;
-  providerRating: number | null;
+  providerRatings: ProviderRatings;
   healthRating: number | null;
   confidenceRating: number | null;
   qualityOfLifeRating: number | null;
@@ -134,13 +135,37 @@ export function isReferralSourceComplete(
   return true;
 }
 
-export function isServiceTypeComplete(
-  serviceType: ServiceTypeValue | null,
+export function areServiceTypesComplete(
+  serviceTypes: ServiceTypeValue[],
   other: string,
 ): boolean {
-  if (!serviceType) return false;
-  if (serviceType === "other" && !other.trim()) return false;
+  if (serviceTypes.length === 0) return false;
+  if (serviceTypes.includes("other") && !other.trim()) return false;
   return true;
+}
+
+export function areProviderRatingsComplete(
+  serviceTypes: ServiceTypeValue[],
+  providerRatings: ProviderRatings,
+): boolean {
+  return (
+    serviceTypes.length > 0 &&
+    serviceTypes.every((serviceType) => {
+      const score = providerRatings[serviceType];
+      return Number.isInteger(score) && Number(score) >= 1 && Number(score) <= APPOINTMENT_REVIEW_MAX_SCORE;
+    })
+  );
+}
+
+export function averageProviderRatings(
+  serviceTypes: ServiceTypeValue[],
+  providerRatings: ProviderRatings,
+): number | null {
+  const scores = serviceTypes
+    .map((serviceType) => providerRatings[serviceType])
+    .filter((score): score is number => typeof score === "number" && Number.isFinite(score));
+  if (scores.length === 0) return null;
+  return Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length);
 }
 
 export function serviceTypeLabel(value: string, other: string): string {
@@ -151,14 +176,18 @@ export function serviceTypeLabel(value: string, other: string): string {
   return base;
 }
 
+export function serviceTypesLabel(values: ServiceTypeValue[], other: string): string {
+  return values.map((value) => serviceTypeLabel(value, value === "other" ? other : "")).join(", ");
+}
+
 export const EMPTY_APPOINTMENT_REVIEW_FORM: AppointmentReviewFormState = {
   email: "",
   patientName: "",
   appointmentEase: null,
   visitRating: null,
-  serviceType: null,
+  serviceTypes: [],
   serviceTypeOther: "",
-  providerRating: null,
+  providerRatings: {},
   healthRating: null,
   confidenceRating: null,
   qualityOfLifeRating: null,

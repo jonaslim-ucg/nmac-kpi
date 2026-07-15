@@ -62,7 +62,7 @@ export function validateSurveyOutreachScheduleInput(raw: unknown): string | null
     initialDelayHours < INITIAL_SURVEY_MIN_DELAY_HOURS ||
     initialDelayHours > INITIAL_SURVEY_MAX_DELAY_HOURS
   ) {
-    return `Initial survey must be scheduled ${INITIAL_SURVEY_MIN_DELAY_HOURS}-${INITIAL_SURVEY_MAX_DELAY_HOURS} hours after consultation.`;
+    return `Initial survey must be scheduled ${INITIAL_SURVEY_MIN_DELAY_HOURS}-${INITIAL_SURVEY_MAX_DELAY_HOURS} hours after the patient's last appointment of the day.`;
   }
 
   if (Number(o.reminder1Days) !== REMINDER_1_DAYS_AFTER_INITIAL) {
@@ -129,5 +129,5 @@ export function isReminderDue(
 
 export function formatScheduleSummary(config: SurveyOutreachScheduleConfig = DEFAULT_SURVEY_OUTREACH_SCHEDULE): string {
   const finalWeeks = config.finalReminderDays === 21 ? "3 weeks" : "2 weeks";
-  return `Initial survey: ${config.initialDelayHours} hours after consultation. Reminders: ${config.reminder1Days} days, ${config.reminder2Days} days, and ${finalWeeks} after the initial survey, only while incomplete.`;
+  return `Initial survey: ${config.initialDelayHours} hours after the patient's last appointment of the day. Reminders: ${config.reminder1Days} days, ${config.reminder2Days} days, and ${finalWeeks} after the initial survey, only while incomplete.`;
 }

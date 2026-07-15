@@ -6,6 +6,7 @@ import {
   Loader2,
   Mail,
   Power,
+  RotateCcw,
   Save,
   Search,
   Send,
@@ -39,6 +40,8 @@ type SentRow = {
   status: string;
   stagesSent: string;
   crmAppointmentId: string | null;
+  appointmentCount: number;
+  providerNames: string[];
   nextScheduledMessage: {
     stage: SurveyOutreachStage;
     stageLabel: string;
@@ -137,46 +140,10 @@ function toDateTimeLocalValue(iso: string | null): string {
   return local.toISOString().slice(0, 16);
 }
 
-function NumberField({
-  label,
-  hint,
-  value,
-  disabled,
-  readOnly,
-  min = 1,
-  max,
-  onChange,
-}: {
-  label: string;
-  hint: string;
-  value: number;
-  disabled?: boolean;
-  readOnly?: boolean;
-  min?: number;
-  max?: number;
-  onChange?: (value: number) => void;
-}) {
-  return (
-    <label className="block">
-      <span className="text-sm font-medium text-foreground">{label}</span>
-      <input
-        type="number"
-        min={min}
-        max={max}
-        readOnly={readOnly}
-        disabled={disabled}
-        value={value}
-        onChange={(e) => onChange?.(Number(e.target.value))}
-        className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground read-only:bg-surface-muted/40 read-only:text-muted-foreground disabled:opacity-50"
-      />
-      <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>
-    </label>
-  );
-}
-
 export function SurveyOutreachDevPanel() {
   const { user, loading: sessionLoading } = useSession();
   const [schedule, setSchedule] = useState<ScheduleConfig | null>(null);
+  const [savedSchedule, setSavedSchedule] = useState<ScheduleConfig | null>(null);
   const [summary, setSummary] = useState("");
   const [sendingEnabled, setSendingEnabled] = useState(false);
   const [sendingAppEnabled, setSendingAppEnabled] = useState(false);
@@ -187,6 +154,7 @@ export function SurveyOutreachDevPanel() {
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [sendingToggleSaving, setSendingToggleSaving] = useState(false);
   const [scheduleFeedback, setScheduleFeedback] = useState<Feedback>(null);
+  const [sendingFeedback, setSendingFeedback] = useState<Feedback>(null);
 
   const [rows, setRows] = useState<SentRow[]>([]);
   const [stats, setStats] = useState<SentStats | null>(null);
@@ -267,7 +235,10 @@ export function SurveyOutreachDevPanel() {
         setScheduleFeedback({ tone: "err", text: j.error ?? "Could not load schedule." });
         return;
       }
-      if (j.schedule) setSchedule(j.schedule);
+      if (j.schedule) {
+        setSchedule(j.schedule);
+        setSavedSchedule(j.schedule);
+      }
       setSummary(j.summary ?? "");
       setSendingEnabled(Boolean(j.sendingEnabled));
       setSendingAppEnabled(Boolean(j.sendingAppEnabled));
@@ -394,7 +365,10 @@ export function SurveyOutreachDevPanel() {
         setScheduleFeedback({ tone: "err", text: j.error ?? "Could not save schedule." });
         return;
       }
-      if (j.schedule) setSchedule(j.schedule);
+      if (j.schedule) {
+        setSchedule(j.schedule);
+        setSavedSchedule(j.schedule);
+      }
       setSummary(j.summary ?? "");
       setSendingEnabled(Boolean(j.sendingEnabled));
       setSendingAppEnabled(Boolean(j.sendingAppEnabled));
@@ -411,7 +385,7 @@ export function SurveyOutreachDevPanel() {
   async function toggleSurveySending() {
     const next = !sendingAppEnabled;
     setSendingToggleSaving(true);
-    setScheduleFeedback(null);
+    setSendingFeedback(null);
     try {
       const r = await fetch("/api/dev/survey-outreach/schedule", {
         method: "PATCH",
@@ -430,17 +404,20 @@ export function SurveyOutreachDevPanel() {
         error?: string;
       };
       if (!r.ok) {
-        setScheduleFeedback({ tone: "err", text: j.error ?? "Could not update survey sending." });
+        setSendingFeedback({ tone: "err", text: j.error ?? "Could not update survey sending." });
         return;
       }
-      if (j.schedule) setSchedule(j.schedule);
+      if (j.schedule && !schedule) {
+        setSchedule(j.schedule);
+        setSavedSchedule(j.schedule);
+      }
       setSummary(j.summary ?? "");
       setSendingEnabled(Boolean(j.sendingEnabled));
       setSendingAppEnabled(Boolean(j.sendingAppEnabled));
       setSendingMasterEnabled(Boolean(j.sendingMasterEnabled));
       setLiveStartAt(j.liveStartAt ?? null);
       setSchedulerHealth(j.schedulerHealth ?? null);
-      setScheduleFeedback({
+      setSendingFeedback({
         tone: "ok",
         text: next ? "Survey sending switch turned on." : "Survey sending switch turned off.",
       });
@@ -646,6 +623,26 @@ export function SurveyOutreachDevPanel() {
       schedulerHealth.failedRows === 0 &&
       !schedulerHealth.lastError,
   );
+  const scheduleDirty = Boolean(
+    schedule &&
+      savedSchedule &&
+      (schedule.initialDelayHours !== savedSchedule.initialDelayHours ||
+        schedule.reminder1Days !== savedSchedule.reminder1Days ||
+        schedule.reminder2Days !== savedSchedule.reminder2Days ||
+        schedule.finalReminderDays !== savedSchedule.finalReminderDays),
+  );
+  const scheduleValid = Boolean(
+    schedule &&
+      Number.isInteger(schedule.initialDelayHours) &&
+      schedule.initialDelayHours >= 2 &&
+      schedule.initialDelayHours <= 24 &&
+      schedule.reminder1Days === 3 &&
+      schedule.reminder2Days === 7 &&
+      (schedule.finalReminderDays === 14 || schedule.finalReminderDays === 21),
+  );
+  const displayedScheduleSummary = scheduleDirty && schedule
+    ? `Initial survey: ${schedule.initialDelayHours} hours after the patient's last appointment of the day. Reminders: Day 3, Day 7, and Day ${schedule.finalReminderDays} after the initial survey, only while incomplete.`
+    : summary;
 
   return (
     <div className="flex flex-col gap-4">
@@ -671,6 +668,18 @@ export function SurveyOutreachDevPanel() {
               App switch: {sendingAppEnabled ? "on" : "off"} · Deployment master:{" "}
               {sendingMasterEnabled ? "on" : "off"}
             </p>
+            {sendingFeedback && (
+              <p
+                className={
+                  "mt-1 text-xs " +
+                  (sendingFeedback.tone === "ok"
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-destructive")
+                }
+              >
+                {sendingFeedback.text}
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -705,6 +714,150 @@ export function SurveyOutreachDevPanel() {
             )}
           </div>
         </div>
+      </section>
+
+      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/[0.04]">
+        <div className="border-b border-border bg-surface-muted/40 px-4 py-3 sm:px-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <CalendarClock className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold text-foreground">Email schedule</h2>
+            </div>
+            <span
+              className={
+                "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium " +
+                (scheduleDirty
+                  ? "bg-amber-500/15 text-amber-800 dark:text-amber-200"
+                  : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300")
+              }
+            >
+              {scheduleDirty ? "Unsaved changes" : "Saved"}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Timing changes do not turn survey sending on.
+          </p>
+        </div>
+
+        {schedule && (
+          <div className="px-4 py-4 sm:px-5">
+            <div className="grid gap-5 md:grid-cols-2">
+              <label className="block">
+                <span className="text-sm font-medium text-foreground">Initial survey</span>
+                <select
+                  value={schedule.initialDelayHours}
+                  disabled={scheduleSaving}
+                  onChange={(e) => {
+                    setScheduleFeedback(null);
+                    setSchedule({ ...schedule, initialDelayHours: Number(e.target.value) });
+                  }}
+                  className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground disabled:opacity-50"
+                >
+                  {Array.from({ length: 23 }, (_, index) => index + 2).map((hours) => (
+                    <option key={hours} value={hours}>
+                      {hours} hours after last appointment
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-1.5 block text-xs text-muted-foreground">
+                  Allowed window: 2–24 hours after the last appointment of the day.
+                </span>
+              </label>
+
+              <fieldset disabled={scheduleSaving}>
+                <legend className="text-sm font-medium text-foreground">Final reminder</legend>
+                <div className="mt-2 grid grid-cols-2 overflow-hidden rounded-lg border border-border bg-background p-1">
+                  {[14, 21].map((days) => {
+                    const selected = schedule.finalReminderDays === days;
+                    return (
+                      <button
+                        key={days}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => {
+                          setScheduleFeedback(null);
+                          setSchedule({ ...schedule, finalReminderDays: days });
+                        }}
+                        className={
+                          "rounded-md px-3 py-2 text-sm font-medium transition disabled:opacity-50 " +
+                          (selected
+                            ? "bg-accent text-accent-foreground shadow-sm"
+                            : "text-muted-foreground hover:bg-surface-muted/60 hover:text-foreground")
+                        }
+                      >
+                        {days === 14 ? "2 weeks" : "3 weeks"}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-1.5 text-xs text-muted-foreground">After the initial survey was sent.</p>
+              </fieldset>
+            </div>
+
+            <div className="mt-5 border-y border-border py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Delivery timeline</p>
+              <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-4">
+                {[
+                  ["Initial survey", `${schedule.initialDelayHours} hours`, "after last appointment"],
+                  ["Reminder 1", "Day 3", "fixed"],
+                  ["Reminder 2", "Day 7", "fixed"],
+                  ["Final reminder", `Day ${schedule.finalReminderDays}`, "2 or 3 weeks"],
+                ].map(([label, value, detail]) => (
+                  <div key={label} className="min-w-0">
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    <p className="mt-0.5 text-base font-semibold text-foreground">{value}</p>
+                    <p className="text-xs text-muted-foreground">{detail}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                {displayedScheduleSummary && (
+                  <p className="text-xs text-muted-foreground">{displayedScheduleSummary}</p>
+                )}
+                {scheduleFeedback && (
+                  <p
+                    className={
+                      "mt-1 text-sm " +
+                      (scheduleFeedback.tone === "ok"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-destructive")
+                    }
+                  >
+                    {scheduleFeedback.text}
+                  </p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  title="Discard schedule changes"
+                  aria-label="Discard schedule changes"
+                  disabled={scheduleSaving || !scheduleDirty || !savedSchedule}
+                  onClick={() => {
+                    if (!savedSchedule) return;
+                    setSchedule(savedSchedule);
+                    setScheduleFeedback(null);
+                  }}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground transition hover:bg-surface-muted/60 hover:text-foreground disabled:opacity-40"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  disabled={scheduleSaving || !scheduleDirty || !scheduleValid}
+                  onClick={() => void saveSchedule()}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-accent-foreground transition hover:opacity-95 disabled:opacity-40"
+                >
+                  {scheduleSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Save schedule
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="overflow-hidden rounded-xl border border-amber-400/50 bg-amber-50/80 shadow-sm ring-1 ring-amber-500/10 dark:border-amber-400/30 dark:bg-amber-400/10">
@@ -829,6 +982,15 @@ export function SurveyOutreachDevPanel() {
                 {localSchedulerChecking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 Run cron now
               </button>
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                <input
+                  type="checkbox"
+                  checked={localSchedulerEnabled}
+                  onChange={(e) => setLocalSchedulerEnabled(e.target.checked)}
+                  className="h-4 w-4 rounded border-amber-500/50"
+                />
+                Auto-check every minute
+              </label>
               {(localSchedulerFeedback || prepFeedback) && (
                 <p
                   className={
@@ -842,6 +1004,9 @@ export function SurveyOutreachDevPanel() {
                 </p>
               )}
             </div>
+            {localSchedulerLastRun && (
+              <p className="mt-2 text-xs text-muted-foreground">Last checked {formatWhen(localSchedulerLastRun)}</p>
+            )}
             <p className="mt-2 text-xs text-amber-900/75 dark:text-amber-100/75">
               Live sending remains controlled by the switches above. This prep area only creates test rows.
             </p>
@@ -872,130 +1037,6 @@ export function SurveyOutreachDevPanel() {
         </div>
 
         <div className="space-y-4 px-4 py-4 sm:px-5">
-          <div className="rounded-lg border border-border bg-surface-muted/30 px-4 py-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-foreground">Schedule</h3>
-              <span
-                className={
-                  "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium " +
-                  (sendingEnabled
-                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                    : "bg-amber-500/15 text-amber-800 dark:text-amber-200")
-                }
-              >
-                {sendingEnabled ? "Sending enabled" : "Sending disabled"}
-              </span>
-            </div>
-
-            {schedule && (
-              <div className="mt-3 grid gap-4 lg:grid-cols-2">
-                <NumberField
-                  label="Initial survey delay"
-                  hint="2-24 hours after consultation."
-                  value={schedule.initialDelayHours}
-                  min={2}
-                  max={24}
-                  disabled={scheduleSaving}
-                  onChange={(v) => setSchedule({ ...schedule, initialDelayHours: v })}
-                />
-                <label className="block">
-                  <span className="text-sm font-medium text-foreground">Final reminder</span>
-                  <select
-                    value={schedule.finalReminderDays}
-                    disabled={scheduleSaving}
-                    onChange={(e) => setSchedule({ ...schedule, finalReminderDays: Number(e.target.value) })}
-                    className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground disabled:opacity-50"
-                  >
-                    <option value={14}>2 weeks after initial survey</option>
-                    <option value={21}>3 weeks after initial survey</option>
-                  </select>
-                  <span className="mt-1 block text-xs text-muted-foreground">Only 2 or 3 weeks is allowed.</span>
-                </label>
-                <div className="rounded-lg border border-border bg-surface-muted/30 px-3 py-2 lg:col-span-2">
-                  <p className="text-xs font-medium text-muted-foreground">Fixed reminders</p>
-                  <p className="mt-1 text-sm text-foreground">
-                    Reminder 1: {schedule.reminder1Days} days after initial survey · Reminder 2:{" "}
-                    {schedule.reminder2Days} days after initial survey
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {summary && <p className="mt-3 text-xs text-muted-foreground">{summary}</p>}
-
-            <div className="mt-4 border-t border-border/70 pt-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
-                  <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="font-medium text-foreground">Local test runner</span>
-                  <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-accent">
-                    Test only
-                  </span>
-                  {localSchedulerLastRun && (
-                    <span className="text-muted-foreground">Checked {formatWhen(localSchedulerLastRun)}</span>
-                  )}
-                  {localSchedulerFeedback && (
-                    <span
-                      className={
-                        localSchedulerFeedback.tone === "ok"
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : "text-destructive"
-                      }
-                    >
-                      {localSchedulerFeedback.text}
-                    </span>
-                  )}
-                </div>
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={localSchedulerChecking}
-                    onClick={() => void runLocalSchedulerCheck()}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-surface-muted/50 disabled:opacity-50"
-                  >
-                    {localSchedulerChecking ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <CalendarClock className="h-3.5 w-3.5" />
-                    )}
-                    Check now
-                  </button>
-                  <label className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                    <input
-                      type="checkbox"
-                      checked={localSchedulerEnabled}
-                      onChange={(e) => setLocalSchedulerEnabled(e.target.checked)}
-                      className="h-3.5 w-3.5 rounded border-border"
-                    />
-                    Auto
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                disabled={scheduleSaving || !schedule}
-                onClick={() => void saveSchedule()}
-                className="inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-accent-foreground disabled:opacity-50"
-              >
-                {scheduleSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Save schedule
-              </button>
-              {scheduleFeedback && (
-                <p
-                  className={
-                    "text-sm " +
-                    (scheduleFeedback.tone === "ok" ? "text-emerald-600 dark:text-emerald-400" : "text-destructive")
-                  }
-                >
-                  {scheduleFeedback.text}
-                </p>
-              )}
-            </div>
-          </div>
-
           {stats && (
             <div className="grid gap-3 sm:grid-cols-4">
               {[
@@ -1114,6 +1155,9 @@ export function SurveyOutreachDevPanel() {
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">
                         {row.appointmentDate ?? "—"}
+                        {row.appointmentCount > 1 && (
+                          <span className="block text-[10px]">{row.appointmentCount} appointments</span>
+                        )}
                         {row.crmAppointmentId && (
                           <span className="block font-mono text-[10px]">CRM {row.crmAppointmentId}</span>
                         )}
@@ -1207,10 +1251,14 @@ export function SurveyOutreachDevPanel() {
             <div className="space-y-4 px-4 py-4 sm:px-5">
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-lg border border-border bg-surface-muted/30 px-3 py-2">
-                  <p className="text-xs text-muted-foreground">Visit</p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedRow.appointmentCount > 1 ? "Appointments" : "Visit"}
+                  </p>
                   <p className="mt-1 text-sm font-medium text-foreground">{selectedRow.appointmentDate ?? "—"}</p>
                   {selectedRow.appointmentAt && (
-                    <p className="mt-0.5 text-xs text-muted-foreground">{formatWhen(selectedRow.appointmentAt)}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Last appointment: {formatWhen(selectedRow.appointmentAt)}
+                    </p>
                   )}
                 </div>
                 <div className="rounded-lg border border-border bg-surface-muted/30 px-3 py-2">
@@ -1229,6 +1277,11 @@ export function SurveyOutreachDevPanel() {
                   </p>
                   {selectedRow.crmAppointmentId && (
                     <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">CRM {selectedRow.crmAppointmentId}</p>
+                  )}
+                  {selectedRow.providerNames.length > 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {selectedRow.providerNames.join(", ")}
+                    </p>
                   )}
                 </div>
               </div>

@@ -38,6 +38,8 @@ function toDevRow(row: SurveyOutreachRow, schedule: Awaited<ReturnType<typeof ge
     status: row.status,
     stagesSent: outreachStagesLabel(row),
     crmAppointmentId: row.crm_appointment_id,
+    appointmentCount: Math.max(row.crm_appointment_ids?.length ?? 0, 1),
+    providerNames: row.provider_names ?? [],
     nextScheduledMessage: nextScheduledMessage
       ? {
           stage: nextScheduledMessage.stage,

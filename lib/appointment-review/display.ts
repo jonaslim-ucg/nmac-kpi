@@ -7,6 +7,7 @@ import {
   TESTIMONIAL_PERMISSION_OPTIONS,
   WAIT_TIME_OPTIONS,
   serviceTypeLabel,
+  serviceTypesLabel,
   type ReferralSourceValue,
   type ServiceTypeValue,
   type TestimonialPermissionValue,
@@ -21,6 +22,7 @@ export type AppointmentReviewDetail = {
   visitRating: number | null;
   serviceTypeLabel: string;
   providerRating: number | null;
+  providerRatings: { providerLabel: string; rating: number }[];
   healthRating: number | null;
   confidenceRating: number | null;
   qualityOfLifeRating: number | null;
@@ -66,10 +68,45 @@ function bool(value: unknown): boolean | null {
 }
 
 function resolveServiceTypeLabel(row: AppointmentReviewRow): string {
+  if (Array.isArray(row.service_types) && row.service_types.length > 0) {
+    return serviceTypesLabel(row.service_types, row.service_type_other);
+  }
+  const storedLabel = text(row.provider_and_services);
+  if (storedLabel) return storedLabel;
   if (row.service_type) {
     return serviceTypeLabel(row.service_type, row.service_type_other);
   }
-  return text(row.provider_and_services) || "—";
+  return "—";
+}
+
+function resolveProviderRatings(
+  row: AppointmentReviewRow,
+): { providerLabel: string; rating: number }[] {
+  const serviceTypes = Array.isArray(row.service_types) && row.service_types.length > 0
+    ? row.service_types
+    : row.service_type
+      ? [row.service_type]
+      : [];
+  const storedRatings = row.provider_ratings && typeof row.provider_ratings === "object"
+    ? row.provider_ratings
+    : {};
+  const ratings = serviceTypes.flatMap((serviceType) => {
+    const score = rating(storedRatings[serviceType]);
+    if (score === null) return [];
+    return [{
+      providerLabel: serviceTypeLabel(
+        serviceType,
+        serviceType === "other" ? row.service_type_other : "",
+      ),
+      rating: score,
+    }];
+  });
+  if (ratings.length > 0) return ratings;
+
+  const legacyRating = rating(row.provider_rating);
+  return legacyRating === null
+    ? []
+    : [{ providerLabel: resolveServiceTypeLabel(row), rating: legacyRating }];
 }
 
 function reviewComments(row: AppointmentReviewRow): string[] {
@@ -89,6 +126,7 @@ export function toAppointmentReviewDetail(row: AppointmentReviewRow): Appointmen
     visitRating: rating(row.visit_rating),
     serviceTypeLabel: resolveServiceTypeLabel(row),
     providerRating: rating(row.provider_rating),
+    providerRatings: resolveProviderRatings(row),
     healthRating: rating(row.health_rating),
     confidenceRating: rating(row.confidence_rating),
     qualityOfLifeRating: rating(row.quality_of_life_rating),

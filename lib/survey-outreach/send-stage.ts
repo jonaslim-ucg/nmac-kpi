@@ -167,7 +167,7 @@ export async function sendSurveyStage(input: {
         surveyUrl: buildSurveyUrl(row.survey_token),
         outreachId: row.id,
         skipped: true,
-        reason: `Initial survey is scheduled for ${dueAt.toISOString()} (${schedule.initialDelayHours} hours after consultation).`,
+        reason: `Initial survey is scheduled for ${dueAt.toISOString()} (${schedule.initialDelayHours} hours after the patient's last appointment of the day).`,
       };
     }
   }
@@ -218,7 +218,12 @@ export async function sendSurveyStage(input: {
     };
   }
 
-  const { subject, textBody, htmlBody } = buildSurveyEmail(stage, row.patient_name, row.survey_token);
+  const { subject, textBody, htmlBody } = buildSurveyEmail(
+    stage,
+    row.patient_name,
+    row.survey_token,
+    Math.max(row.crm_appointment_ids?.length ?? 0, 1),
+  );
   if (lockToken) {
     await extendStageSendClaim({
       id: row.id,

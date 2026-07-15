@@ -1,4 +1,5 @@
 import { createServiceRoleClient } from "@/lib/supabase/admin";
+import type { DailyOutreachGroup } from "@/lib/survey-outreach/daily-group";
 import type { SurveyOutreachLookup, SurveyOutreachRow, SurveyOutreachStage } from "@/lib/survey-outreach/types";
 
 const STAGE_COLUMN: Record<SurveyOutreachStage, keyof SurveyOutreachRow> = {
@@ -50,10 +51,15 @@ export async function getClaimedOutreach(
 export async function lookupOutreachByToken(token: string): Promise<SurveyOutreachLookup | null> {
   const row = await getOutreachByToken(token);
   if (!row) return null;
+  const dailyGroup = row.merged_into_outreach_id
+    ? (await getOutreachById(row.merged_into_outreach_id)) ?? row
+    : row;
   return {
     email: row.patient_email,
     patientName: row.patient_name,
-    completed: row.completed_at !== null,
+    completed: row.completed_at !== null || dailyGroup.completed_at !== null,
+    appointmentCount: Math.max(dailyGroup.crm_appointment_ids?.length ?? 0, 1),
+    providerNames: dailyGroup.provider_names ?? [],
   };
 }
 
@@ -309,6 +315,9 @@ export async function updateManualNextScheduledAt(
 
 export async function markOutreachCompleted(token: string): Promise<void> {
   const supabase = createServiceRoleClient();
+  const row = await getOutreachByToken(token);
+  if (!row) return;
+  const ids = [row.id, row.merged_into_outreach_id].filter((id): id is string => Boolean(id));
   const { error } = await supabase
     .from("survey_outreach")
     .update({
@@ -323,7 +332,7 @@ export async function markOutreachCompleted(token: string): Promise<void> {
       failed_stage: null,
       permanently_failed_at: null,
     })
-    .eq("survey_token", token)
+    .in("id", ids)
     .is("completed_at", null);
   if (error) throw new Error(error.message);
 }
@@ -372,39 +381,37 @@ export async function resetTestOutreach(email: string): Promise<number> {
 }
 
 export async function upsertCrmOutreachBatch(
-  rows: {
-    crmAppointmentId: string;
-    patientEmail: string;
-    patientName: string;
-    appointmentDate: string;
-    appointmentAt: string;
-  }[],
+  rows: DailyOutreachGroup[],
 ): Promise<{ synced: number; exists: number }> {
   if (rows.length === 0) return { synced: 0, exists: 0 };
 
   const supabase = createServiceRoleClient();
-  const uniqueRows = [...new Map(rows.map((row) => [row.crmAppointmentId, row])).values()];
-  const toInsert = uniqueRows.map((r) => ({
-    crm_appointment_id: r.crmAppointmentId,
-    patient_email: r.patientEmail,
-    patient_name: r.patientName,
-    appointment_date: r.appointmentDate,
-    appointment_at: r.appointmentAt,
-    is_test: false,
-    status: "pending",
-  }));
-
   const { data, error } = await supabase
-    .from("survey_outreach")
-    .upsert(toInsert, {
-      onConflict: "crm_appointment_id",
-      ignoreDuplicates: true,
-    })
-    .select("crm_appointment_id");
-  if (error) throw new Error(error.message);
+    .rpc("sync_survey_outreach_daily_groups", {
+      p_groups: rows.map((row) => ({
+        groupKey: row.groupKey,
+        patientAccNumber: row.patientAccNumber,
+        patientEmail: row.patientEmail,
+        patientName: row.patientName,
+        appointmentDate: row.appointmentDate,
+        appointmentAt: row.appointmentAt,
+        appointmentIds: row.appointmentIds,
+        providerNames: row.providerNames,
+        visitTypes: row.visitTypes,
+      })),
+    });
+  if (error) {
+    if (/sync_survey_outreach_daily_groups|schema cache|function/i.test(error.message)) {
+      throw new Error("Daily survey grouping is not installed. Production survey delivery was paused.");
+    }
+    throw new Error(error.message);
+  }
 
-  const synced = data?.length ?? 0;
-  return { synced, exists: uniqueRows.length - synced };
+  const result = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+  return {
+    synced: Number(result.synced ?? 0),
+    exists: Number(result.exists ?? 0),
+  };
 }
 
 export async function upsertCrmOutreach(input: {

@@ -162,7 +162,7 @@ export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
           {
             label: "Avg. provider rating",
             value: empty || !stats.averages.providerRating ? "—" : `${stats.averages.providerRating}/${APPOINTMENT_REVIEW_MAX_SCORE}`,
-            hint: "Rating of the provider who treated them",
+            hint: "Rating of care from the provider(s) selected",
           },
           {
             label: "Avg. recommend score",
@@ -316,7 +316,7 @@ export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
             </ChartCard>
           </div>
 
-          <YesNoPie title="Provider spent enough time" data={stats.providerTimeAdequate} />
+          <YesNoPie title="Provider(s) spent enough time" data={stats.providerTimeAdequate} />
 
           {stats.serviceTypes.length > 0 ? (
             <ChartCard title="Providers seen">

@@ -1,5 +1,9 @@
 import { createServiceRoleClient } from "@/lib/supabase/admin";
-import { serviceTypeLabel, type AppointmentReviewPayload } from "@/lib/appointment-review/types";
+import {
+  averageProviderRatings,
+  serviceTypesLabel,
+  type AppointmentReviewPayload,
+} from "@/lib/appointment-review/types";
 import type { AppointmentReviewRow } from "@/lib/appointment-review/analytics";
 
 export const APPOINTMENT_REVIEWS_SETUP_SQL = `-- Run in Supabase SQL Editor
@@ -12,8 +16,10 @@ create table if not exists public.appointment_reviews (
   visit_rating smallint not null check (visit_rating between 1 and 5),
   provider_and_services text not null default '',
   service_type text,
+  service_types text[] not null default '{}',
   service_type_other text not null default '',
   provider_rating smallint check (provider_rating between 1 and 5),
+  provider_ratings jsonb not null default '{}'::jsonb check (jsonb_typeof(provider_ratings) = 'object'),
   health_improvement text not null default '',
   health_rating smallint check (health_rating between 1 and 5),
   confidence_rating smallint check (confidence_rating between 1 and 5),
@@ -46,19 +52,21 @@ export async function insertAppointmentReview(payload: AppointmentReviewPayload)
     return { ok: false, error: "Review storage is not available." };
   }
 
-  const serviceLabel = serviceTypeLabel(payload.serviceType, payload.serviceTypeOther);
+  const serviceLabel = serviceTypesLabel(payload.serviceTypes, payload.serviceTypeOther);
 
   try {
     const supabase = createServiceRoleClient();
-    const { error } = await supabase.from("appointment_reviews").insert({
+    const reviewRow = {
       email: payload.email,
       patient_name: payload.patientName,
       appointment_ease: payload.appointmentEase,
       visit_rating: payload.visitRating,
       provider_and_services: serviceLabel,
-      service_type: payload.serviceType,
+      service_type: payload.serviceTypes[0] ?? null,
+      service_types: payload.serviceTypes,
       service_type_other: payload.serviceTypeOther,
-      provider_rating: payload.providerRating,
+      provider_rating: averageProviderRatings(payload.serviceTypes, payload.providerRatings),
+      provider_ratings: payload.providerRatings,
       health_improvement: payload.healthImprovementComment,
       health_rating: payload.healthRating,
       confidence_rating: payload.confidenceRating,
@@ -77,7 +85,8 @@ export async function insertAppointmentReview(payload: AppointmentReviewPayload)
       referral_other: payload.referralOther,
       exceptional_staff_comment: payload.exceptionalStaffComment,
       survey_token: payload.surveyToken,
-    });
+    };
+    const { error } = await supabase.from("appointment_reviews").insert(reviewRow);
 
     if (error) {
       if (/duplicate|unique/i.test(error.message) && /survey_token/i.test(error.message)) {
@@ -88,7 +97,7 @@ export async function insertAppointmentReview(payload: AppointmentReviewPayload)
         };
       }
       if (
-        /appointment_reviews/i.test(error.message) &&
+        /appointment_reviews|service_types|provider_ratings/i.test(error.message) &&
         /does not exist|schema cache|could not find/i.test(error.message)
       ) {
         return { ok: false, error: "Review storage is not configured.", setupRequired: true };

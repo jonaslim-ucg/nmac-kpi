@@ -34,6 +34,7 @@ type LocalDateTime = {
 
 const POLL_START_HOUR = 9;
 const POLL_END_HOUR_EXCLUSIVE = 12;
+const DEFAULT_DAILY_REPORT_NEEDLES = ["DailyDataSending", "Daily Data Sending"];
 
 function unauthorized() {
   return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -71,6 +72,15 @@ function graphSubjectNeedle() {
 
 function graphSenderNeedle() {
   return (process.env.GRAPH_3CX_SENDER || process.env.GRAPH_REPORT_SENDER || "").trim().toLowerCase();
+}
+
+function graphDailyReportNeedles() {
+  const raw = process.env.GRAPH_3CX_DAILY_REPORT_QUERY ?? process.env.GRAPH_REPORT_DAILY_QUERY;
+  const value = raw === undefined ? DEFAULT_DAILY_REPORT_NEEDLES.join(",") : raw;
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function graphFolder() {
@@ -128,6 +138,22 @@ function attachmentLooksReadable(attachment: GraphFileAttachment) {
     type.includes("csv") ||
     type.startsWith("text/")
   );
+}
+
+function compactSearchText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function textIncludesNeedle(value: string, needle: string) {
+  const haystack = value.toLowerCase();
+  const search = needle.toLowerCase();
+  return haystack.includes(search) || compactSearchText(haystack).includes(compactSearchText(search));
+}
+
+function dailyReportMatches(message: GraphMessage, attachment: GraphFileAttachment, needles: string[]) {
+  if (needles.length === 0) return true;
+  const text = [message.subject, message.bodyPreview, attachment.name].filter(Boolean).join(" ");
+  return needles.some((needle) => textIncludesNeedle(text, needle));
 }
 
 function decodeAttachment(attachment: GraphFileAttachment) {
@@ -203,6 +229,7 @@ async function handleCron(req: Request) {
   const now = new Date();
   const pollTz = pollTimeZone();
   const reportTz = reportTimeZone();
+  const dailyReportNeedles = graphDailyReportNeedles();
   const window = pollWindow(now, pollTz);
 
   if (!force && !window.isOpen) {
@@ -240,11 +267,25 @@ async function handleCron(req: Request) {
         message.id,
       )}/attachments`;
       const attachmentJson = await graphJson<{ value?: GraphFileAttachment[] }>(token, attachmentUrl);
-      const attachments = (attachmentJson.value ?? []).filter(attachmentLooksReadable);
+      const readableAttachments = (attachmentJson.value ?? []).filter(attachmentLooksReadable);
+      const attachments = readableAttachments.filter((attachment) => dailyReportMatches(message, attachment, dailyReportNeedles));
+
+      if (readableAttachments.length > 0 && attachments.length === 0) {
+        skipped.push({
+          messageId: message.id,
+          subject: message.subject,
+          attachmentNames: readableAttachments.map((attachment) => attachment.name ?? ""),
+          reason: "Readable attachments did not match the daily 3CX report filter.",
+          dailyReportNeedles,
+        });
+      }
 
       for (const attachment of attachments) {
         const text = decodeAttachment(attachment);
-        if (!text.trim()) continue;
+        if (!text.trim()) {
+          skipped.push({ messageId: message.id, attachmentName: attachment.name, reason: "Attachment had no readable text." });
+          continue;
+        }
 
         const period = threeCxDailyPeriodFromEmailReceivedAt(message.receivedDateTime, reportTz);
         if (!period) {
@@ -290,6 +331,7 @@ async function handleCron(req: Request) {
         folder,
         pollTimeZone: pollTz,
         reportTimeZone: reportTz,
+        dailyReportNeedles,
         windowStart: window.start.toISOString(),
         windowEnd: window.searchEnd.toISOString(),
         messageCount: messages.length,
@@ -306,6 +348,7 @@ async function handleCron(req: Request) {
       window: {
         pollTimeZone: pollTz,
         reportTimeZone: reportTz,
+        dailyReportNeedles,
         start: window.start.toISOString(),
         end: window.searchEnd.toISOString(),
         localDate: window.localDate,

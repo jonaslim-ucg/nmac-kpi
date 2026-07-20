@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { normalizeThreeCxImportRange } from "@/lib/3cx/email-report";
 import { callMetricsFromMonth, readDetailedReport } from "@/lib/3cx/import-server";
+import { getAppDashboardSettings } from "@/lib/auth/app-settings";
+import { isNmacNavViewAllowed } from "@/lib/auth/role-nmac-nav";
 import { getSessionFromCookies } from "@/lib/auth/session";
-import { canAccessDev } from "@/lib/auth/types";
 import { MONTHS } from "@/lib/kpi-nmac-2026/model";
 import { readNmacMasterMonth } from "@/lib/kpi/write-server";
 
@@ -36,7 +37,9 @@ const EMPTY_METRICS = {
 
 export async function GET(req: Request) {
   const session = await getSessionFromCookies();
-  if (!session || !canAccessDev(session.role)) return unauthorized();
+  if (!session) return unauthorized();
+  const settings = await getAppDashboardSettings();
+  if (!isNmacNavViewAllowed(session.role, "threecx", settings?.roleNmacNav ?? {})) return unauthorized();
 
   const url = new URL(req.url);
   const year = parseYear(url.searchParams.get("year"));

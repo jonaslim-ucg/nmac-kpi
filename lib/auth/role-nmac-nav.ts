@@ -21,6 +21,7 @@ export const NMAC_NAV_ITEMS: { id: NmacNavViewId; label: string; href: string }[
   { id: "scheduling", label: "Scheduling", href: "/nmac-2026/scheduling" },
   { id: "finance", label: "Finance & revenue", href: "/nmac-2026/finance" },
   { id: "calls", label: "Call performance", href: "/nmac-2026/calls" },
+  { id: "threecx", label: "3CX queue performance", href: "/nmac-2026/3cx" },
   { id: "nursing", label: "Nursing KPIs", href: "/nmac-2026/nursing" },
   { id: "specialty", label: "Specialty clinics", href: "/nmac-2026/specialty" },
   { id: "compliance", label: "Compliance & quality", href: "/nmac-2026/compliance" },
@@ -36,6 +37,7 @@ export function nmacNavHrefToViewId(href: string): NmacNavViewId | null {
   const match = href.match(/^\/nmac-2026\/([^/]+)$/);
   if (!match) return null;
   const segment = match[1]!;
+  if (segment === "3cx") return "threecx";
   return NMAC_NAV_VIEW_IDS.includes(segment as NmacNavViewId) ? (segment as NmacNavViewId) : null;
 }
 

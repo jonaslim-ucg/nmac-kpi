@@ -22,7 +22,8 @@ export default function Nmac2026Page() {
     if (!raw) return "overview";
     return Array.isArray(raw) ? (raw[0] ?? "overview") : raw;
   }, [raw]);
-  const view: Nk26View = isNk26View(segment) ? segment : "overview";
+  const canonicalSegment = segment === "3cx" ? "threecx" : segment;
+  const view: Nk26View = isNk26View(canonicalSegment) ? canonicalSegment : "overview";
   const allowed = !prefsReady || isNmacNavViewAllowed(user?.role, view, roleNmacNav);
 
   useEffect(() => {

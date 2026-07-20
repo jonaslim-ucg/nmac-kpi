@@ -4,6 +4,7 @@ export const NK26_VIEWS = [
   "scheduling",
   "finance",
   "calls",
+  "threecx",
   "nursing",
   "specialty",
   "compliance",
@@ -28,6 +29,8 @@ export function nk26Title(view: string): string {
       return "Finance & revenue";
     case "calls":
       return "Call performance";
+    case "threecx":
+      return "3CX queue performance";
     case "nursing":
       return "Nursing KPIs";
     case "specialty":

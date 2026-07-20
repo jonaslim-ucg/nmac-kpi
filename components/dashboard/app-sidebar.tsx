@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { ChevronDown } from "lucide-react";
 import { AppBrand } from "@/components/dashboard/app-logo";
 import { SIDEBAR_SECTIONS, type SidebarLink, type SidebarSection } from "@/components/dashboard/nmac-2026-nav";
 import { useSession } from "@/components/auth/session-provider";
@@ -78,45 +79,73 @@ function buildSections(
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, loading } = useSession();
   const { hideLegacyNav, ready: prefsReady, roleNmacNav, customRoles } = useDashboardPreferences();
 
   const navReady = !loading && prefsReady;
   const sections = buildSections(navReady, hideLegacyNav, user?.role ?? null, roleNmacNav, customRoles);
+  const mobileNavItems = sections.flatMap((section) =>
+    section.items.map((item) => ({ item, sectionTitle: section.title })),
+  );
+  const activeMobileNavItem =
+    mobileNavItems.find(({ item }) => linkActive(pathname, item.href)) ?? mobileNavItems[0] ?? null;
+  const ActiveMobileIcon = activeMobileNavItem?.item.icon;
+  const activeMobileHref = activeMobileNavItem?.item.href ?? "";
 
   return (
     <>
       <div className="border-b border-border bg-sidebar lg:hidden">
-        <div className="overflow-x-auto px-3 py-2">
+        <div className="px-3 py-2">
           {!navReady ? (
-            <div className="flex gap-2" aria-busy="true" aria-label="Loading navigation">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-9 w-28 shrink-0 animate-pulse rounded-lg bg-muted-foreground/10" />
-              ))}
-            </div>
+            <div
+              className="h-[58px] animate-pulse rounded-xl border border-border bg-muted-foreground/10"
+              aria-busy="true"
+              aria-label="Loading navigation"
+            />
           ) : (
-            <div className="flex gap-2">
-              {sections.flatMap((section) =>
-                section.items.map((item) => {
-                  const Icon = item.icon;
-                  const active = linkActive(pathname, item.href);
-                  return (
-                    <Link
-                      key={item.href + item.label}
-                      href={item.href}
-                      className={
-                        "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition " +
-                        (active
-                          ? "border-accent bg-nav-active-bg text-nav-active-fg"
-                          : "border-border bg-card text-muted-foreground hover:bg-surface-muted/80 hover:text-foreground")
-                      }
-                    >
-                      <Icon className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
-                      <span className="whitespace-nowrap">{item.label}</span>
-                    </Link>
-                  );
-                }),
-              )}
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-border bg-card/80 p-1.5 shadow-sm">
+              <div className="flex min-w-0 items-center gap-2 px-2">
+                {ActiveMobileIcon ? (
+                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-muted text-nav-active-fg ring-1 ring-border">
+                    <ActiveMobileIcon className="h-4 w-4" aria-hidden />
+                  </span>
+                ) : null}
+                <div className="min-w-0">
+                  <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                    {activeMobileNavItem?.sectionTitle ?? "Navigation"}
+                  </p>
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {activeMobileNavItem?.item.label ?? "Navigation"}
+                  </p>
+                </div>
+              </div>
+              <div className="relative">
+                <select
+                  aria-label="Dashboard navigation"
+                  value={activeMobileHref}
+                  onChange={(event) => {
+                    const href = event.currentTarget.value;
+                    if (!mobileNavItems.some(({ item }) => item.href === href)) return;
+                    router.push(href);
+                  }}
+                  className="h-10 w-[132px] appearance-none rounded-lg border border-border bg-surface-muted px-3 pr-8 text-xs font-semibold text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25 sm:w-52"
+                >
+                  {sections.map((section) => (
+                    <optgroup key={section.title} label={section.title}>
+                      {section.items.map((item) => (
+                        <option key={item.href + item.label} value={item.href}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <ChevronDown
+                  className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden
+                />
+              </div>
             </div>
           )}
         </div>

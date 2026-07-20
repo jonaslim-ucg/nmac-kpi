@@ -52,6 +52,7 @@ import { fetchNmacMasterMonthly } from "@/lib/supabase/nmac-master-service";
 import { fetchNmacTargetMonths, fetchNmacTargets } from "@/lib/supabase/nmac-targets-service";
 import { MonthTabs } from "./nmac-master-entry-panel";
 import { ReferralKpiPanel } from "./referral-kpi-panel";
+import { ThreeCxQueuePerformancePanel } from "./three-cx-queue-performance-panel";
 
 type Db = Record<number, MonthDb>;
 
@@ -521,23 +522,25 @@ export function KpiNmac2026Client({ view }: Props) {
 
   return (
     <div className="nk26-root nk26-shell">
-      <div className="nk26-year-bar">
-        <label className="nk26-year-label" htmlFor="nk26-reporting-year">
-          Reporting year
-        </label>
-        <select
-          id="nk26-reporting-year"
-          className="nk26-year-select"
-          value={String(selectedYear)}
-          onChange={(e) => onYearChange(Number(e.target.value))}
-        >
-          {SUPPORTED_KPI_YEARS.map((year) => (
-            <option key={year} value={year}>
-              {year}
-            </option>
-          ))}
-        </select>
-      </div>
+      {v !== "threecx" ? (
+        <div className="nk26-year-bar">
+          <label className="nk26-year-label" htmlFor="nk26-reporting-year">
+            Reporting year
+          </label>
+          <select
+            id="nk26-reporting-year"
+            className="nk26-year-select"
+            value={String(selectedYear)}
+            onChange={(e) => onYearChange(Number(e.target.value))}
+          >
+            {SUPPORTED_KPI_YEARS.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
 
       {v === "overview" ? (
         <>
@@ -1033,6 +1036,25 @@ export function KpiNmac2026Client({ view }: Props) {
               </div>
             ) : null}
           </div>
+          </div>
+        </>
+      ) : null}
+
+      {v === "threecx" ? (
+        <>
+          <header className="nk26-page-head">
+            <div className="nk26-section-title">3CX queue performance</div>
+            <div className="nk26-section-sub">
+              Saved 3CX queue data by month, week, or daily report
+              <span className="mt-1 block text-foreground/90">{monthLabel}</span>
+            </div>
+          </header>
+          <div key={`${v}-content`} className="nk26-route-enter">
+            <ThreeCxQueuePerformancePanel
+              year={selectedYear}
+              monthIndex={selectedMonth}
+              onMonthSelect={setSelectedMonth}
+            />
           </div>
         </>
       ) : null}

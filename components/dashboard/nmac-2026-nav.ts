@@ -48,6 +48,7 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
       { href: "/nmac-2026/scheduling", label: "Scheduling", icon: Calendar },
       { href: "/nmac-2026/finance", label: "Finance & revenue", icon: Wallet },
       { href: "/nmac-2026/calls", label: "Call performance", icon: Phone },
+      { href: "/nmac-2026/3cx", label: "3CX queue performance", icon: Phone },
       { href: "/nmac-2026/nursing", label: "Nursing KPIs", icon: HeartPulse },
       { href: "/nmac-2026/specialty", label: "Specialty clinics", icon: Stethoscope },
       { href: "/nmac-2026/compliance", label: "Compliance & quality", icon: ClipboardList },

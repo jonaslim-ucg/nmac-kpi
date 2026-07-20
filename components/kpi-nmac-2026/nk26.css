@@ -1175,6 +1175,109 @@
   margin-bottom: 0;
 }
 
+/* ---- 3CX queue performance controls ---- */
+
+.threecx-filter-row {
+  min-width: 0;
+}
+
+.threecx-date-strip {
+  display: flex;
+  flex: 1 1 360px;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  border-left: 1px solid var(--nk26-border);
+  padding-left: 12px;
+}
+
+.threecx-date-label {
+  flex: 0 0 auto;
+  color: var(--nk26-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.threecx-date-chip-list {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  padding: 2px 2px 4px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.threecx-date-chip-list::-webkit-scrollbar {
+  display: none;
+}
+
+.threecx-date-chip {
+  flex: 0 0 auto;
+  min-width: 58px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--nk26-surface2) 65%, transparent);
+  color: var(--nk26-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  scroll-snap-align: start;
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.threecx-date-chip:hover {
+  background: var(--nk26-surface2);
+  color: var(--nk26-text);
+}
+
+.threecx-date-chip.threecx-date-chip-active {
+  background: var(--nk26-accent);
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset;
+}
+
+.threecx-date-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (max-width: 900px) {
+  .threecx-date-strip {
+    flex-basis: 100%;
+    border-left: 0;
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .threecx-date-strip {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .threecx-date-chip-list {
+    display: grid;
+    grid-auto-columns: minmax(62px, max-content);
+    grid-auto-flow: column;
+    grid-template-rows: repeat(2, 32px);
+    padding-bottom: 2px;
+  }
+
+  .threecx-date-chip {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nk26-route-enter,
   .nk26-tab-content-enter {

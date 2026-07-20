@@ -71,6 +71,25 @@ function dateOnlyInTimeZone(value: Date, timeZone: string) {
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
+function dateFromDateOnly(value: string) {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+function formatDateForMessage(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(dateFromDateOnly(value));
+}
+
+function previousDateOnly(value: string) {
+  const date = dateFromDateOnly(value);
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().slice(0, 10);
+}
+
 function availableDateRange() {
   const startDate = parseDateOnly(process.env.GRAPH_3CX_DATA_RANGE_START_DATE ?? null) ?? DEFAULT_AVAILABLE_START_DATE;
   return {
@@ -202,11 +221,25 @@ export async function GET(req: Request) {
     if (startDate > endDate) {
       return noStoreJson({ error: "startDate must be before or equal to endDate." }, { status: 400 });
     }
-    if (startDate < availableRange.startDate || endDate > availableRange.endDate) {
+    if (startDate < availableRange.startDate) {
+      const lastUnavailableDate = previousDateOnly(availableRange.startDate);
       return noStoreJson(
         {
-          error: `3CX range data is available from ${availableRange.startDate} up to ${availableRange.endDate}.`,
+          ok: false,
+          error: `3CX daily data is available from ${formatDateForMessage(availableRange.startDate)} onward. ${formatDateForMessage(lastUnavailableDate)} or earlier is not available.`,
           availableDateRange: availableRange,
+          requestedDateRange: { startDate, endDate },
+        },
+        { status: 400 },
+      );
+    }
+    if (endDate > availableRange.endDate) {
+      return noStoreJson(
+        {
+          ok: false,
+          error: `3CX daily data is available up to ${formatDateForMessage(availableRange.endDate)}. Future dates after that are not available yet.`,
+          availableDateRange: availableRange,
+          requestedDateRange: { startDate, endDate },
         },
         { status: 400 },
       );

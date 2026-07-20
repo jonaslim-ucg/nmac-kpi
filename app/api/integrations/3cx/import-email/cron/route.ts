@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAuthorizedThreeCxSecretRequest } from "@/lib/3cx/auth";
 import { threeCxDailyPeriodFromEmailReceivedAt } from "@/lib/3cx/email-report";
 import { logThreeCxImport, saveThreeCxImport } from "@/lib/3cx/import-server";
 import { getGraphAccessToken } from "@/lib/graph/send-mail";
@@ -48,18 +49,6 @@ function noStoreJson(body: unknown, init?: ResponseInit) {
       "Cache-Control": "private, no-store, max-age=0",
     },
   });
-}
-
-function isAuthorizedCronRequest(req: Request): boolean {
-  const header = req.headers.get("authorization")?.trim();
-  if (!header?.toLowerCase().startsWith("bearer ")) return false;
-  const token = header.slice(7).trim();
-  const allowed = [
-    process.env.GRAPH_3CX_CRON_SECRET?.trim(),
-    process.env.CRON_SECRET?.trim(),
-    process.env.NODE_ENV !== "production" ? process.env.AUTH_SECRET?.trim() : null,
-  ].filter((value): value is string => Boolean(value));
-  return allowed.some((secret) => secret === token);
 }
 
 function graphReportMailbox() {
@@ -213,7 +202,7 @@ function pollWindow(now: Date, timeZone: string) {
 }
 
 async function handleCron(req: Request) {
-  if (!isAuthorizedCronRequest(req)) return unauthorized();
+  if (!isAuthorizedThreeCxSecretRequest(req)) return unauthorized();
 
   const url = new URL(req.url);
   const force = url.searchParams.get("force") === "1" || url.searchParams.get("force") === "true";

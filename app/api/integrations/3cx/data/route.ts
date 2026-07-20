@@ -7,6 +7,7 @@ import {
   type ThreeCxReportRange,
   type ThreeCxReportRow,
 } from "@/lib/3cx/email-report";
+import { isAuthorizedThreeCxSecretRequest } from "@/lib/3cx/auth";
 import { callMetricsFromMonth, readDetailedReport, readDetailedReportForDateRange } from "@/lib/3cx/import-server";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { canAccessDev } from "@/lib/auth/types";
@@ -176,9 +177,15 @@ async function readMonthRange(year: number, monthIndex: number): Promise<ThreeCx
   };
 }
 
-export async function GET(req: Request) {
+async function canReadThreeCxData(req: Request) {
+  if (isAuthorizedThreeCxSecretRequest(req)) return true;
+
   const session = await getSessionFromCookies();
-  if (!session || !canAccessDev(session.role)) return unauthorized();
+  return Boolean(session && canAccessDev(session.role));
+}
+
+export async function GET(req: Request) {
+  if (!(await canReadThreeCxData(req))) return unauthorized();
 
   const url = new URL(req.url);
   const mode = parseMode(url);

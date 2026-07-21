@@ -34,7 +34,7 @@ type ThreeCxDataRange = {
   source: ThreeCxDataSource;
 };
 
-const DEFAULT_AVAILABLE_START_DATE = "2026-07-13";
+const AVAILABLE_START_DATE = "2026-07-01";
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
@@ -91,9 +91,8 @@ function previousDateOnly(value: string) {
 }
 
 function availableDateRange() {
-  const startDate = parseDateOnly(process.env.GRAPH_3CX_DATA_RANGE_START_DATE ?? null) ?? DEFAULT_AVAILABLE_START_DATE;
   return {
-    startDate,
+    startDate: AVAILABLE_START_DATE,
     endDate: dateOnlyInTimeZone(new Date(), reportTimeZone()),
   };
 }

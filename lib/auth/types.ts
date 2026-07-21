@@ -1,9 +1,12 @@
 import { findCustomRole, isSystemRoleId, type CustomRole } from "@/lib/auth/custom-roles";
+import { isAppRole } from "@/lib/auth/role-id";
 
 export const APP_ROLES = ["viewer", "editor", "admin", "dev"] as const;
-export type AppRole = (typeof APP_ROLES)[number];
+export type SystemRole = (typeof APP_ROLES)[number];
+/** Includes built-in roles and configured custom role ids. */
+export type AppRole = string;
 
-export const ROLE_LABELS: Record<AppRole, string> = {
+export const ROLE_LABELS: Record<SystemRole, string> = {
   viewer: "Viewer",
   editor: "Editor",
   admin: "Admin",
@@ -19,12 +22,13 @@ export function formatRoleLabel(
   return findCustomRole(role, customRoles)?.label ?? role.replace(/_/g, " ");
 }
 
-export function isAppRole(value: unknown): value is AppRole {
-  return typeof value === "string" && (APP_ROLES as readonly string[]).includes(value);
-}
+export { isAppRole };
 
 export function isValidUserRole(value: unknown, customRoles: CustomRole[] = []): value is string {
-  return typeof value === "string" && (isAppRole(value) || customRoles.some((role) => role.id === value));
+  return (
+    isAppRole(value) &&
+    (isSystemRoleId(value) || customRoles.some((role) => role.id === value))
+  );
 }
 
 export function canEditKpiData(

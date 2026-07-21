@@ -6,6 +6,8 @@ import { NO_APP_ACCESS_MESSAGE } from "@/lib/auth/app-user-access";
 import { getBitrixClientAuth, isLikelyBitrixEmbed } from "@/lib/bitrix/embedded-client";
 
 type Phase = "idle" | "trying" | "failed" | "denied";
+const BITRIX_SIGN_IN_TIMEOUT_MS = 15_000;
+const SLOW_SIGN_IN_NOTICE_MS = 5_000;
 
 /**
  * When opened inside Bitrix24 (iframe), loads BX24 and signs in via `/api/auth/bitrix`.
@@ -22,6 +24,13 @@ export function BitrixAutoSignIn({
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>(() => (isLikelyBitrixEmbed() ? "trying" : "idle"));
   const [deniedMessage, setDeniedMessage] = useState<string | null>(null);
+  const [showSlowNotice, setShowSlowNotice] = useState(false);
+
+  useEffect(() => {
+    if (phase !== "trying") return;
+    const timeout = window.setTimeout(() => setShowSlowNotice(true), SLOW_SIGN_IN_NOTICE_MS);
+    return () => window.clearTimeout(timeout);
+  }, [phase]);
 
   useEffect(() => {
     if (phase !== "trying") return;
@@ -43,10 +52,14 @@ export function BitrixAutoSignIn({
         return;
       }
 
+      let requestTimeout: number | undefined;
       try {
+        const controller = new AbortController();
+        requestTimeout = window.setTimeout(() => controller.abort(), BITRIX_SIGN_IN_TIMEOUT_MS);
         const res = await fetch("/api/auth/bitrix", {
           method: "POST",
           credentials: "include",
+          signal: controller.signal,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             access_token: auth.access_token,
@@ -54,7 +67,11 @@ export function BitrixAutoSignIn({
             embedded: true,
           }),
         });
-        const j = (await res.json()) as { ok?: boolean; message?: string; maintenance?: boolean };
+        const j = (await res.json()) as {
+          ok?: boolean;
+          message?: string;
+          maintenance?: boolean;
+        };
         if (cancelled) return;
 
         if (!res.ok || !j.ok) {
@@ -90,13 +107,15 @@ export function BitrixAutoSignIn({
           setPhase("failed");
           onFallback();
         }
+      } finally {
+        if (requestTimeout !== undefined) window.clearTimeout(requestTimeout);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [phase, onFallback, router]);
+  }, [allowOtpFallback, phase, onFallback, router]);
 
   if (phase === "denied") {
     return (
@@ -115,6 +134,23 @@ export function BitrixAutoSignIn({
     <div className="py-8 text-center">
       <p className="text-sm font-medium text-foreground">Signing in with Bitrix24…</p>
       <p className="mt-2 text-xs text-muted-foreground">Using your Bitrix account</p>
+      {showSlowNotice ? (
+        <div className="mt-5">
+          <p className="text-xs text-muted-foreground">Bitrix is taking longer than expected.</p>
+          {allowOtpFallback ? (
+            <button
+              type="button"
+              className="mt-3 text-sm font-medium text-accent underline underline-offset-2"
+              onClick={() => {
+                setPhase("failed");
+                onFallback();
+              }}
+            >
+              Sign in with email instead
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

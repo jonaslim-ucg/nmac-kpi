@@ -65,7 +65,7 @@ export async function POST(req: Request) {
   if (!bx.ok) {
     return NextResponse.json(
       { ok: false, message: bx.message || "Bitrix authorization failed." },
-      { status: 401 },
+      { status: bx.httpStatus === 502 || bx.httpStatus === 504 ? bx.httpStatus : 401 },
     );
   }
 

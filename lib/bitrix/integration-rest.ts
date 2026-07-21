@@ -1,6 +1,8 @@
 import { isValidEmailFormat } from "@/lib/auth/email-policy";
 import { normalizePortalDomain } from "@/lib/bitrix/portal";
 
+const BITRIX_REST_TIMEOUT_MS = 12_000;
+
 export interface BitrixUserCurrentResult {
   /** Primary email from Bitrix (usually work). */
   email: string | null;
@@ -45,15 +47,33 @@ export async function fetchBitrixUserCurrent(
 ): Promise<{ ok: true; user: BitrixUserCurrentResult } | BitrixUserCurrentFailure> {
   const host = normalizePortalDomain(portalDomain);
   const url = `https://${host}/rest/user.current`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-    },
-    body: new URLSearchParams({ auth: authToken }).toString(),
-    cache: "no-store",
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), BITRIX_REST_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      },
+      body: new URLSearchParams({ auth: authToken }).toString(),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === "AbortError";
+    return {
+      ok: false,
+      message: timedOut
+        ? "Bitrix did not respond in time. Please try again."
+        : "Could not reach Bitrix. Please try again.",
+      code: timedOut ? "BITRIX_TIMEOUT" : "BITRIX_UNAVAILABLE",
+      httpStatus: timedOut ? 504 : 502,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
 
   let data: Record<string, unknown>;
   try {

@@ -1,6 +1,8 @@
 "use client";
 
 const BITRIX_SDK_SCRIPT = "https://api.bitrix24.com/api/v1/";
+const BITRIX_SDK_LOAD_TIMEOUT_MS = 10_000;
+const BITRIX_SDK_INIT_TIMEOUT_MS = 15_000;
 
 export type BitrixClientAuth = {
   access_token: string;
@@ -18,27 +20,44 @@ declare global {
   }
 }
 
-function loadScriptOnce(src: string): Promise<void> {
+function loadScriptOnce(src: string): Promise<true> {
   return new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[src="${src}"]`);
+    if (window.BX24) {
+      resolve(true);
+      return;
+    }
+
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`);
     if (existing) {
-      resolve();
+      existing.addEventListener("load", () => resolve(true), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Failed to load Bitrix SDK")), {
+        once: true,
+      });
       return;
     }
     const s = document.createElement("script");
     s.src = src;
     s.async = true;
-    s.onload = () => resolve();
+    s.onload = () => resolve(true);
     s.onerror = () => reject(new Error("Failed to load Bitrix SDK"));
     document.head.appendChild(s);
   });
 }
 
 function withTimeout<T>(ms: number, promise: Promise<T>): Promise<T | null> {
-  return Promise.race([
-    promise,
-    new Promise<null>((resolve) => window.setTimeout(() => resolve(null), ms)),
-  ]);
+  return new Promise<T | null>((resolve, reject) => {
+    const timeout = window.setTimeout(() => resolve(null), ms);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeout);
+        resolve(value);
+      },
+      (error: unknown) => {
+        window.clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
 }
 
 /** True when the page is likely embedded (iframe) or opened from a Bitrix host. */
@@ -62,7 +81,11 @@ export async function getBitrixClientAuth(): Promise<BitrixClientAuth | null> {
   if (!isLikelyBitrixEmbed()) return null;
 
   try {
-    await loadScriptOnce(BITRIX_SDK_SCRIPT);
+    const loaded = await withTimeout(
+      BITRIX_SDK_LOAD_TIMEOUT_MS,
+      loadScriptOnce(BITRIX_SDK_SCRIPT),
+    );
+    if (loaded !== true) return null;
   } catch {
     return null;
   }
@@ -71,7 +94,7 @@ export async function getBitrixClientAuth(): Promise<BitrixClientAuth | null> {
   if (!BX24?.init || !BX24?.getAuth) return null;
 
   const initDone = await withTimeout(
-    20_000,
+    BITRIX_SDK_INIT_TIMEOUT_MS,
     new Promise<boolean>((resolve) => {
       try {
         BX24.init(() => resolve(true));

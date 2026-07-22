@@ -4,7 +4,9 @@ import { authorizeAppointmentReviewReportRequest } from "@/lib/appointment-revie
 import { toAppointmentReviewDetail } from "@/lib/appointment-review/display";
 import { APPOINTMENT_REVIEWS_SETUP_SQL, listAppointmentReviews } from "@/lib/appointment-review/store";
 import {
+  buildResponseOnlyAppointmentReport,
   buildProviderAppointmentReport,
+  mergeProviderAppointmentReports,
   parseAppointmentReviewReportRange,
 } from "@/lib/appointment-review/report";
 import { getSessionFromCookies } from "@/lib/auth/session";
@@ -14,6 +16,7 @@ import {
   findTestSurveyOutreachTokens,
   listSurveyOutreachForReport,
 } from "@/lib/survey-outreach/store";
+import { isScheduledTestRecipientAllowed } from "@/lib/survey-outreach/config";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +90,12 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: testTokenResult.error }, { status: 500 });
     }
     const testTokens = new Set(testTokenResult.tokens);
-    rows = rows.filter((row) => !row.survey_token || !testTokens.has(row.survey_token));
+    rows = rows.filter(
+      (row) =>
+        row.survey_token
+          ? !testTokens.has(row.survey_token)
+          : !isScheduledTestRecipientAllowed(row.email),
+    );
   }
 
   const reviews = rows.map(toAppointmentReviewDetail);
@@ -104,7 +112,23 @@ export async function GET(req: Request) {
         ? row.provider_names
         : providerNamesBySurveyToken.get(row.survey_token) ?? [],
   }));
-  const providerReport = buildProviderAppointmentReport(reportOutreachRows);
+  const outreachProviderReport = buildProviderAppointmentReport(reportOutreachRows);
+  const reportedSurveyTokens = new Set(outreachResult.rows.map((row) => row.survey_token));
+  const responseOnlyProviderReport = buildResponseOnlyAppointmentReport(
+    rows.flatMap((row, index) => {
+      if (row.survey_token && reportedSurveyTokens.has(row.survey_token)) return [];
+      return [{
+        reviewId: row.id,
+        createdAt: row.created_at,
+        providerNames: reviews[index].providerRatings.map((provider) => provider.providerLabel),
+        isTest: isScheduledTestRecipientAllowed(row.email),
+      }];
+    }),
+  );
+  const providerReport = mergeProviderAppointmentReports(
+    outreachProviderReport,
+    responseOnlyProviderReport,
+  );
 
   return NextResponse.json(
     {

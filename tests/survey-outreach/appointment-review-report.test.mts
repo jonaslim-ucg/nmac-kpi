@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildResponseOnlyAppointmentReport,
   buildProviderAppointmentReport,
+  mergeProviderAppointmentReports,
   parseAppointmentReviewReportRange,
   type SurveyReportOutreachRow,
 } from "../../lib/appointment-review/report.ts";
@@ -87,11 +89,56 @@ test("counts exact appointment-to-provider mappings and survey responses", () =>
     },
   ]);
   assert.equal(result.appointments[0].providerCount, 1);
+  assert.equal(result.appointments[0].source, "outreach");
+  assert.equal(result.appointments[0].reviewId, null);
   assert.equal(result.appointments[0].isTest, false);
   assert.equal(result.appointments[0].providerMappingComplete, true);
   assert.deepEqual(result.appointments[0].providerAppointments, [
     { appointmentId: "101", providerName: "Brown, Kyjuan" },
     { appointmentId: "102", providerName: "Brown, Kyjuan" },
+  ]);
+});
+
+test("reports provider appointments inferred from unlinked survey responses", () => {
+  const responseOnly = buildResponseOnlyAppointmentReport([
+    {
+      reviewId: "review-1",
+      createdAt: "2026-07-22T13:38:03.841684+00:00",
+      providerNames: ["Dr. Davor Dzepina"],
+      isTest: true,
+    },
+  ]);
+  const result = mergeProviderAppointmentReports(
+    { providers: [], appointments: [] },
+    responseOnly,
+  );
+
+  assert.deepEqual(result.providers, [
+    {
+      providerName: "Dr. Davor Dzepina",
+      appointmentCount: 1,
+      surveySentCount: 0,
+      responseCount: 1,
+      appointmentCountEstimated: true,
+    },
+  ]);
+  assert.deepEqual(result.appointments, [
+    {
+      source: "response",
+      outreachId: null,
+      reviewId: "review-1",
+      isTest: true,
+      appointmentDate: null,
+      appointmentAt: null,
+      appointmentIds: [],
+      appointmentCount: 1,
+      providerNames: ["Dr. Davor Dzepina"],
+      providerCount: 1,
+      providerAppointments: [],
+      providerMappingComplete: false,
+      initialSentAt: null,
+      respondedAt: "2026-07-22T13:38:03.841684+00:00",
+    },
   ]);
 });
 

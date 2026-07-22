@@ -37,8 +37,10 @@ export type ProviderAppointmentReport = {
 };
 
 export type SurveyAppointmentReport = {
-  outreachId: string;
-  isTest: boolean;
+  source: "outreach" | "response";
+  outreachId: string | null;
+  reviewId: string | null;
+  isTest: boolean | null;
   appointmentDate: string | null;
   appointmentAt: string | null;
   appointmentIds: string[];
@@ -255,7 +257,9 @@ export function buildProviderAppointmentReport(rows: readonly SurveyReportOutrea
     }
 
     return {
+      source: "outreach" as const,
       outreachId: row.id,
+      reviewId: null,
       isTest: row.is_test,
       appointmentDate: row.appointment_date,
       appointmentAt: row.appointment_at,
@@ -275,4 +279,84 @@ export function buildProviderAppointmentReport(rows: readonly SurveyReportOutrea
   );
 
   return { providers, appointments };
+}
+
+export type ResponseOnlyAppointmentInput = {
+  reviewId: string;
+  createdAt: string;
+  providerNames: string[];
+  isTest: boolean;
+};
+
+/** Infer an appointment from a completed survey when no outreach link was stored. */
+export function buildResponseOnlyAppointmentReport(
+  responses: readonly ResponseOnlyAppointmentInput[],
+): { providers: ProviderAppointmentReport[]; appointments: SurveyAppointmentReport[] } {
+  const providerTotals = new Map<string, ProviderAppointmentReport>();
+  const appointments = responses.map((response) => {
+    const providerNames = cleanUnique(response.providerNames);
+    for (const providerName of providerNames) {
+      const key = providerName.toLocaleLowerCase();
+      const current = providerTotals.get(key);
+      providerTotals.set(key, {
+        providerName: current?.providerName ?? providerName,
+        appointmentCount: (current?.appointmentCount ?? 0) + 1,
+        surveySentCount: current?.surveySentCount ?? 0,
+        responseCount: (current?.responseCount ?? 0) + 1,
+        appointmentCountEstimated: true,
+      });
+    }
+
+    return {
+      source: "response" as const,
+      outreachId: null,
+      reviewId: response.reviewId,
+      isTest: response.isTest,
+      appointmentDate: null,
+      appointmentAt: null,
+      appointmentIds: [],
+      appointmentCount: 1,
+      providerNames,
+      providerCount: providerNames.length,
+      providerAppointments: [],
+      providerMappingComplete: false,
+      initialSentAt: null,
+      respondedAt: response.createdAt,
+    };
+  });
+
+  return {
+    providers: [...providerTotals.values()].sort(
+      (a, b) => b.appointmentCount - a.appointmentCount || a.providerName.localeCompare(b.providerName),
+    ),
+    appointments,
+  };
+}
+
+export function mergeProviderAppointmentReports(
+  ...reports: readonly { providers: ProviderAppointmentReport[]; appointments: SurveyAppointmentReport[] }[]
+): { providers: ProviderAppointmentReport[]; appointments: SurveyAppointmentReport[] } {
+  const providerTotals = new Map<string, ProviderAppointmentReport>();
+  for (const report of reports) {
+    for (const provider of report.providers) {
+      const key = provider.providerName.toLocaleLowerCase();
+      const current = providerTotals.get(key);
+      providerTotals.set(key, {
+        providerName: current?.providerName ?? provider.providerName,
+        appointmentCount: (current?.appointmentCount ?? 0) + provider.appointmentCount,
+        surveySentCount: (current?.surveySentCount ?? 0) + provider.surveySentCount,
+        responseCount: (current?.responseCount ?? 0) + provider.responseCount,
+        appointmentCountEstimated: Boolean(
+          current?.appointmentCountEstimated || provider.appointmentCountEstimated,
+        ),
+      });
+    }
+  }
+
+  return {
+    providers: [...providerTotals.values()].sort(
+      (a, b) => b.appointmentCount - a.appointmentCount || a.providerName.localeCompare(b.providerName),
+    ),
+    appointments: reports.flatMap((report) => report.appointments),
+  };
 }

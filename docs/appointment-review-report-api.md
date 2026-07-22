@@ -70,3 +70,4 @@ Date-only boundaries use the NMAC clinic timezone (`Atlantic/Bermuda`). Response
 - `providers` gives appointment, sent-survey, and response counts per provider.
 - `appointments` gives the provider count and provider mapping for every sent survey appointment group.
 - `appointmentCountEstimated` or `providerMappingComplete: false` identifies legacy grouped records created before the appointment/provider mapping migration.
+- A response submitted without an outreach token produces a `source: "response"` appointment inferred from its selected providers. It has no CRM appointment ID or sent-email timestamp, and its provider appointment count is marked as estimated.

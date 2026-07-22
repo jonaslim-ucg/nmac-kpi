@@ -20,6 +20,7 @@ export type SurveyOutreachRow = {
   patient_name: string;
   appointment_date: string | null;
   appointment_at: string | null;
+  appointment_providers: Record<string, string> | null;
   provider_names: string[];
   visit_types: string[];
   is_test: boolean;

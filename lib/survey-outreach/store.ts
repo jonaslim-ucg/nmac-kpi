@@ -396,6 +396,7 @@ export async function upsertCrmOutreachBatch(
         appointmentDate: row.appointmentDate,
         appointmentAt: row.appointmentAt,
         appointmentIds: row.appointmentIds,
+        appointmentProviders: row.appointmentProviders,
         providerNames: row.providerNames,
         visitTypes: row.visitTypes,
       })),
@@ -405,6 +406,20 @@ export async function upsertCrmOutreachBatch(
       throw new Error("Daily survey grouping is not installed. Production survey delivery was paused.");
     }
     throw new Error(error.message);
+  }
+
+  const { error: providerMappingError } = await supabase
+    .rpc("merge_survey_outreach_appointment_providers", {
+      p_groups: rows.map((row) => ({
+        groupKey: row.groupKey,
+        appointmentProviders: row.appointmentProviders,
+      })),
+    });
+  if (
+    providerMappingError &&
+    !/merge_survey_outreach_appointment_providers|schema cache|function/i.test(providerMappingError.message)
+  ) {
+    throw new Error(providerMappingError.message);
   }
 
   const result = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
@@ -484,6 +499,65 @@ export type SurveyOutreachListResult = {
     failedRows: number;
   };
 };
+
+export type SurveyOutreachReportFilters = {
+  sentFrom?: string;
+  sentBefore?: string;
+};
+
+type SurveyOutreachReportResult =
+  | { ok: true; rows: SurveyOutreachRow[] }
+  | { ok: false; error: string; setupRequired?: boolean };
+
+/** All production survey invitations sent in the requested interval. */
+export async function listSurveyOutreachForReport(
+  filters: SurveyOutreachReportFilters = {},
+): Promise<SurveyOutreachReportResult> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return { ok: false, error: "Survey outreach storage is not available." };
+  }
+
+  try {
+    const supabase = createServiceRoleClient();
+    const rows: SurveyOutreachRow[] = [];
+    const pageSize = 1_000;
+    let offset = 0;
+    let total: number | null = null;
+
+    while (true) {
+      let query = supabase
+        .from("survey_outreach")
+        .select("*", { count: "exact" })
+        .eq("is_test", false)
+        .is("merged_into_outreach_id", null)
+        .not("initial_sent_at", "is", null)
+        .order("initial_sent_at", { ascending: false })
+        .order("id", { ascending: false });
+
+      if (filters.sentFrom) query = query.gte("initial_sent_at", filters.sentFrom);
+      if (filters.sentBefore) query = query.lt("initial_sent_at", filters.sentBefore);
+
+      const { data, error, count } = await query.range(offset, offset + pageSize - 1);
+      if (error) {
+        if (/survey_outreach|merged_into_outreach_id/i.test(error.message) && /does not exist|schema cache/i.test(error.message)) {
+          return { ok: false, error: "Survey outreach storage is not configured.", setupRequired: true };
+        }
+        return { ok: false, error: "Could not load sent survey data." };
+      }
+
+      const page = (data ?? []) as SurveyOutreachRow[];
+      rows.push(...page);
+      total = count ?? total;
+      if (page.length === 0 || (total !== null && rows.length >= total)) break;
+      if (total === null && page.length < pageSize) break;
+      offset += page.length;
+    }
+
+    return { ok: true, rows };
+  } catch {
+    return { ok: false, error: "Could not load sent survey data." };
+  }
+}
 
 export function outreachStagesLabel(row: SurveyOutreachRow): string {
   const stages: string[] = [];

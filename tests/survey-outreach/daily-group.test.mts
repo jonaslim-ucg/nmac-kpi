@@ -32,6 +32,10 @@ test("groups same-patient same-day appointments and anchors to the latest appoin
 
   assert.equal(groups.length, 1);
   assert.deepEqual(groups[0].appointmentIds, ["101", "102"]);
+  assert.deepEqual(groups[0].appointmentProviders, {
+    "101": "Brown, Kyjuan",
+    "102": "Estwick, Paula",
+  });
   assert.deepEqual(groups[0].providerNames, ["Brown, Kyjuan", "Estwick, Paula"]);
   assert.equal(groups[0].appointmentAt, "2026-07-16T17:30:00.000Z");
   assert.equal(

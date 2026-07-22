@@ -128,28 +128,47 @@ export async function listAppointmentReviews(options: ListAppointmentReviewsOpti
 
   try {
     const supabase = createServiceRoleClient();
-    let query = supabase
-      .from("appointment_reviews")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const requestedLimit = options.limit === undefined
+      ? null
+      : Math.min(Math.max(Math.trunc(options.limit), 1), 10_000);
+    const pageSize = Math.min(requestedLimit ?? 1_000, 1_000);
+    const rows: AppointmentReviewRow[] = [];
+    let offset = 0;
+    let total: number | null = null;
 
-    if (options.createdFrom) {
-      query = query.gte("created_at", options.createdFrom);
-    }
-    if (options.createdBefore) {
-      query = query.lt("created_at", options.createdBefore);
-    }
+    while (requestedLimit === null || rows.length < requestedLimit) {
+      const remaining = requestedLimit === null ? pageSize : Math.min(pageSize, requestedLimit - rows.length);
+      let query = supabase
+        .from("appointment_reviews")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false });
 
-    const { data, error } = await query.limit(options.limit ?? 500);
-
-    if (error) {
-      if (/appointment_reviews/i.test(error.message) && /does not exist|schema cache/i.test(error.message)) {
-        return { ok: false, error: "Review storage is not configured.", setupRequired: true };
+      if (options.createdFrom) {
+        query = query.gte("created_at", options.createdFrom);
       }
-      return { ok: false, error: "Could not load reviews." };
+      if (options.createdBefore) {
+        query = query.lt("created_at", options.createdBefore);
+      }
+
+      const { data, error, count } = await query.range(offset, offset + remaining - 1);
+
+      if (error) {
+        if (/appointment_reviews/i.test(error.message) && /does not exist|schema cache/i.test(error.message)) {
+          return { ok: false, error: "Review storage is not configured.", setupRequired: true };
+        }
+        return { ok: false, error: "Could not load reviews." };
+      }
+
+      const page = (data ?? []) as AppointmentReviewRow[];
+      rows.push(...page);
+      total = count ?? total;
+      if (page.length === 0 || (total !== null && rows.length >= total)) break;
+      if (total === null && page.length < remaining) break;
+      offset += page.length;
     }
 
-    return { ok: true, rows: (data ?? []) as AppointmentReviewRow[] };
+    return { ok: true, rows };
   } catch {
     return { ok: false, error: "Could not load reviews." };
   }

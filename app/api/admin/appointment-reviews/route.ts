@@ -2,23 +2,19 @@ import { NextResponse } from "next/server";
 import { buildAppointmentReviewStats } from "@/lib/appointment-review/analytics";
 import { toAppointmentReviewDetail } from "@/lib/appointment-review/display";
 import { APPOINTMENT_REVIEWS_SETUP_SQL, listAppointmentReviews } from "@/lib/appointment-review/store";
+import {
+  buildProviderAppointmentReport,
+  parseAppointmentReviewReportRange,
+} from "@/lib/appointment-review/report";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { isNmacNavViewAllowed, SURVEY_RESULTS_NAV_VIEW_ID } from "@/lib/auth/role-nmac-nav";
 import { getAppDashboardSettings } from "@/lib/auth/app-settings";
+import { listSurveyOutreachForReport } from "@/lib/survey-outreach/store";
 
 export const dynamic = "force-dynamic";
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-}
-
-function currentQuarterRange(now = new Date()): { start: number; end: number } {
-  const year = now.getUTCFullYear();
-  const startMonth = Math.floor(now.getUTCMonth() / 3) * 3;
-  return {
-    start: Date.UTC(year, startMonth, 1),
-    end: Date.UTC(year, startMonth + 3, 1),
-  };
 }
 
 export async function GET(req: Request) {
@@ -33,39 +29,51 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
-  const daysRaw = url.searchParams.get("days");
-  const range = url.searchParams.get("range");
-  const days = daysRaw ? Number(daysRaw) : null;
-
-  const filters: { createdFrom?: string; createdBefore?: string } = {};
-  if (range === "quarter") {
-    const { start, end } = currentQuarterRange();
-    filters.createdFrom = new Date(start).toISOString();
-    filters.createdBefore = new Date(end).toISOString();
-  } else if (days && Number.isFinite(days) && days > 0) {
-    filters.createdFrom = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const parsedRange = parseAppointmentReviewReportRange(url.searchParams);
+  if (!parsedRange.ok) {
+    return NextResponse.json({ error: parsedRange.error }, { status: 400 });
   }
+  const { range } = parsedRange;
 
-  const result = await listAppointmentReviews(filters);
-  if (!result.ok) {
-    if (result.setupRequired) {
+  const [reviewsResult, outreachResult] = await Promise.all([
+    listAppointmentReviews({ createdFrom: range.startAt, createdBefore: range.endBefore }),
+    listSurveyOutreachForReport({ sentFrom: range.startAt, sentBefore: range.endBefore }),
+  ]);
+  if (!reviewsResult.ok) {
+    if (reviewsResult.setupRequired) {
       return NextResponse.json(
         {
           setupRequired: true,
           setupSql: APPOINTMENT_REVIEWS_SETUP_SQL,
-          error: result.error ?? "Run the database setup to enable appointment reviews.",
+          error: reviewsResult.error ?? "Run the database setup to enable appointment reviews.",
         },
         { status: 503 },
       );
     }
-    return NextResponse.json({ error: result.error ?? "Could not load reviews." }, { status: 500 });
+    return NextResponse.json({ error: reviewsResult.error ?? "Could not load reviews." }, { status: 500 });
+  }
+  if (!outreachResult.ok) {
+    return NextResponse.json(
+      {
+        setupRequired: outreachResult.setupRequired ?? false,
+        error: outreachResult.error ?? "Could not load sent survey data.",
+      },
+      { status: outreachResult.setupRequired ? 503 : 500 },
+    );
   }
 
-  const rows = result.rows;
+  const rows = reviewsResult.rows;
+  const providerReport = buildProviderAppointmentReport(outreachResult.rows);
 
   return NextResponse.json(
     {
+      dateStart: range.dateStart,
+      dateEnd: range.dateEnd,
+      numberSent: outreachResult.rows.length,
+      numberResponses: rows.length,
       stats: buildAppointmentReviewStats(rows),
+      providers: providerReport.providers,
+      appointments: providerReport.appointments,
       reviews: rows.map(toAppointmentReviewDetail),
       ready: true,
     },

@@ -18,6 +18,7 @@ export type DailyOutreachGroup = {
   appointmentAt: string;
   crmAppointmentId: string;
   appointmentIds: string[];
+  appointmentProviders: Record<string, string>;
   providerNames: string[];
   visitTypes: string[];
 };
@@ -69,6 +70,9 @@ export function groupDailyOutreachAppointments(
         appointmentAt: appointment.appointmentAt,
         crmAppointmentId: appointment.crmAppointmentId,
         appointmentIds: [appointment.crmAppointmentId],
+        appointmentProviders: appointment.providerName
+          ? { [appointment.crmAppointmentId]: appointment.providerName.trim() }
+          : {},
         providerNames: appointment.providerName ? [appointment.providerName.trim()] : [],
         visitTypes: appointment.visitType ? [appointment.visitType.trim()] : [],
       });
@@ -76,6 +80,9 @@ export function groupDailyOutreachAppointments(
     }
 
     addUnique(existing.appointmentIds, appointment.crmAppointmentId);
+    if (appointment.providerName?.trim()) {
+      existing.appointmentProviders[appointment.crmAppointmentId] = appointment.providerName.trim();
+    }
     addUnique(existing.providerNames, appointment.providerName);
     addUnique(existing.visitTypes, appointment.visitType);
 

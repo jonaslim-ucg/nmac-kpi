@@ -1,6 +1,25 @@
 # Appointment review report API
 
-`GET /api/admin/appointment-reviews` returns the complete survey-results report for an authenticated user who can access **Survey results**.
+`GET /api/admin/appointment-reviews` returns the complete survey-results report. It accepts either a logged-in session for a user who can access **Survey results**, or a server-to-server bearer key.
+
+## Server-to-server authentication
+
+Generate a secret and save it as `APPOINTMENT_REPORTS_API_KEY` in the KPI deployment environment:
+
+```bash
+openssl rand -hex 32
+```
+
+Redeploy after adding the environment variable, then call the endpoint with the same value:
+
+```bash
+curl --get 'https://kpi.nmac.bm/api/admin/appointment-reviews' \
+  --header 'Authorization: Bearer YOUR_APPOINTMENT_REPORTS_API_KEY' \
+  --data-urlencode 'dateStart=2026-07-01' \
+  --data-urlencode 'dateEnd=2026-07-22'
+```
+
+Use a dedicated secret for this endpoint. Do not reuse `REPORTS_API_TOKEN`, which authenticates requests from this app to the CRM.
 
 ## Date filters
 

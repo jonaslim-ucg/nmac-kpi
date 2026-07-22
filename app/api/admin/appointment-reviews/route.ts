@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildAppointmentReviewStats } from "@/lib/appointment-review/analytics";
+import { authorizeAppointmentReviewReportRequest } from "@/lib/appointment-review/authorize";
 import { toAppointmentReviewDetail } from "@/lib/appointment-review/display";
 import { APPOINTMENT_REVIEWS_SETUP_SQL, listAppointmentReviews } from "@/lib/appointment-review/store";
 import {
@@ -18,14 +19,17 @@ function unauthorized() {
 }
 
 export async function GET(req: Request) {
-  const session = await getSessionFromCookies();
-  if (!session) {
+  const apiKeyAuthorized = authorizeAppointmentReviewReportRequest(req);
+  const session = apiKeyAuthorized ? null : await getSessionFromCookies();
+  if (!apiKeyAuthorized && !session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const settings = await getAppDashboardSettings();
-  if (!isNmacNavViewAllowed(session.role, SURVEY_RESULTS_NAV_VIEW_ID, settings?.roleNmacNav ?? {})) {
-    return unauthorized();
+  if (session) {
+    const settings = await getAppDashboardSettings();
+    if (!isNmacNavViewAllowed(session.role, SURVEY_RESULTS_NAV_VIEW_ID, settings?.roleNmacNav ?? {})) {
+      return unauthorized();
+    }
   }
 
   const url = new URL(req.url);

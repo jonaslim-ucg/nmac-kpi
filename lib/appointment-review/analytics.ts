@@ -42,6 +42,7 @@ export type AppointmentReviewRow = {
   referral_sources: ReferralSourceValue[];
   referral_other: string;
   exceptional_staff_comment: string;
+  survey_token: string | null;
 };
 
 export type LabelCount = { label: string; count: number; pct: number };

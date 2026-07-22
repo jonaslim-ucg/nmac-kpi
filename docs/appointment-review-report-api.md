@@ -27,11 +27,13 @@ Use a dedicated secret for this endpoint. Do not reuse `REPORTS_API_TOKEN`, whic
 - `dateEnd=YYYY-MM-DD` — optional, inclusive clinic-calendar end date.
 - `startDate` and `endDate` are accepted as aliases.
 - Existing `range=quarter` and `days=30`/`days=90` filters remain supported.
+- `includeTests=true` includes test outreach and its linked responses. It defaults to `false`.
 
 Examples:
 
 ```text
 /api/admin/appointment-reviews?dateStart=2026-07-01&dateEnd=2026-07-22
+/api/admin/appointment-reviews?dateStart=2026-07-01&dateEnd=2026-07-22&includeTests=true
 /api/admin/appointment-reviews?range=quarter
 /api/admin/appointment-reviews?days=30
 ```
@@ -45,6 +47,7 @@ Date-only boundaries use the NMAC clinic timezone (`Atlantic/Bermuda`). Response
   "ready": true,
   "dateStart": "2026-07-01",
   "dateEnd": "2026-07-22",
+  "includeTests": false,
   "numberSent": 120,
   "numberResponses": 54,
   "stats": {},

@@ -9,6 +9,7 @@ import {
 function outreach(overrides: Partial<SurveyReportOutreachRow>): SurveyReportOutreachRow {
   return {
     id: "outreach-1",
+    survey_token: "survey-token-1",
     crm_appointment_id: "101",
     crm_appointment_ids: ["101"],
     appointment_date: "2026-07-22",
@@ -17,6 +18,7 @@ function outreach(overrides: Partial<SurveyReportOutreachRow>): SurveyReportOutr
     provider_names: ["Brown, Kyjuan"],
     initial_sent_at: "2026-07-22T17:00:00.000Z",
     completed_at: null,
+    is_test: false,
     ...overrides,
   };
 }
@@ -85,6 +87,7 @@ test("counts exact appointment-to-provider mappings and survey responses", () =>
     },
   ]);
   assert.equal(result.appointments[0].providerCount, 1);
+  assert.equal(result.appointments[0].isTest, false);
   assert.equal(result.appointments[0].providerMappingComplete, true);
   assert.deepEqual(result.appointments[0].providerAppointments, [
     { appointmentId: "101", providerName: "Brown, Kyjuan" },
@@ -113,4 +116,30 @@ test("provides an explicit estimate for legacy multi-provider rows", () => {
       { providerName: "Estwick, Paula", appointmentCount: 1, appointmentCountEstimated: true },
     ],
   );
+});
+
+test("maps a linked survey provider to a single appointment when CRM provider data is absent", () => {
+  const result = buildProviderAppointmentReport([
+    outreach({
+      appointment_providers: null,
+      provider_names: ["Dr. Davor Dzepina"],
+      is_test: true,
+      completed_at: "2026-07-22T19:00:00.000Z",
+    }),
+  ]);
+
+  assert.deepEqual(result.providers, [
+    {
+      providerName: "Dr. Davor Dzepina",
+      appointmentCount: 1,
+      surveySentCount: 1,
+      responseCount: 1,
+      appointmentCountEstimated: false,
+    },
+  ]);
+  assert.deepEqual(result.appointments[0].providerAppointments, [
+    { appointmentId: "101", providerName: "Dr. Davor Dzepina" },
+  ]);
+  assert.equal(result.appointments[0].providerMappingComplete, true);
+  assert.equal(result.appointments[0].isTest, true);
 });

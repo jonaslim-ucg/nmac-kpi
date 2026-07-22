@@ -10,7 +10,10 @@ import {
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { isNmacNavViewAllowed, SURVEY_RESULTS_NAV_VIEW_ID } from "@/lib/auth/role-nmac-nav";
 import { getAppDashboardSettings } from "@/lib/auth/app-settings";
-import { listSurveyOutreachForReport } from "@/lib/survey-outreach/store";
+import {
+  findTestSurveyOutreachTokens,
+  listSurveyOutreachForReport,
+} from "@/lib/survey-outreach/store";
 
 export const dynamic = "force-dynamic";
 
@@ -38,10 +41,19 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: parsedRange.error }, { status: 400 });
   }
   const { range } = parsedRange;
+  const includeTestsParam = url.searchParams.get("includeTests");
+  if (includeTestsParam !== null && includeTestsParam !== "true" && includeTestsParam !== "false") {
+    return NextResponse.json({ error: "includeTests must be true or false." }, { status: 400 });
+  }
+  const includeTests = includeTestsParam === "true";
 
   const [reviewsResult, outreachResult] = await Promise.all([
     listAppointmentReviews({ createdFrom: range.startAt, createdBefore: range.endBefore }),
-    listSurveyOutreachForReport({ sentFrom: range.startAt, sentBefore: range.endBefore }),
+    listSurveyOutreachForReport({
+      sentFrom: range.startAt,
+      sentBefore: range.endBefore,
+      includeTests,
+    }),
   ]);
   if (!reviewsResult.ok) {
     if (reviewsResult.setupRequired) {
@@ -66,19 +78,45 @@ export async function GET(req: Request) {
     );
   }
 
-  const rows = reviewsResult.rows;
-  const providerReport = buildProviderAppointmentReport(outreachResult.rows);
+  let rows = reviewsResult.rows;
+  if (!includeTests) {
+    const testTokenResult = await findTestSurveyOutreachTokens(
+      rows.map((row) => row.survey_token).filter((token): token is string => Boolean(token)),
+    );
+    if (!testTokenResult.ok) {
+      return NextResponse.json({ error: testTokenResult.error }, { status: 500 });
+    }
+    const testTokens = new Set(testTokenResult.tokens);
+    rows = rows.filter((row) => !row.survey_token || !testTokens.has(row.survey_token));
+  }
+
+  const reviews = rows.map(toAppointmentReviewDetail);
+  const providerNamesBySurveyToken = new Map<string, string[]>();
+  rows.forEach((row, index) => {
+    if (!row.survey_token) return;
+    const providerNames = reviews[index].providerRatings.map((provider) => provider.providerLabel);
+    if (providerNames.length > 0) providerNamesBySurveyToken.set(row.survey_token, providerNames);
+  });
+  const reportOutreachRows = outreachResult.rows.map((row) => ({
+    ...row,
+    provider_names:
+      row.provider_names?.length > 0
+        ? row.provider_names
+        : providerNamesBySurveyToken.get(row.survey_token) ?? [],
+  }));
+  const providerReport = buildProviderAppointmentReport(reportOutreachRows);
 
   return NextResponse.json(
     {
       dateStart: range.dateStart,
       dateEnd: range.dateEnd,
+      includeTests,
       numberSent: outreachResult.rows.length,
       numberResponses: rows.length,
       stats: buildAppointmentReviewStats(rows),
       providers: providerReport.providers,
       appointments: providerReport.appointments,
-      reviews: rows.map(toAppointmentReviewDetail),
+      reviews,
       ready: true,
     },
     { headers: { "Cache-Control": "private, no-store, max-age=0" } },

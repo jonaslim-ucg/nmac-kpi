@@ -16,6 +16,7 @@ export type AppointmentReviewReportRangeResult =
 
 export type SurveyReportOutreachRow = {
   id: string;
+  survey_token: string;
   crm_appointment_id: string | null;
   crm_appointment_ids: string[] | null;
   appointment_date: string | null;
@@ -24,6 +25,7 @@ export type SurveyReportOutreachRow = {
   provider_names: string[] | null;
   initial_sent_at: string | null;
   completed_at: string | null;
+  is_test: boolean;
 };
 
 export type ProviderAppointmentReport = {
@@ -36,6 +38,7 @@ export type ProviderAppointmentReport = {
 
 export type SurveyAppointmentReport = {
   outreachId: string;
+  isTest: boolean;
   appointmentDate: string | null;
   appointmentAt: string | null;
   appointmentIds: string[];
@@ -205,9 +208,14 @@ function providerCountsForRow(row: SurveyReportOutreachRow): {
     (providerName) => !mappedProviderKeys.has(providerName.toLocaleLowerCase()),
   );
   const unmappedIds = ids.filter((id) => !mappedIds.has(id));
+  const inferredSingleMapping =
+    assignments.length === 0 && missingProviders.length === 1 && ids.length === 1;
 
   if (missingProviders.length === 1 && assignments.length === 0) {
     increment(missingProviders[0], Math.max(ids.length, 1), ids.length > 1);
+    if (inferredSingleMapping) {
+      assignments.push({ appointmentId: ids[0], providerName: missingProviders[0] });
+    }
   } else {
     for (const providerName of missingProviders) increment(providerName, 1, true);
   }
@@ -217,7 +225,7 @@ function providerCountsForRow(row: SurveyReportOutreachRow): {
     assignments,
     mappingComplete:
       (missingProviders.length === 0 && unmappedIds.length === 0) ||
-      (assignments.length === 0 && missingProviders.length === 1 && ids.length <= 1),
+      inferredSingleMapping,
   };
 }
 
@@ -248,6 +256,7 @@ export function buildProviderAppointmentReport(rows: readonly SurveyReportOutrea
 
     return {
       outreachId: row.id,
+      isTest: row.is_test,
       appointmentDate: row.appointment_date,
       appointmentAt: row.appointment_at,
       appointmentIds: ids,

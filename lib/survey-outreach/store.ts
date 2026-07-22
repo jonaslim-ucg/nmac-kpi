@@ -503,6 +503,7 @@ export type SurveyOutreachListResult = {
 export type SurveyOutreachReportFilters = {
   sentFrom?: string;
   sentBefore?: string;
+  includeTests?: boolean;
 };
 
 type SurveyOutreachReportResult =
@@ -528,12 +529,12 @@ export async function listSurveyOutreachForReport(
       let query = supabase
         .from("survey_outreach")
         .select("*", { count: "exact" })
-        .eq("is_test", false)
         .is("merged_into_outreach_id", null)
         .not("initial_sent_at", "is", null)
         .order("initial_sent_at", { ascending: false })
         .order("id", { ascending: false });
 
+      if (!filters.includeTests) query = query.eq("is_test", false);
       if (filters.sentFrom) query = query.gte("initial_sent_at", filters.sentFrom);
       if (filters.sentBefore) query = query.lt("initial_sent_at", filters.sentBefore);
 
@@ -556,6 +557,40 @@ export async function listSurveyOutreachForReport(
     return { ok: true, rows };
   } catch {
     return { ok: false, error: "Could not load sent survey data." };
+  }
+}
+
+type SurveyOutreachTestTokenResult =
+  | { ok: true; tokens: string[] }
+  | { ok: false; error: string };
+
+/** Resolve which linked review tokens belong to test outreach rows. */
+export async function findTestSurveyOutreachTokens(
+  surveyTokens: readonly string[],
+): Promise<SurveyOutreachTestTokenResult> {
+  const tokens = [...new Set(surveyTokens.map((token) => token.trim()).filter(Boolean))];
+  if (tokens.length === 0) return { ok: true, tokens: [] };
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return { ok: false, error: "Survey outreach storage is not available." };
+  }
+
+  try {
+    const supabase = createServiceRoleClient();
+    const testTokens: string[] = [];
+    const batchSize = 100;
+    for (let offset = 0; offset < tokens.length; offset += batchSize) {
+      const batch = tokens.slice(offset, offset + batchSize);
+      const { data, error } = await supabase
+        .from("survey_outreach")
+        .select("survey_token")
+        .eq("is_test", true)
+        .in("survey_token", batch);
+      if (error) return { ok: false, error: "Could not classify test survey responses." };
+      testTokens.push(...(data ?? []).map((row) => String(row.survey_token)));
+    }
+    return { ok: true, tokens: testTokens };
+  } catch {
+    return { ok: false, error: "Could not classify test survey responses." };
   }
 }
 

@@ -66,8 +66,10 @@ export default function AdminAppointmentReviewsPage() {
     setSetupRequired(false);
 
     try {
-      const qs = filter === "all" ? "" : filter === "quarter" ? "?range=quarter" : `?days=${filter}`;
-      const r = await fetch(`/api/admin/appointment-reviews${qs}`, { credentials: "include" });
+      const params = new URLSearchParams({ includeTests: "true" });
+      if (filter === "quarter") params.set("range", "quarter");
+      if (filter === "30" || filter === "90") params.set("days", filter);
+      const r = await fetch(`/api/admin/appointment-reviews?${params}`, { credentials: "include" });
       const j = (await r.json()) as ApiResponse;
       if (!r.ok) {
         if (j.setupRequired) {

@@ -65,18 +65,23 @@ export function parseCrmAppointmentAt(
   }
 
   const rawTime = appointmentTime.trim();
-  const hasExplicitOffset = /[zZ]|[+-]\d{2}(?::?\d{2})?$/.test(rawTime);
-  if (!rawTime.includes("T") && !hasExplicitOffset) {
-    return clinicLocalDateTimeToUtc(datePart, rawTime);
+  if (!rawTime.includes("T")) {
+    // The CRM serializes its clinic-local time column with a +00 suffix. Since
+    // the date is supplied separately, treat every time-only value as a
+    // Bermuda wall-clock time rather than shifting it as a UTC instant.
+    const clinicTime = rawTime.replace(/(?:[zZ]|[+-]\d{2}(?::?\d{2})?)$/, "");
+    return clinicLocalDateTimeToUtc(datePart, clinicTime);
   }
-  if (rawTime.includes("T") && !hasExplicitOffset) {
+
+  const hasExplicitOffset = /[zZ]|[+-]\d{2}(?::?\d{2})?$/.test(rawTime);
+  if (!hasExplicitOffset) {
     const localDateTime = /^(\d{4}-\d{2}-\d{2})T(.+)$/.exec(rawTime);
     return localDateTime
       ? clinicLocalDateTimeToUtc(localDateTime[1], localDateTime[2])
       : null;
   }
 
-  let timePart = rawTime.includes("T") ? rawTime : `${datePart}T${rawTime}`;
+  let timePart = rawTime;
   timePart = timePart.replace(/([+-]\d{2})$/, "$1:00");
   const parsed = new Date(timePart);
   return isNaN(parsed.getTime()) ? null : parsed;

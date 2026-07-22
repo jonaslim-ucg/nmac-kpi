@@ -16,9 +16,16 @@ test("interprets a bare winter appointment time in Bermuda", () => {
   );
 });
 
-test("preserves an explicit CRM timezone offset", () => {
+test("treats the CRM time-only +00 suffix as Bermuda clinic time", () => {
   assert.equal(
     parseCrmAppointmentAt("2026-07-15", "09:00:00+00")?.toISOString(),
+    "2026-07-15T12:00:00.000Z",
+  );
+});
+
+test("preserves an explicit offset on a full CRM timestamp", () => {
+  assert.equal(
+    parseCrmAppointmentAt("2026-07-15", "2026-07-15T09:00:00+00")?.toISOString(),
     "2026-07-15T09:00:00.000Z",
   );
 });

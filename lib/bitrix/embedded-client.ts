@@ -60,16 +60,26 @@ function withTimeout<T>(ms: number, promise: Promise<T>): Promise<T | null> {
   });
 }
 
-/** True when the page is likely embedded (iframe) or opened from a Bitrix host. */
+export function hasBitrixEmbedSignals(input: {
+  referrer: string;
+  search: string;
+  hasBitrixSdk?: boolean;
+}): boolean {
+  return (
+    input.hasBitrixSdk === true ||
+    /bitrix24\.com/i.test(input.referrer) ||
+    /[?&]DOMAIN=/i.test(input.search)
+  );
+}
+
+/** True only when the page has a Bitrix-specific signal, not merely because it is inside an iframe. */
 export function isLikelyBitrixEmbed(): boolean {
   if (typeof window === "undefined") return false;
-  try {
-    if (window.self !== window.top) return true;
-  } catch {
-    return true;
-  }
-  if (/bitrix24\.com/i.test(document.referrer)) return true;
-  return /[?&]DOMAIN=/i.test(window.location.search);
+  return hasBitrixEmbedSignals({
+    referrer: document.referrer,
+    search: window.location.search,
+    hasBitrixSdk: Boolean(window.BX24),
+  });
 }
 
 /**

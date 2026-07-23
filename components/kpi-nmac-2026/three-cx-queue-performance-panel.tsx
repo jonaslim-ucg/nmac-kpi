@@ -335,7 +335,7 @@ export function ThreeCxQueuePerformancePanel({ year, monthIndex, onMonthSelect }
   const tableRows = useMemo(() => dataOnlyReportRows(rows.length > 0 ? rows : fallbackReportRows(metrics)), [metrics, rows]);
   const displayedRows = useMemo(() => visibleReportRows(tableRows, expandedQueues), [expandedQueues, tableRows]);
 
-  const answerRate = metrics ? `${metrics.answeredRate}%` : "–";
+  const answerRate = metrics ? `${metrics.answeredRate.toFixed(1)}%` : "–";
 
   return (
     <div className="flex flex-col gap-4">

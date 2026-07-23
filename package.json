@@ -8,8 +8,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npm run test:auth && npm run test:scheduler",
+    "test": "npm run test:auth && npm run test:3cx && npm run test:scheduler",
     "test:auth": "node --experimental-strip-types --test tests/auth/*.test.mts",
+    "test:3cx": "node --experimental-strip-types --test tests/3cx/*.test.mts",
     "test:scheduler": "node --experimental-strip-types --test tests/survey-outreach/*.test.mts"
   },
   "dependencies": {

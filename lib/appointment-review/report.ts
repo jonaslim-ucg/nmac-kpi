@@ -8,6 +8,20 @@ export type AppointmentReviewReportRange = {
   dateEnd: string | null;
   startAt?: string;
   endBefore?: string;
+  quarter?: AppointmentReviewQuarter;
+};
+
+export type AppointmentReviewQuarter = {
+  id: string;
+  year: number;
+  quarter: 1 | 2 | 3 | 4;
+  label: string;
+  dateStart: string;
+  dateEnd: string;
+  resultsFinalDate: string;
+  announcementStartDate: string;
+  announcementEndDate: string;
+  status: "upcoming" | "open" | "closed";
 };
 
 export type AppointmentReviewReportRangeResult =
@@ -84,6 +98,58 @@ function clinicDayStart(value: string): string {
   return parsed.toISOString();
 }
 
+function quarterStart(year: number, quarter: 1 | 2 | 3 | 4): string {
+  const month = (quarter - 1) * 3 + 1;
+  return `${year}-${String(month).padStart(2, "0")}-01`;
+}
+
+function nextQuarterStart(year: number, quarter: 1 | 2 | 3 | 4): string {
+  return quarter === 4 ? `${year + 1}-01-01` : quarterStart(year, (quarter + 1) as 1 | 2 | 3 | 4);
+}
+
+export function appointmentReviewQuarter(
+  year: number,
+  quarter: 1 | 2 | 3 | 4,
+  now = new Date(),
+): AppointmentReviewQuarter {
+  const dateStart = quarterStart(year, quarter);
+  const nextStart = nextQuarterStart(year, quarter);
+  const dateEnd = addCalendarDays(nextStart, -1);
+  const clinicToday = clinicCalendarDate(now);
+  const status = clinicToday < dateStart ? "upcoming" : clinicToday > dateEnd ? "closed" : "open";
+
+  return {
+    id: `${year}-Q${quarter}`,
+    year,
+    quarter,
+    label: `Q${quarter} ${year}`,
+    dateStart,
+    dateEnd,
+    resultsFinalDate: nextStart,
+    announcementStartDate: nextStart,
+    announcementEndDate: addCalendarDays(nextStart, 13),
+    status,
+  };
+}
+
+export function currentAppointmentReviewQuarter(now = new Date()): AppointmentReviewQuarter {
+  const clinicToday = clinicCalendarDate(now);
+  const [year, month] = clinicToday.split("-").map(Number);
+  const quarter = (Math.floor((month - 1) / 3) + 1) as 1 | 2 | 3 | 4;
+  return appointmentReviewQuarter(year, quarter, now);
+}
+
+function quarterReportRange(quarter: AppointmentReviewQuarter): AppointmentReviewReportRange {
+  const endBefore = addCalendarDays(quarter.dateEnd, 1);
+  return {
+    dateStart: quarter.dateStart,
+    dateEnd: quarter.dateEnd,
+    startAt: clinicDayStart(quarter.dateStart),
+    endBefore: clinicDayStart(endBefore),
+    quarter,
+  };
+}
+
 function customDateParam(searchParams: URLSearchParams, primary: string, alias: string): string | null {
   return searchParams.get(primary) ?? searchParams.get(alias);
 }
@@ -117,22 +183,26 @@ export function parseAppointmentReviewReportRange(
     };
   }
 
-  if (searchParams.get("range") === "quarter") {
-    const clinicToday = clinicCalendarDate(now);
-    const [year, month] = clinicToday.split("-").map(Number);
-    const quarterStartMonth = Math.floor((month - 1) / 3) * 3 + 1;
-    const start = `${year}-${String(quarterStartMonth).padStart(2, "0")}-01`;
-    const nextQuarterYear = quarterStartMonth === 10 ? year + 1 : year;
-    const nextQuarterMonth = quarterStartMonth === 10 ? 1 : quarterStartMonth + 3;
-    const nextQuarter = `${nextQuarterYear}-${String(nextQuarterMonth).padStart(2, "0")}-01`;
+  const quarterParam = searchParams.get("quarter");
+  if (quarterParam !== null) {
+    const match = /^(\d{4})-Q([1-4])$/.exec(quarterParam);
+    const year = match ? Number(match[1]) : NaN;
+    const quarter = match ? Number(match[2]) : NaN;
+    if (!match || !Number.isInteger(year) || year < 2000 || year > 2100) {
+      return { ok: false, error: "quarter must use YYYY-Q1 through YYYY-Q4." };
+    }
     return {
       ok: true,
-      range: {
-        dateStart: start,
-        dateEnd: addCalendarDays(nextQuarter, -1),
-        startAt: clinicDayStart(start),
-        endBefore: clinicDayStart(nextQuarter),
-      },
+      range: quarterReportRange(
+        appointmentReviewQuarter(year, quarter as 1 | 2 | 3 | 4, now),
+      ),
+    };
+  }
+
+  if (searchParams.get("range") === "quarter") {
+    return {
+      ok: true,
+      range: quarterReportRange(currentAppointmentReviewQuarter(now)),
     };
   }
 

@@ -53,6 +53,48 @@ test("rejects invalid and reversed date filters", () => {
   );
 });
 
+test("parses an explicit quarter with its close and announcement dates", () => {
+  const result = parseAppointmentReviewReportRange(
+    new URLSearchParams({ quarter: "2026-Q3" }),
+    new Date("2026-07-23T12:00:00.000Z"),
+  );
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual(result.range, {
+    dateStart: "2026-07-01",
+    dateEnd: "2026-09-30",
+    startAt: "2026-07-01T03:00:00.000Z",
+    endBefore: "2026-10-01T03:00:00.000Z",
+    quarter: {
+      id: "2026-Q3",
+      year: 2026,
+      quarter: 3,
+      label: "Q3 2026",
+      dateStart: "2026-07-01",
+      dateEnd: "2026-09-30",
+      resultsFinalDate: "2026-10-01",
+      announcementStartDate: "2026-10-01",
+      announcementEndDate: "2026-10-14",
+      status: "open",
+    },
+  });
+});
+
+test("marks a finished quarter closed and rejects malformed quarter filters", () => {
+  const result = parseAppointmentReviewReportRange(
+    new URLSearchParams({ quarter: "2026-Q3" }),
+    new Date("2026-10-15T12:00:00.000Z"),
+  );
+
+  assert.equal(result.ok, true);
+  if (result.ok) assert.equal(result.range.quarter?.status, "closed");
+  assert.deepEqual(
+    parseAppointmentReviewReportRange(new URLSearchParams({ quarter: "Q3-2026" })),
+    { ok: false, error: "quarter must use YYYY-Q1 through YYYY-Q4." },
+  );
+});
+
 test("counts exact appointment-to-provider mappings and survey responses", () => {
   const result = buildProviderAppointmentReport([
     outreach({

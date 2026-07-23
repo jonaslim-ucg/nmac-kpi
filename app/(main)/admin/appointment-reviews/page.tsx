@@ -5,11 +5,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppointmentReviewDashboard } from "@/components/appointment-review/appointment-review-dashboard";
 import { AppointmentReviewDetailModal } from "@/components/appointment-review/appointment-review-detail-modal";
 import { AppointmentReviewList } from "@/components/appointment-review/appointment-review-list";
+import { QuarterlyDrawSummary } from "@/components/appointment-review/quarterly-draw-summary";
 import { MainShell } from "@/components/dashboard/main-shell";
 import { useDashboardPreferences } from "@/components/auth/dashboard-preferences-provider";
 import { useSession } from "@/components/auth/session-provider";
 import type { AppointmentReviewStats } from "@/lib/appointment-review/analytics";
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
+import type { AppointmentReviewQuarter } from "@/lib/appointment-review/report";
 import { APPOINTMENT_REVIEWS_SETUP_SQL } from "@/lib/appointment-review/store";
 import { isNmacNavHrefAllowed } from "@/lib/auth/role-nmac-nav";
 
@@ -19,10 +21,30 @@ type Tab = "overview" | "reviews";
 type ApiResponse = {
   stats?: AppointmentReviewStats;
   reviews?: AppointmentReviewDetail[];
+  quarter?: AppointmentReviewQuarter | null;
+  currentQuarter?: AppointmentReviewQuarter;
+  eligibleEntries?: number | null;
   error?: string;
   setupRequired?: boolean;
   setupSql?: string;
 };
+
+function availableQuarters(current: AppointmentReviewQuarter | null): { id: string; label: string }[] {
+  if (!current) return [];
+  const firstYear = Math.max(2026, current.year - 3);
+  const options: { id: string; label: string }[] = [];
+  for (let year = current.year; year >= firstYear; year--) {
+    const lastQuarter = year === current.year ? current.quarter : 4;
+    for (let quarter = lastQuarter; quarter >= 1; quarter--) {
+      const id = `${year}-Q${quarter}`;
+      options.push({
+        id,
+        label: `Q${quarter} ${year}${id === current.id ? " (Current)" : ""}`,
+      });
+    }
+  }
+  return options;
+}
 
 export default function AdminAppointmentReviewsPage() {
   const { user, loading } = useSession();
@@ -33,7 +55,11 @@ export default function AdminAppointmentReviewsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [setupRequired, setSetupRequired] = useState(false);
-  const [period, setPeriod] = useState<ReviewPeriod>("all");
+  const [period, setPeriod] = useState<ReviewPeriod>("quarter");
+  const [selectedQuarter, setSelectedQuarter] = useState<string | null>(null);
+  const [quarter, setQuarter] = useState<AppointmentReviewQuarter | null>(null);
+  const [currentQuarter, setCurrentQuarter] = useState<AppointmentReviewQuarter | null>(null);
+  const [eligibleEntries, setEligibleEntries] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>("overview");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -45,11 +71,12 @@ export default function AdminAppointmentReviewsPage() {
     [reviews, selectedId],
   );
   const selectedReview = selectedIndex >= 0 ? reviews[selectedIndex] : null;
+  const quarterOptions = useMemo(() => availableQuarters(currentQuarter), [currentQuarter]);
 
   const periodLabel = useMemo(() => {
     switch (period) {
       case "quarter":
-        return "This quarter";
+        return quarter?.label ?? "Current quarter";
       case "30":
         return "Last 30 days";
       case "90":
@@ -57,17 +84,24 @@ export default function AdminAppointmentReviewsPage() {
       default:
         return "All";
     }
-  }, [period]);
+  }, [period, quarter]);
 
-  const load = useCallback(async (filter: ReviewPeriod, silent = false) => {
+  const load = useCallback(async (
+    filter: ReviewPeriod,
+    quarterId: string | null,
+    silent = false,
+  ) => {
     if (!silent) setInitialLoading(true);
     else setRefreshing(true);
     setLoadError(null);
     setSetupRequired(false);
 
     try {
-      const params = new URLSearchParams({ includeTests: "true" });
-      if (filter === "quarter") params.set("range", "quarter");
+      const params = new URLSearchParams({ includeTests: "false" });
+      if (filter === "quarter") {
+        if (quarterId) params.set("quarter", quarterId);
+        else params.set("range", "quarter");
+      }
       if (filter === "30" || filter === "90") params.set("days", filter);
       const r = await fetch(`/api/admin/appointment-reviews?${params}`, { credentials: "include" });
       const j = (await r.json()) as ApiResponse;
@@ -80,14 +114,21 @@ export default function AdminAppointmentReviewsPage() {
         }
         setStats(null);
         setReviews([]);
+        setQuarter(null);
+        setEligibleEntries(null);
         return;
       }
       setStats(j.stats ?? null);
       setReviews(j.reviews ?? []);
+      setQuarter(j.quarter ?? null);
+      setCurrentQuarter(j.currentQuarter ?? null);
+      setEligibleEntries(typeof j.eligibleEntries === "number" ? j.eligibleEntries : null);
     } catch {
       setLoadError("Could not load results.");
       setStats(null);
       setReviews([]);
+      setQuarter(null);
+      setEligibleEntries(null);
     } finally {
       setInitialLoading(false);
       setRefreshing(false);
@@ -96,8 +137,8 @@ export default function AdminAppointmentReviewsPage() {
 
   useEffect(() => {
     if (loading || !allowed) return;
-    void load(period);
-  }, [allowed, load, loading, period]);
+    void load(period, selectedQuarter);
+  }, [allowed, load, loading, period, selectedQuarter]);
 
   const viewReview = useCallback((id: string) => {
     setSelectedId(id);
@@ -154,7 +195,7 @@ export default function AdminAppointmentReviewsPage() {
             {(
               [
                 { id: "all", label: "All time" },
-                { id: "quarter", label: "This quarter" },
+                { id: "quarter", label: "Quarterly" },
                 { id: "30", label: "Last 30 days" },
                 { id: "90", label: "Last 90 days" },
               ] as const
@@ -176,11 +217,26 @@ export default function AdminAppointmentReviewsPage() {
                 {label}
               </button>
             ))}
+            {period === "quarter" && quarterOptions.length > 0 ? (
+              <select
+                aria-label="Survey quarter"
+                value={selectedQuarter ?? quarter?.id ?? currentQuarter?.id ?? ""}
+                onChange={(event) => {
+                  setSelectedQuarter(event.target.value);
+                  setSelectedId(null);
+                }}
+                className="h-[34px] rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground outline-none transition focus:border-accent"
+              >
+                {quarterOptions.map((option) => (
+                  <option key={option.id} value={option.id}>{option.label}</option>
+                ))}
+              </select>
+            ) : null}
           </div>
         </div>
         <button
           type="button"
-          onClick={() => void load(period, true)}
+          onClick={() => void load(period, selectedQuarter, true)}
           disabled={refreshing}
           className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-surface-muted/80 disabled:opacity-50 sm:w-auto"
         >
@@ -188,6 +244,10 @@ export default function AdminAppointmentReviewsPage() {
           Refresh
         </button>
       </div>
+
+      {period === "quarter" && quarter && eligibleEntries !== null ? (
+        <QuarterlyDrawSummary quarter={quarter} eligibleEntries={eligibleEntries} />
+      ) : null}
 
       {loadError ? (
         <div className="dashboard-card mb-6 p-5">

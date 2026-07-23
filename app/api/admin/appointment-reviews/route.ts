@@ -6,6 +6,7 @@ import { APPOINTMENT_REVIEWS_SETUP_SQL, listAppointmentReviews } from "@/lib/app
 import {
   buildResponseOnlyAppointmentReport,
   buildProviderAppointmentReport,
+  currentAppointmentReviewQuarter,
   mergeProviderAppointmentReports,
   parseAppointmentReviewReportRange,
 } from "@/lib/appointment-review/report";
@@ -39,7 +40,8 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
-  const parsedRange = parseAppointmentReviewReportRange(url.searchParams);
+  const now = new Date();
+  const parsedRange = parseAppointmentReviewReportRange(url.searchParams, now);
   if (!parsedRange.ok) {
     return NextResponse.json({ error: parsedRange.error }, { status: 400 });
   }
@@ -137,6 +139,9 @@ export async function GET(req: Request) {
       includeTests,
       numberSent: outreachResult.rows.length,
       numberResponses: rows.length,
+      quarter: range.quarter ?? null,
+      currentQuarter: currentAppointmentReviewQuarter(now),
+      eligibleEntries: range.quarter && !includeTests ? rows.length : null,
       stats: buildAppointmentReviewStats(rows),
       providers: providerReport.providers,
       appointments: providerReport.appointments,

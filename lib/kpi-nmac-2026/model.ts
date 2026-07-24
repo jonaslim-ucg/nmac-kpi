@@ -84,6 +84,8 @@ export const KPIs: KpiRow[] = [
 export const DEFAULT_HIDDEN_NMAC_KPI_IDS = [
   "call_answered",
   "call_missed",
+  "leakage",
+  "eod",
   "checkin_checkout",
   "appt_confirm",
   "sop",
@@ -92,6 +94,9 @@ export const DEFAULT_HIDDEN_NMAC_KPI_IDS = [
   "net_margin",
   "revenue_trend",
 ] as const;
+
+/** KPIs kept out of reporting until their definitions and data sources are confirmed. */
+export const TEMPORARILY_HIDDEN_NMAC_KPI_IDS = ["leakage", "eod"] as const;
 
 export const DEVELOPER_HIDDEN_KPI_IDS = DEFAULT_HIDDEN_NMAC_KPI_IDS;
 
@@ -107,11 +112,16 @@ export function normalizeHiddenNmacKpiIds(raw: unknown): string[] {
     seen.add(value);
     out.push(value);
   }
+  for (const id of TEMPORARILY_HIDDEN_NMAC_KPI_IDS) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
   return out;
 }
 
 function hiddenKpiSet(hiddenIds: readonly string[] = DEFAULT_HIDDEN_NMAC_KPI_IDS): Set<string> {
-  return new Set(hiddenIds);
+  return new Set([...hiddenIds, ...TEMPORARILY_HIDDEN_NMAC_KPI_IDS]);
 }
 
 export function isNmacKpiVisible(id: string, hiddenIds: readonly string[] = DEFAULT_HIDDEN_NMAC_KPI_IDS): boolean {

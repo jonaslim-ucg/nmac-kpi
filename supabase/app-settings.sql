@@ -11,13 +11,23 @@ create table if not exists public.app_settings (
   survey_outreach_last_error text,
   survey_outreach_last_result jsonb,
   nmac_month_cache_revision bigint not null default 0,
-  hidden_nmac_kpi_ids jsonb not null default '["call_answered","call_missed","checkin_checkout","appt_confirm","sop","engage","revenue","net_margin","revenue_trend"]'::jsonb,
+  hidden_nmac_kpi_ids jsonb not null default '["call_answered","call_missed","leakage","eod","checkin_checkout","appt_confirm","sop","engage","revenue","net_margin","revenue_trend"]'::jsonb,
   updated_at timestamptz not null default now(),
   constraint app_settings_singleton check (id = 'default')
 );
 
 alter table public.app_settings
-  add column if not exists hidden_nmac_kpi_ids jsonb not null default '["call_answered","call_missed","checkin_checkout","appt_confirm","sop","engage","revenue","net_margin","revenue_trend"]'::jsonb;
+  add column if not exists hidden_nmac_kpi_ids jsonb not null default '["call_answered","call_missed","leakage","eod","checkin_checkout","appt_confirm","sop","engage","revenue","net_margin","revenue_trend"]'::jsonb;
+
+update public.app_settings
+set hidden_nmac_kpi_ids = hidden_nmac_kpi_ids || '["leakage"]'::jsonb
+where id = 'default'
+  and not hidden_nmac_kpi_ids @> '["leakage"]'::jsonb;
+
+update public.app_settings
+set hidden_nmac_kpi_ids = hidden_nmac_kpi_ids || '["eod"]'::jsonb
+where id = 'default'
+  and not hidden_nmac_kpi_ids @> '["eod"]'::jsonb;
 
 alter table public.app_settings
   add column if not exists survey_outreach_sending_enabled boolean not null default false;

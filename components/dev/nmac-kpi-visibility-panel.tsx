@@ -9,10 +9,12 @@ import {
   DEFAULT_HIDDEN_NMAC_KPI_IDS,
   DOMAINS_ORDER,
   KPIs,
+  TEMPORARILY_HIDDEN_NMAC_KPI_IDS,
   type KpiRow,
 } from "@/lib/kpi-nmac-2026/model";
 
 type Feedback = { tone: "ok" | "err"; text: string } | null;
+const TEMPORARILY_HIDDEN_SET = new Set<string>(TEMPORARILY_HIDDEN_NMAC_KPI_IDS);
 
 function matchesQuery(kpi: KpiRow, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -149,10 +151,16 @@ export function NmacKpiVisibilityPanel() {
           <button
             type="button"
             disabled={savingId !== null}
-            onClick={() => void saveHidden([], "All KPIs are visible.", "show-all")}
+            onClick={() =>
+              void saveHidden(
+                [...TEMPORARILY_HIDDEN_NMAC_KPI_IDS],
+                "All configurable KPIs are visible.",
+                "show-all",
+              )
+            }
             className="inline-flex min-h-[38px] items-center justify-center rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground transition hover:bg-accent-muted/40 disabled:opacity-50"
           >
-            Show all
+            Show all configurable
           </button>
         </div>
       </div>
@@ -186,6 +194,7 @@ export function NmacKpiVisibilityPanel() {
                 <div className="divide-y divide-border">
                   {rows.map((kpi) => {
                     const hidden = hiddenSet.has(kpi.id);
+                    const temporarilyHidden = TEMPORARILY_HIDDEN_SET.has(kpi.id);
                     const saving = savingId === kpi.id;
                     return (
                       <div key={kpi.id} className="flex items-center justify-between gap-4 px-3 py-3">
@@ -199,7 +208,7 @@ export function NmacKpiVisibilityPanel() {
                             <p className="truncate text-sm font-medium text-foreground">{kpi.label}</p>
                           </div>
                           <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                            {kpi.id} · {hidden ? "Hidden" : "Visible"}
+                            {kpi.id} · {temporarilyHidden ? "Temporarily hidden" : hidden ? "Hidden" : "Visible"}
                           </p>
                         </div>
                         {saving ? (
@@ -207,7 +216,7 @@ export function NmacKpiVisibilityPanel() {
                         ) : null}
                         <Toggle
                           checked={!hidden}
-                          disabled={savingId !== null}
+                          disabled={savingId !== null || temporarilyHidden}
                           label={`${kpi.label}: ${hidden ? "hidden" : "visible"}`}
                           onClick={() => void toggleKpi(kpi)}
                         />

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildSurveyEmail } from "../../lib/survey-outreach/emails.ts";
+import { surveyBaseUrl } from "../../lib/survey-outreach/urls.ts";
 
 test("builds an action-oriented initial survey email from a CRM-formatted name", () => {
   const email = buildSurveyEmail("initial", "Flood, Amani", "survey-token");
@@ -43,4 +44,15 @@ test("keeps the action-needed prefix on reminder subjects", () => {
     buildSurveyEmail("final", "Dr. Amani Flood", "token").textBody,
     /^Hi Amani,/,
   );
+});
+
+test("uses the branded survey domain instead of a Vercel deployment URL", () => {
+  const previousVercelUrl = process.env.VERCEL_URL;
+  process.env.VERCEL_URL = "nmac-example-deployment.vercel.app";
+  try {
+    assert.equal(surveyBaseUrl(), "https://kpi.nmac.bm");
+  } finally {
+    if (previousVercelUrl === undefined) delete process.env.VERCEL_URL;
+    else process.env.VERCEL_URL = previousVercelUrl;
+  }
 });

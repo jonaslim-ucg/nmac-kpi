@@ -80,16 +80,19 @@ export default function DevLogsPage() {
   const [setupSql, setSetupSql] = useState<string | null>(null);
   const [filter, setFilter] = useState<ActivityFilter>("all");
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const loadedRef = useRef(false);
+  const requestIdRef = useRef(0);
 
   const refresh = useCallback(async (silent = false) => {
+    const requestId = ++requestIdRef.current;
     if (silent) setRefreshing(true);
     else setInitialLoading(true);
     setLoadError(null);
     if (!silent) setSetupRequired(false);
     try {
-      const r = await fetch("/api/dev/logs?limit=200", { credentials: "include", cache: "no-store" });
+      const params = new URLSearchParams({ limit: "200", type: filter });
+      const r = await fetch(`/api/dev/logs?${params}`, { credentials: "include", cache: "no-store" });
       const j = (await r.json()) as LogsResponse;
+      if (requestId !== requestIdRef.current) return;
       if (j.setupRequired) {
         setSetupRequired(true);
         setSetupSql(j.setupSql ?? null);
@@ -105,17 +108,18 @@ export default function DevLogsPage() {
       setSetupRequired(false);
       setRows((j.logs ?? []).filter(isActivityEntry));
     } catch {
+      if (requestId !== requestIdRef.current) return;
       setLoadError("Could not load activity.");
       if (!silent) setRows([]);
     } finally {
+      if (requestId !== requestIdRef.current) return;
       setInitialLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [filter]);
 
   useEffect(() => {
-    if (loading || !canAccessDev(user?.role) || loadedRef.current) return;
-    loadedRef.current = true;
+    if (loading || !canAccessDev(user?.role)) return;
     void refresh(false);
   }, [loading, user?.role, refresh]);
 

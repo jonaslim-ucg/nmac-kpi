@@ -44,6 +44,13 @@ export type DevLogsListResult = {
   error?: string;
 };
 
+export const DEV_LOG_ACTIVITY_FILTERS = ["all", "login", "kpi", "admin"] as const;
+export type DevLogActivityFilter = (typeof DEV_LOG_ACTIVITY_FILTERS)[number];
+
+export function isDevLogActivityFilter(value: unknown): value is DevLogActivityFilter {
+  return typeof value === "string" && (DEV_LOG_ACTIVITY_FILTERS as readonly string[]).includes(value);
+}
+
 function rowToEntry(row: DevLogRow): DevLogEntry {
   return {
     id: row.id,
@@ -119,12 +126,27 @@ export async function appendDevLog(input: AppendDevLogInput): Promise<AppendDevL
   }
 }
 
-export async function listDevLogs(limit = 100): Promise<DevLogsListResult> {
+export async function listDevLogs(
+  limit = 100,
+  activityFilter: DevLogActivityFilter = "all",
+): Promise<DevLogsListResult> {
   try {
     const supabase = createServiceRoleClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from("app_dev_logs")
-      .select("id,level,message,source,context,created_by_email,created_at")
+      .select("id,level,message,source,context,created_by_email,created_at");
+
+    if (activityFilter === "login") {
+      query = query.eq("source", "auth");
+    } else if (activityFilter === "kpi") {
+      query = query.like("source", "kpi.%");
+    } else if (activityFilter === "admin") {
+      query = query.like("source", "admin.%");
+    } else {
+      query = query.or("source.eq.auth,source.like.kpi.%,source.like.admin.%");
+    }
+
+    const { data, error } = await query
       .order("created_at", { ascending: false })
       .limit(Math.min(Math.max(limit, 1), 500));
 

@@ -79,6 +79,6 @@ export async function POST(req: Request) {
     user: { email: session.user.email, role: session.user.role },
   });
   applySessionCookie(res, session.token);
-  auditAuthSignedIn({ email: session.user.email, role: session.user.role }, "email_otp");
+  await auditAuthSignedIn({ email: session.user.email, role: session.user.role }, "email_otp");
   return res;
 }

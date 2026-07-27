@@ -120,7 +120,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     changes.last_name = { from: target.last_name, to: updates.last_name };
   }
   if (Object.keys(changes).length > 0) {
-    auditAdminUserUpdated(
+    await auditAdminUserUpdated(
       { email: session.email, role: session.role },
       { email: (data.email as string) ?? (target.email as string), changes },
     );
@@ -168,7 +168,7 @@ export async function DELETE(_req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "Could not remove user." }, { status: 500 });
   }
 
-  auditAdminUserRemoved({ email: session.email, role: session.role }, { email });
+  await auditAdminUserRemoved({ email: session.email, role: session.role }, { email });
 
   return NextResponse.json({ ok: true });
 }

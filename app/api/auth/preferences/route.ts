@@ -106,7 +106,7 @@ export async function PATCH(req: Request) {
       return before !== after;
     });
     if (changedRoles.length > 0) {
-      auditRoleNmacNavUpdated({ email: session.email, role: session.role }, { roles: changedRoles });
+      await auditRoleNmacNavUpdated({ email: session.email, role: session.role }, { roles: changedRoles });
     }
   }
 

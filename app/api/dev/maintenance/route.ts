@@ -50,7 +50,7 @@ export async function PATCH(req: Request) {
   clearMaintenanceModeEdgeCache();
 
   if (previous && previous.maintenanceMode !== settings.maintenanceMode) {
-    auditMaintenanceModeUpdated(
+    await auditMaintenanceModeUpdated(
       { email: session.email, role: session.role },
       { enabled: settings.maintenanceMode },
     );

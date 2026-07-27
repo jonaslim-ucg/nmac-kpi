@@ -96,7 +96,7 @@ export async function POST(req: Request) {
     displayName: bx.user.displayName,
   });
   applySessionCookie(res, session.token, embedded);
-  auditAuthSignedIn(
+  await auditAuthSignedIn(
     { email: session.user.email, role: session.user.role },
     "bitrix",
     { portal: domain, displayName: bx.user.displayName },

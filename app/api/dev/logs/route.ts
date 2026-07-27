@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   clearDevLogs,
   DEV_LOGS_SETUP_SQL,
+  isDevLogActivityFilter,
   listDevLogs,
 } from "@/lib/dev/logs";
 import { getSessionFromCookies } from "@/lib/auth/session";
@@ -23,7 +24,9 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const limitRaw = Number(url.searchParams.get("limit") ?? "100");
-  const result = await listDevLogs(Number.isFinite(limitRaw) ? limitRaw : 100);
+  const activityFilterRaw = url.searchParams.get("type");
+  const activityFilter = isDevLogActivityFilter(activityFilterRaw) ? activityFilterRaw : "all";
+  const result = await listDevLogs(Number.isFinite(limitRaw) ? limitRaw : 100, activityFilter);
 
   if (result.setupRequired) {
     return withSetup({

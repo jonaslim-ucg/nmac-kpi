@@ -6,7 +6,7 @@ import { clearSessionCookieOnResponse } from "@/lib/auth/session-cookie";
 export async function POST() {
   const session = await getSessionFromCookies();
   if (session) {
-    auditAuthSignedOut({ email: session.email, role: session.role });
+    await auditAuthSignedOut({ email: session.email, role: session.role });
   }
 
   const res = NextResponse.json({ ok: true });

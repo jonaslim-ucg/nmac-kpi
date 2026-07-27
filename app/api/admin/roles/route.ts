@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Could not create role." }, { status: 500 });
   }
 
-  auditCustomRoleCreated({ email: session.email, role: session.role }, { roleId: id, label });
+  await auditCustomRoleCreated({ email: session.email, role: session.role }, { roleId: id, label });
 
   return NextResponse.json({ role, customRoles: nextSettings.customRoles });
 }
@@ -94,7 +94,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Could not delete role." }, { status: 500 });
   }
 
-  auditCustomRoleRemoved({ email: session.email, role: session.role }, { roleId, label: target.label });
+  await auditCustomRoleRemoved({ email: session.email, role: session.role }, { roleId, label: target.label });
 
   return NextResponse.json({ customRoles: nextSettings.customRoles });
 }

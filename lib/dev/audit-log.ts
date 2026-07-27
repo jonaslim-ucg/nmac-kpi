@@ -1,4 +1,4 @@
-import { packAuditChanges, summarizeChangeSet, type StoredAuditChanges } from "@/lib/dev/kpi-audit-diff";
+import { summarizeChangeSet, type StoredAuditChanges } from "@/lib/dev/kpi-audit-diff";
 import { appendDevLog } from "@/lib/dev/logs";
 import { MONTHS } from "@/lib/kpi-nmac-2026/model";
 type AuditActor = {
@@ -6,14 +6,13 @@ type AuditActor = {
   role: string;
 };
 
-function fire(input: Parameters<typeof appendDevLog>[0]) {
-  void appendDevLog(input).then((result) => {
-    if (result.setupRequired) {
-      console.error("[audit-log] app_dev_logs table missing — run supabase/add-dev-logs.sql");
-    } else if (result.error) {
-      console.error("[audit-log]", result.error);
-    }
-  });
+async function fire(input: Parameters<typeof appendDevLog>[0]): Promise<void> {
+  const result = await appendDevLog(input);
+  if (result.setupRequired) {
+    console.error("[audit-log] app_dev_logs table missing — run supabase/add-dev-logs.sql");
+  } else if (result.error) {
+    console.error("[audit-log]", result.error);
+  }
 }
 
 export function auditAuthSignedIn(
@@ -22,7 +21,7 @@ export function auditAuthSignedIn(
   context?: Record<string, unknown>,
 ) {
   const via = method === "bitrix" ? "Bitrix24" : "email code";
-  fire({
+  return fire({
     level: "info",
     source: "auth",
     message: `Signed in via ${via}`,
@@ -32,7 +31,7 @@ export function auditAuthSignedIn(
 }
 
 export function auditAuthSignedOut(actor: AuditActor) {
-  fire({
+  return fire({
     level: "info",
     source: "auth",
     message: "Signed out",
@@ -43,7 +42,7 @@ export function auditAuthSignedOut(actor: AuditActor) {
 
 export function auditAppOpened(actor: AuditActor, via: "bitrix" | "browser") {
   const viaLabel = via === "bitrix" ? "Bitrix24" : "browser";
-  fire({
+  return fire({
     level: "info",
     source: "auth",
     message: `Opened app via ${viaLabel}`,
@@ -68,7 +67,7 @@ export function auditWeeklyKpiSaved(
       : `${input.weekIndices.slice(0, 5).join(", ")}… (+${input.weekIndices.length - 5} more)`;
   const summary = summarizeChangeSet(input.changes);
 
-  fire({
+  return fire({
     level: "info",
     source: "kpi.weekly",
     message: `Saved weekly KPI “${input.kpiSlug}” for ${input.year} (${summary})`,
@@ -91,7 +90,7 @@ export function auditNmacMasterMonthSaved(
 ) {
   const month = MONTHS[input.monthIndex] ?? `Month ${input.monthIndex + 1}`;
   const summary = summarizeChangeSet(input.changes);
-  fire({
+  return fire({
     level: "info",
     source: "kpi.nmac",
     message: `Saved NMAC master actuals for ${month} ${input.year} (${summary})`,
@@ -112,7 +111,7 @@ export function auditNmacTargetsSaved(
   input: { year: number; targetCount: number; changes: StoredAuditChanges },
 ) {
   const summary = summarizeChangeSet(input.changes);
-  fire({
+  return fire({
     level: "info",
     source: "kpi.nmac",
     message: `Updated NMAC FY targets for ${input.year} (${summary})`,
@@ -132,7 +131,7 @@ export function auditNmacTargetMonthSaved(
 ) {
   const month = MONTHS[input.monthIndex] ?? `Month ${input.monthIndex + 1}`;
   const summary = summarizeChangeSet(input.changes);
-  fire({
+  return fire({
     level: "info",
     source: "kpi.nmac",
     message: `Updated NMAC targets for ${month} ${input.year} (${summary})`,
@@ -154,7 +153,7 @@ export function auditNmacTargetMonthCleared(
 ) {
   const month = MONTHS[input.monthIndex] ?? `Month ${input.monthIndex + 1}`;
   const summary = summarizeChangeSet(input.changes);
-  fire({
+  return fire({
     level: "info",
     source: "kpi.nmac",
     message: `Cleared NMAC month targets for ${month} ${input.year} (${summary})`,
@@ -173,7 +172,7 @@ export function auditAdminUserAdded(
   actor: AuditActor,
   input: { email: string; role: string },
 ) {
-  fire({
+  return fire({
     level: "info",
     source: "admin.users",
     message: `Added user ${input.email} as ${input.role}`,
@@ -187,7 +186,7 @@ export function auditAdminUserUpdated(
   input: { email: string; changes: Record<string, unknown> },
 ) {
   const parts = Object.keys(input.changes);
-  fire({
+  return fire({
     level: "info",
     source: "admin.users",
     message: `Updated user ${input.email}${parts.length ? ` (${parts.join(", ")})` : ""}`,
@@ -197,7 +196,7 @@ export function auditAdminUserUpdated(
 }
 
 export function auditAdminUserRemoved(actor: AuditActor, input: { email: string }) {
-  fire({
+  return fire({
     level: "warn",
     source: "admin.users",
     message: `Removed user ${input.email}`,
@@ -207,7 +206,7 @@ export function auditAdminUserRemoved(actor: AuditActor, input: { email: string 
 }
 
 export function auditRoleNmacNavUpdated(actor: AuditActor, input: { roles: string[] }) {
-  fire({
+  return fire({
     level: "info",
     source: "admin.access",
     message: `Updated Master KPI access for ${input.roles.join(", ")}`,
@@ -220,7 +219,7 @@ export function auditCustomRoleCreated(
   actor: AuditActor,
   input: { roleId: string; label: string },
 ) {
-  fire({
+  return fire({
     level: "info",
     source: "admin.roles",
     message: `Created role “${input.label}”`,
@@ -233,7 +232,7 @@ export function auditCustomRoleRemoved(
   actor: AuditActor,
   input: { roleId: string; label: string },
 ) {
-  fire({
+  return fire({
     level: "warn",
     source: "admin.roles",
     message: `Removed role “${input.label}”`,
@@ -243,7 +242,7 @@ export function auditCustomRoleRemoved(
 }
 
 export function auditMaintenanceModeUpdated(actor: AuditActor, input: { enabled: boolean }) {
-  fire({
+  return fire({
     level: input.enabled ? "warn" : "info",
     source: "admin.access",
     message: input.enabled ? "Enabled maintenance mode" : "Disabled maintenance mode",

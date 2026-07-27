@@ -84,7 +84,7 @@ export async function POST(req: Request) {
     const before = await readNmacMasterMonth(year, monthIndex);
     const result = await writeNmacMasterMonth(year, monthIndex, values);
     if (result.error) return NextResponse.json({ error: result.error }, { status: 500 });
-    auditNmacMasterMonthSaved(actor, {
+    await auditNmacMasterMonthSaved(actor, {
       year,
       monthIndex,
       kpiCount: countMonthDbKpis(values),
@@ -99,7 +99,7 @@ export async function POST(req: Request) {
     const before = await readNmacTargets(year);
     const result = await writeNmacTargets(year, values);
     if (result.error) return NextResponse.json({ error: result.error }, { status: 500 });
-    auditNmacTargetsSaved(actor, {
+    await auditNmacTargetsSaved(actor, {
       year,
       targetCount: countTargetValues(values),
       changes: packAuditChanges(diffNumberRecord(before.data, values)),
@@ -117,7 +117,7 @@ export async function POST(req: Request) {
     const before = await readNmacTargetMonth(year, monthIndex);
     const result = await writeNmacTargetMonth(year, monthIndex, values);
     if (result.error) return NextResponse.json({ error: result.error }, { status: 500 });
-    auditNmacTargetMonthSaved(actor, {
+    await auditNmacTargetMonthSaved(actor, {
       year,
       monthIndex,
       targetCount: countTargetValues(values),
@@ -134,7 +134,7 @@ export async function POST(req: Request) {
     const before = await readNmacTargetMonth(year, monthIndex);
     const result = await deleteNmacTargetMonthRow(year, monthIndex);
     if (result.error) return NextResponse.json({ error: result.error }, { status: 500 });
-    auditNmacTargetMonthCleared(actor, {
+    await auditNmacTargetMonthCleared(actor, {
       year,
       monthIndex,
       changes: packAuditChanges(removedNumberRecord(before.data)),

@@ -70,7 +70,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Could not save user." }, { status: 500 });
   }
 
-  auditAdminUserAdded(
+  await auditAdminUserAdded(
     { email: session.email, role: session.role },
     { email: data.email as string, role },
   );

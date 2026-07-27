@@ -6,17 +6,11 @@ import { getAppDashboardSettings } from "@/lib/auth/app-settings";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { canEditKpiData } from "@/lib/auth/types";
 import {
-  diffMonthDb,
-  diffNumberRecord,
   diffWeeklyRows,
   packAuditChanges,
-  removedNumberRecord,
 } from "@/lib/dev/kpi-audit-diff";
 import type { WeeklyRow } from "@/lib/kpi/types";
 import {
-  readNmacMasterMonth,
-  readNmacTargetMonth,
-  readNmacTargets,
   readWeeklyRows,
   writeWeeklyRows,
 } from "@/lib/kpi/write-server";
@@ -75,16 +69,16 @@ export async function POST(req: Request) {
     });
   }
 
+  const weekIndices = parsed.map((r) => r.weekIndex).sort((a, b) => a - b);
+  const before = await readWeeklyRows(kpiSlug, year, weekIndices);
   const result = await writeWeeklyRows(kpiSlug, year, parsed);
   if (result.error) {
     return NextResponse.json({ error: result.error }, { status: 500 });
   }
 
-  const weekIndices = parsed.map((r) => r.weekIndex).sort((a, b) => a - b);
-  const before = await readWeeklyRows(kpiSlug, year, weekIndices);
   const changes = packAuditChanges(diffWeeklyRows(before.data, parsed));
 
-  auditWeeklyKpiSaved(
+  await auditWeeklyKpiSaved(
     { email: session.email, role: session.role },
     { kpiSlug, year, rowCount: parsed.length, weekIndices, changes },
   );

@@ -1,4 +1,4 @@
-import type { ArdtsStatus } from "@/lib/ardts/types";
+import type { ArdtsStatus, ArdtsStatusCard } from "@/lib/ardts/types";
 
 export function monthDateBounds(year: number, monthIndex: number): { from: string; to: string } {
   const month = String(monthIndex + 1).padStart(2, "0");
@@ -26,6 +26,37 @@ export const REFERRAL_STATUS_CARDS: ReferralStatusCard[] = [
   { key: "follow_up_booked", label: "Completed", sub: "Follow-up scheduled" },
   { key: "closed", label: "Closed", sub: "Workflow closed" },
 ];
+
+export const REFERRAL_ALL_STATUS_CARD_KEYS = [
+  "total",
+  "needs_appt_booking",
+  "initial_appt_booked",
+  "referral_appt_attended",
+  "diagnostic_appt_attended",
+  "initial_appt_not_attended",
+  "rescheduled",
+  "results_fu_needed",
+  "results_fu_pending_confirmation",
+  "results_fu_booked",
+  "results_fu_attended",
+  "refused",
+] as const;
+
+const REFERRAL_ALL_STATUS_CARD_RANK = new Map<string, number>(
+  REFERRAL_ALL_STATUS_CARD_KEYS.map((key, index) => [key, index]),
+);
+
+/** Preserve the documented All-tab sequence while retaining any future server cards. */
+export function orderReferralStatusCards(cards: readonly ArdtsStatusCard[]): ArdtsStatusCard[] {
+  return cards
+    .map((card, index) => ({ card, index }))
+    .sort((a, b) => {
+      const aRank = REFERRAL_ALL_STATUS_CARD_RANK.get(a.card.key) ?? Number.MAX_SAFE_INTEGER;
+      const bRank = REFERRAL_ALL_STATUS_CARD_RANK.get(b.card.key) ?? Number.MAX_SAFE_INTEGER;
+      return aRank - bRank || a.index - b.index;
+    })
+    .map(({ card }) => card);
+}
 
 export function referralCountForCard(
   key: ReferralStatusCard["key"],

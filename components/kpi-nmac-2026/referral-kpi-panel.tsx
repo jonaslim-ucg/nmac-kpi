@@ -8,6 +8,7 @@ import {
   referralSentExpandedChart,
   referralStatusBreakdownExpandedChart,
 } from "@/lib/ardts/referral-charts";
+import { orderReferralStatusCards } from "@/lib/ardts/referral-display";
 import type { ArdtsStatusCountsResponse } from "@/lib/ardts/types";
 import { MONTHS } from "@/lib/kpi-nmac-2026/model";
 import { MonthTabs } from "./nmac-master-entry-panel";
@@ -36,6 +37,8 @@ function buildMonthQuery(year: number, monthIndex: number): string {
     year: String(year),
     month: String(monthIndex + 1),
     item_type: "all",
+    delivery_workstream: "all",
+    operational_type: "all",
   }).toString();
 }
 
@@ -111,7 +114,9 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
     const charts = data.charts;
     const sentByMonth = charts?.referrals_sent_by_month ?? [];
     const outcomesByMonth = charts?.booked_vs_needs_action ?? [];
-    const statusBreakdown = charts?.status_breakdown_selected_period ?? data.all_statuses_in_period?.cards ?? [];
+    const statusBreakdown = orderReferralStatusCards(
+      charts?.status_breakdown_selected_period ?? data.all_statuses_in_period?.cards ?? [],
+    );
 
     void loadChartJs().then((mod) => {
       if (gen !== chartFxGen.current) return;
@@ -137,7 +142,10 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
     };
   }, [data, loading, selectedMonth, chartThemeKey]);
 
-  const statusCards = data?.all_statuses_in_period?.cards ?? [];
+  const statusCards = useMemo(
+    () => orderReferralStatusCards(data?.all_statuses_in_period?.cards ?? []),
+    [data],
+  );
   const summary = data?.period_summary ?? null;
   const pipelineStages = data?.pipeline_stages ?? [];
   const selectedOutcome = data?.charts?.booked_vs_needs_action?.find((row) => row.month === selectedMonth + 1);
@@ -160,8 +168,8 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
 
       <div className="nk26-referral-meta">
         <p className="nk26-referral-note">
-          Total referrals sent in {MONTHS[selectedMonth]} {selectedYear} by <strong>date sent</strong>. KPI rates and
-          pipeline stages are calculated by ARDTS.
+          All referral and diagnostic workstreams sent in {MONTHS[selectedMonth]} {selectedYear} by{" "}
+          <strong>date sent</strong>. Status cards, KPI rates, and pipeline stages are calculated by ARDTS.
         </p>
         {periodLabel ? <p className="nk26-referral-period">{periodLabel}</p> : null}
       </div>
@@ -186,7 +194,8 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
                   <div className="nk26-slab">{card.label}</div>
                   <div className="nk26-sval">{card.count}</div>
                   <div className="nk26-ssub">
-                    {card.key === "total" ? "Total referrals in period" : `${card.percent}% of period total`}
+                    {card.description ??
+                      (card.key === "total" ? "All tracked referrals in period" : `${card.percent}% of period total`)}
                   </div>
                 </div>
               );
@@ -198,7 +207,7 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
             <div className="nk26-stat nk26-referral-total">
               <div className="nk26-slab">Sent in period</div>
               <div className="nk26-sval">{summary.sent_in_period}</div>
-              <div className="nk26-ssub">Total referrals in selected month</div>
+              <div className="nk26-ssub">Total tracked referrals in selected month</div>
             </div>
             <div className="nk26-stat">
               <div className="nk26-slab">Booking rate</div>

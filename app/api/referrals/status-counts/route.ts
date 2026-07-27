@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { ArdtsConfigError, fetchArdtsStatusCounts } from "@/lib/ardts/status-counts";
-import { ARDTS_RANGE_PRESETS, type ArdtsRangePreset } from "@/lib/ardts/types";
+import {
+  ARDTS_DELIVERY_WORKSTREAMS,
+  ARDTS_ITEM_TYPES,
+  ARDTS_OPERATIONAL_TYPES,
+  ARDTS_RANGE_PRESETS,
+  type ArdtsRangePreset,
+} from "@/lib/ardts/types";
 import { getSessionFromCookies } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +28,11 @@ function parseMonth(value: string | null): number | null {
   const month = Number(value);
   if (!Number.isInteger(month) || month < 1 || month > 12) return null;
   return month;
+}
+
+function parseScope<T extends string>(value: string | null, allowed: readonly T[], fallback: T): T | null {
+  if (!value) return fallback;
+  return allowed.includes(value as T) ? (value as T) : null;
 }
 
 export async function GET(req: Request) {
@@ -52,6 +63,21 @@ export async function GET(req: Request) {
     ...searchParams.getAll("statuses"),
   ].filter(Boolean);
   const status = statusParams.length > 0 ? statusParams : undefined;
+  const itemType = parseScope(searchParams.get("item_type"), ARDTS_ITEM_TYPES, "all");
+  const deliveryWorkstream = parseScope(
+    searchParams.get("delivery_workstream"),
+    ARDTS_DELIVERY_WORKSTREAMS,
+    "all",
+  );
+  const operationalType = parseScope(
+    searchParams.get("operational_type"),
+    ARDTS_OPERATIONAL_TYPES,
+    "all",
+  );
+
+  if (!itemType || !deliveryWorkstream || !operationalType) {
+    return NextResponse.json({ error: "Invalid referral scope." }, { status: 400 });
+  }
 
   if (!hasMonthParams && range === "custom" && (!from || !to)) {
     return NextResponse.json({ error: "Custom range requires from and to (YYYY-MM-DD)." }, { status: 400 });
@@ -60,8 +86,8 @@ export async function GET(req: Request) {
   try {
     const data = await fetchArdtsStatusCounts(
       hasMonthParams
-        ? { year: year!, month: month!, itemType: "all", status }
-        : { range: range!, from, to, itemType: "all", status },
+        ? { year: year!, month: month!, itemType, deliveryWorkstream, operationalType, status }
+        : { range: range!, from, to, itemType, deliveryWorkstream, operationalType, status },
     );
     return NextResponse.json(data, {
       headers: { "Cache-Control": "private, no-store, max-age=0" },

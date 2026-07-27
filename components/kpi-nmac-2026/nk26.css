@@ -509,12 +509,6 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .nk26-referral-cards > .nk26-stat:last-child {
-    grid-column: 1 / -1;
-    max-width: 50%;
-    justify-self: center;
-  }
-
   .nk26-referral-kpi-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -532,11 +526,6 @@
   .nk26-referral-cards,
   .nk26-referral-kpi-row {
     grid-template-columns: 1fr;
-  }
-
-  .nk26-referral-cards > .nk26-stat:last-child {
-    max-width: none;
-    justify-self: stretch;
   }
 }
 

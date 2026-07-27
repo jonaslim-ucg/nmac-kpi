@@ -1,5 +1,7 @@
 import type {
+  ArdtsDeliveryWorkstream,
   ArdtsItemType,
+  ArdtsOperationalType,
   ArdtsRangePreset,
   ArdtsStatusCountsErrorBody,
   ArdtsStatusCountsResponse,
@@ -19,6 +21,8 @@ export type FetchArdtsStatusCountsParams = {
   year?: number;
   month?: number;
   itemType?: ArdtsItemType;
+  deliveryWorkstream?: ArdtsDeliveryWorkstream;
+  operationalType?: ArdtsOperationalType;
   status?: string | string[];
 };
 
@@ -59,6 +63,14 @@ export async function fetchArdtsStatusCounts(
 
   if (params.itemType) {
     url.searchParams.set("item_type", params.itemType);
+  }
+
+  if (params.deliveryWorkstream) {
+    url.searchParams.set("delivery_workstream", params.deliveryWorkstream);
+  }
+
+  if (params.operationalType) {
+    url.searchParams.set("operational_type", params.operationalType);
   }
 
   if (params.status) {

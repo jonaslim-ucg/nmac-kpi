@@ -30,12 +30,27 @@ export const ARDTS_ITEM_TYPES = ["referral", "diagnostic", "prescription", "all"
 
 export type ArdtsItemType = (typeof ARDTS_ITEM_TYPES)[number];
 
+export const ARDTS_DELIVERY_WORKSTREAMS = ["outgoing", "in_house", "all"] as const;
+
+export type ArdtsDeliveryWorkstream = (typeof ARDTS_DELIVERY_WORKSTREAMS)[number];
+
+export const ARDTS_OPERATIONAL_TYPES = [
+  "referral",
+  "external_diagnostic",
+  "in_house_ultrasound",
+  "prescription",
+  "all",
+] as const;
+
+export type ArdtsOperationalType = (typeof ARDTS_OPERATIONAL_TYPES)[number];
+
 export type ArdtsStatusCard = {
   key: string;
   status: ArdtsStatus | null;
   label: string;
   count: number;
   percent: number;
+  description?: string;
 };
 
 export type ArdtsPipelineStage = {
@@ -68,6 +83,8 @@ export type ArdtsStatusCountsResponse = {
     period_label: string;
     timezone: string;
     item_type_scope: ArdtsItemType;
+    delivery_workstream_scope?: ArdtsDeliveryWorkstream;
+    operational_type_scope?: ArdtsOperationalType;
     date_field: string;
   };
   all_statuses_in_period?: {

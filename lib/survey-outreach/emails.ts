@@ -97,7 +97,7 @@ function buildHtmlBody(input: {
     '<p style="margin:0 0 5px;font-size:16px;line-height:1.4;font-weight:700;">Complete the survey. Enter the quarterly draw.</p>',
     `<p style="margin:0;font-size:15px;line-height:1.55;">${RAFFLE_COPY}</p>`,
     "</div>",
-    '<p style="margin:0 0 16px;font-size:16px;line-height:1.55;color:#071733;font-weight:700;text-align:center;">Your answers are needed in the survey form.</p>',
+    '<p style="margin:0 0 16px;font-size:16px;line-height:1.55;color:#071733;font-weight:700;text-align:center;">Click below to start the survey.</p>',
     '<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto 14px;">',
     "<tr>",
     '<td align="center" bgcolor="#08757d" style="border-radius:10px;box-shadow:0 4px 10px rgba(8,117,125,0.24);">',
@@ -160,7 +160,7 @@ function buildContent(input: {
     input.heading,
     "",
     ...input.intro.flatMap((line) => [line, ""]),
-    "Your answers are needed in the survey form.",
+    "Click below to start the survey.",
     "Replies to this email are not recorded as survey responses.",
     "",
     `Complete My Survey: ${input.link}`,
@@ -195,9 +195,7 @@ export function buildSurveyEmail(
   switch (stage) {
     case "initial":
       return buildContent({
-        subject: hasMultipleAppointments
-          ? "Survey answers needed: How were your recent visits to NMAC?"
-          : "Survey answers needed: How was your recent visit to NMAC?",
+        subject: "How was your recent visit to NMAC?",
         patientName,
         link,
         heading: hasMultipleAppointments

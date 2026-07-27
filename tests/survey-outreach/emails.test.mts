@@ -3,15 +3,17 @@ import test from "node:test";
 import { buildSurveyEmail } from "../../lib/survey-outreach/emails.ts";
 import { surveyBaseUrl } from "../../lib/survey-outreach/urls.ts";
 
-test("builds an action-oriented initial survey email from a CRM-formatted name", () => {
+test("builds an initial survey email from a CRM-formatted name", () => {
   const email = buildSurveyEmail("initial", "Flood, Amani", "survey-token");
 
   assert.equal(
     email.subject,
-    "Survey answers needed: How was your recent visit to NMAC?",
+    "How was your recent visit to NMAC?",
   );
   assert.match(email.textBody, /^Hi Amani,/);
+  assert.match(email.textBody, /Click below to start the survey\./);
   assert.match(email.htmlBody, />Hi Amani,</);
+  assert.match(email.htmlBody, />Click below to start the survey\.</);
   assert.match(email.htmlBody, />Complete My Survey</);
   assert.match(email.htmlBody, /Replies to this email are not recorded as survey responses\./);
   assert.match(email.htmlBody, /header-full\.png/);
@@ -21,12 +23,12 @@ test("builds an action-oriented initial survey email from a CRM-formatted name",
   );
 });
 
-test("uses the plural subject and provider guidance for same-day appointments", () => {
+test("keeps the original subject and provider guidance for same-day appointments", () => {
   const email = buildSurveyEmail("initial", "Amani Flood", "survey-token", 2);
 
   assert.equal(
     email.subject,
-    "Survey answers needed: How were your recent visits to NMAC?",
+    "How was your recent visit to NMAC?",
   );
   assert.match(email.textBody, /select all the providers you saw that day/);
 });

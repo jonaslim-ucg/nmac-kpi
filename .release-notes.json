@@ -1,0 +1,4 @@
+{
+  "endpoint": "https://ucg-ticketing-system.vercel.app/api/v1/apps/nmac-kpi/releases",
+  "tokenEnv": "RELEASE_NOTES_TOKEN"
+}

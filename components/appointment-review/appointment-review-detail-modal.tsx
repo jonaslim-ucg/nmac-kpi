@@ -72,9 +72,16 @@ export function AppointmentReviewDetailModal({
       >
         <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div className="min-w-0">
-            <h2 id="review-detail-title" className="text-base font-semibold text-foreground">
-              Review details
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 id="review-detail-title" className="text-base font-semibold text-foreground">
+                Review details
+              </h2>
+              {review.isTest ? (
+                <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-700 dark:text-amber-300">
+                  Test response
+                </span>
+              ) : null}
+            </div>
             <p className="mt-0.5 text-xs text-muted-foreground">{formatReviewWhen(review.createdAt)}</p>
           </div>
           <button

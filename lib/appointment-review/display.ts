@@ -15,6 +15,7 @@ import {
 
 export type AppointmentReviewDetail = {
   id: string;
+  isTest: boolean;
   createdAt: string;
   email: string;
   patientName: string;
@@ -116,10 +117,14 @@ function reviewComments(row: AppointmentReviewRow): string[] {
     .filter(Boolean);
 }
 
-export function toAppointmentReviewDetail(row: AppointmentReviewRow): AppointmentReviewDetail {
+export function toAppointmentReviewDetail(
+  row: AppointmentReviewRow,
+  isTest = false,
+): AppointmentReviewDetail {
   const comments = reviewComments(row);
   return {
     id: row.id,
+    isTest,
     createdAt: row.created_at,
     email: text(row.email) || "—",
     patientName: text(row.patient_name) || "—",

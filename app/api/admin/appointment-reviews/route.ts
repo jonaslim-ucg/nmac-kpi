@@ -83,24 +83,24 @@ export async function GET(req: Request) {
     );
   }
 
-  let rows = reviewsResult.rows;
-  if (!includeTests) {
-    const testTokenResult = await findTestSurveyOutreachTokens(
-      rows.map((row) => row.survey_token).filter((token): token is string => Boolean(token)),
-    );
-    if (!testTokenResult.ok) {
-      return NextResponse.json({ error: testTokenResult.error }, { status: 500 });
-    }
-    const testTokens = new Set(testTokenResult.tokens);
-    rows = rows.filter(
-      (row) =>
-        row.survey_token
-          ? !testTokens.has(row.survey_token)
-          : !isScheduledTestRecipientAllowed(row.email),
-    );
+  const testTokenResult = await findTestSurveyOutreachTokens(
+    reviewsResult.rows
+      .map((row) => row.survey_token)
+      .filter((token): token is string => Boolean(token)),
+  );
+  if (!testTokenResult.ok) {
+    return NextResponse.json({ error: testTokenResult.error }, { status: 500 });
   }
+  const testTokens = new Set(testTokenResult.tokens);
+  const isTestReview = (row: (typeof reviewsResult.rows)[number]) =>
+    row.survey_token
+      ? testTokens.has(row.survey_token)
+      : isScheduledTestRecipientAllowed(row.email);
 
-  const reviews = rows.map(toAppointmentReviewDetail);
+  let rows = reviewsResult.rows;
+  if (!includeTests) rows = rows.filter((row) => !isTestReview(row));
+
+  const reviews = rows.map((row) => toAppointmentReviewDetail(row, isTestReview(row)));
   const providerNamesBySurveyToken = new Map<string, string[]>();
   rows.forEach((row, index) => {
     if (!row.survey_token) return;
@@ -123,7 +123,7 @@ export async function GET(req: Request) {
         reviewId: row.id,
         createdAt: row.created_at,
         providerNames: reviews[index].providerRatings.map((provider) => provider.providerLabel),
-        isTest: isScheduledTestRecipientAllowed(row.email),
+        isTest: reviews[index].isTest,
       }];
     }),
   );

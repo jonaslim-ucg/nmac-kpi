@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppointmentReviewDashboard } from "@/components/appointment-review/appointment-review-dashboard";
 import { AppointmentReviewDetailModal } from "@/components/appointment-review/appointment-review-detail-modal";
 import { AppointmentReviewList } from "@/components/appointment-review/appointment-review-list";
@@ -62,6 +62,9 @@ export default function AdminAppointmentReviewsPage() {
   const [eligibleEntries, setEligibleEntries] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>("overview");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showTestResponses, setShowTestResponses] = useState(false);
+  const hasLoaded = useRef(false);
+  const latestLoadRequest = useRef(0);
 
   const allowed =
     !prefsReady || isNmacNavHrefAllowed(user?.role, "/admin/appointment-reviews", roleNmacNav);
@@ -89,28 +92,42 @@ export default function AdminAppointmentReviewsPage() {
   const load = useCallback(async (
     filter: ReviewPeriod,
     quarterId: string | null,
+    includeTestResponses: boolean,
     silent = false,
   ) => {
+    const requestId = latestLoadRequest.current + 1;
+    latestLoadRequest.current = requestId;
     if (!silent) setInitialLoading(true);
     else setRefreshing(true);
     setLoadError(null);
     setSetupRequired(false);
 
     try {
-      const params = new URLSearchParams({ includeTests: "false" });
+      const params = new URLSearchParams();
       if (filter === "quarter") {
         if (quarterId) params.set("quarter", quarterId);
         else params.set("range", "quarter");
       }
       if (filter === "30" || filter === "90") params.set("days", filter);
-      const r = await fetch(`/api/admin/appointment-reviews?${params}`, { credentials: "include" });
-      const j = (await r.json()) as ApiResponse;
-      if (!r.ok) {
-        if (j.setupRequired) {
+
+      const liveParams = new URLSearchParams(params);
+      liveParams.set("includeTests", "false");
+      const testParams = new URLSearchParams(params);
+      testParams.set("includeTests", "true");
+      const [liveResponse, inclusiveResponse] = await Promise.all([
+        fetch(`/api/admin/appointment-reviews?${liveParams}`, { credentials: "include" }),
+        includeTestResponses
+          ? fetch(`/api/admin/appointment-reviews?${testParams}`, { credentials: "include" })
+          : Promise.resolve(null),
+      ]);
+      const liveData = (await liveResponse.json()) as ApiResponse;
+      if (requestId !== latestLoadRequest.current) return;
+      if (!liveResponse.ok) {
+        if (liveData.setupRequired) {
           setSetupRequired(true);
-          setLoadError(j.error ?? "Database setup required.");
+          setLoadError(liveData.error ?? "Database setup required.");
         } else {
-          setLoadError(j.error ?? "Could not load results.");
+          setLoadError(liveData.error ?? "Could not load results.");
         }
         setStats(null);
         setReviews([]);
@@ -118,18 +135,35 @@ export default function AdminAppointmentReviewsPage() {
         setEligibleEntries(null);
         return;
       }
-      setStats(j.stats ?? null);
-      setReviews(j.reviews ?? []);
-      setQuarter(j.quarter ?? null);
-      setCurrentQuarter(j.currentQuarter ?? null);
-      setEligibleEntries(typeof j.eligibleEntries === "number" ? j.eligibleEntries : null);
+
+      let displayedReviews = liveData.reviews ?? [];
+      if (inclusiveResponse) {
+        const inclusiveData = (await inclusiveResponse.json()) as ApiResponse;
+        if (requestId !== latestLoadRequest.current) return;
+        if (!inclusiveResponse.ok) {
+          setLoadError(inclusiveData.error ?? "Could not load test responses.");
+        } else {
+          displayedReviews = inclusiveData.reviews ?? displayedReviews;
+        }
+      }
+
+      setStats(liveData.stats ?? null);
+      setReviews(displayedReviews);
+      setQuarter(liveData.quarter ?? null);
+      setCurrentQuarter(liveData.currentQuarter ?? null);
+      setEligibleEntries(
+        typeof liveData.eligibleEntries === "number" ? liveData.eligibleEntries : null,
+      );
     } catch {
+      if (requestId !== latestLoadRequest.current) return;
       setLoadError("Could not load results.");
       setStats(null);
       setReviews([]);
       setQuarter(null);
       setEligibleEntries(null);
     } finally {
+      if (requestId !== latestLoadRequest.current) return;
+      hasLoaded.current = true;
       setInitialLoading(false);
       setRefreshing(false);
     }
@@ -137,8 +171,8 @@ export default function AdminAppointmentReviewsPage() {
 
   useEffect(() => {
     if (loading || !allowed) return;
-    void load(period, selectedQuarter);
-  }, [allowed, load, loading, period, selectedQuarter]);
+    void load(period, selectedQuarter, showTestResponses, hasLoaded.current);
+  }, [allowed, load, loading, period, selectedQuarter, showTestResponses]);
 
   const viewReview = useCallback((id: string) => {
     setSelectedId(id);
@@ -236,7 +270,7 @@ export default function AdminAppointmentReviewsPage() {
         </div>
         <button
           type="button"
-          onClick={() => void load(period, selectedQuarter, true)}
+          onClick={() => void load(period, selectedQuarter, showTestResponses, true)}
           disabled={refreshing}
           className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-surface-muted/80 disabled:opacity-50 sm:w-auto"
         >
@@ -266,7 +300,17 @@ export default function AdminAppointmentReviewsPage() {
       ) : null}
 
       {tab === "reviews" ? (
-        <AppointmentReviewList reviews={reviews} onViewReview={viewReview} periodLabel={periodLabel} />
+        <AppointmentReviewList
+          reviews={reviews}
+          onViewReview={viewReview}
+          periodLabel={periodLabel}
+          showTestResponses={showTestResponses}
+          testResponsesLoading={refreshing}
+          onShowTestResponsesChange={(show) => {
+            setSelectedId(null);
+            setShowTestResponses(show);
+          }}
+        />
       ) : null}
 
       {selectedReview ? (

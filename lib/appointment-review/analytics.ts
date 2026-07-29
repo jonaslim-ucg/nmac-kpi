@@ -33,6 +33,7 @@ export type AppointmentReviewRow = {
   recommendation_rating: number | null;
   would_encourage_patient: boolean | null;
   testimonial_permission: TestimonialPermissionValue;
+  testimonial_text: string;
   wait_time: WaitTimeValue;
   provider_time_adequate: boolean;
   provider_time_comment: string;
@@ -191,6 +192,7 @@ export function buildAppointmentReviewStats(rows: AppointmentReviewRow[]): Appoi
   ].filter((item) => item.score > 0);
 
   const commentKinds: { kind: string; pick: (r: AppointmentReviewRow) => string }[] = [
+    { kind: "Testimonial", pick: (r) => r.testimonial_text },
     { kind: "Exceptional staff", pick: (r) => r.exceptional_staff_comment },
   ];
 

@@ -28,6 +28,7 @@ create table if not exists public.appointment_reviews (
   recommendation_rating smallint check (recommendation_rating between 1 and 5),
   would_encourage_patient boolean,
   testimonial_permission text not null check (testimonial_permission in ('yes-named', 'yes-anonymous', 'confidential')),
+  testimonial_text text not null default '',
   wait_time text not null check (wait_time in ('0-5', '10-15', '20-30', 'over-30')),
   provider_time_adequate boolean not null,
   provider_time_comment text not null default '',
@@ -75,6 +76,7 @@ export async function insertAppointmentReview(payload: AppointmentReviewPayload)
       recommendation_rating: payload.recommendationRating,
       would_encourage_patient: payload.wouldEncouragePatient,
       testimonial_permission: payload.testimonialPermission,
+      testimonial_text: payload.testimonialText,
       wait_time: payload.waitTime,
       provider_time_adequate: payload.providerTimeAdequate,
       provider_time_comment: payload.providerTimeComment,
@@ -97,7 +99,7 @@ export async function insertAppointmentReview(payload: AppointmentReviewPayload)
         };
       }
       if (
-        /appointment_reviews|service_types|provider_ratings/i.test(error.message) &&
+        /appointment_reviews|service_types|provider_ratings|testimonial_text/i.test(error.message) &&
         /does not exist|schema cache|could not find/i.test(error.message)
       ) {
         return { ok: false, error: "Review storage is not configured.", setupRequired: true };

@@ -149,6 +149,7 @@ export function AppointmentReviewDetailModal({
               <MessageSquareText className="h-4 w-4 text-accent" aria-hidden />
               Optional written responses
             </div>
+            <CommentBlock label="7. Testimonial" text={review.testimonialText} />
             <CommentBlock
               label={review.referralSourcesLabel ? "13. Exceptional staff" : "12. Exceptional staff"}
               text={review.exceptionalStaffComment}

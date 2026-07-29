@@ -21,6 +21,7 @@ alter table public.appointment_reviews
   add column if not exists recommendation_rating smallint,
   add column if not exists would_encourage_patient boolean,
   add column if not exists testimonial_permission text,
+  add column if not exists testimonial_text text not null default '',
   add column if not exists wait_time text,
   add column if not exists provider_time_adequate boolean,
   add column if not exists provider_time_comment text not null default '',

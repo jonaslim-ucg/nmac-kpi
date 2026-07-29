@@ -32,6 +32,7 @@ export type AppointmentReviewDetail = {
   recommendationMessage: string;
   testimonialPermission: TestimonialPermissionValue | null;
   testimonialPermissionLabel: string;
+  testimonialText: string;
   waitTimeLabel: string;
   providerTimeAdequate: boolean | null;
   providerTimeComment: string;
@@ -110,7 +111,7 @@ function resolveProviderRatings(
 }
 
 function reviewComments(row: AppointmentReviewRow): string[] {
-  return [row.exceptional_staff_comment]
+  return [row.testimonial_text, row.exceptional_staff_comment]
     .map(text)
     .filter(Boolean);
 }
@@ -136,6 +137,7 @@ export function toAppointmentReviewDetail(row: AppointmentReviewRow): Appointmen
     recommendationMessage: text(row.recommendation_message),
     testimonialPermission: row.testimonial_permission ?? null,
     testimonialPermissionLabel: formatTestimonialPermission(row.testimonial_permission),
+    testimonialText: text(row.testimonial_text),
     waitTimeLabel: optionLabel(WAIT_TIME_OPTIONS, row.wait_time),
     providerTimeAdequate: bool(row.provider_time_adequate),
     providerTimeComment: text(row.provider_time_comment),

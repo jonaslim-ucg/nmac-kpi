@@ -8,6 +8,7 @@ import {
   TESTIMONIAL_PERMISSION_OPTIONS,
   WAIT_TIME_OPTIONS,
   isReferralSourceComplete,
+  isTestimonialComplete,
   areServiceTypesComplete,
   type AppointmentReviewPayload,
   type PatientDurationValue,
@@ -116,6 +117,10 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
     TESTIMONIAL_VALUES.has(b.testimonialPermission as TestimonialPermissionValue)
       ? (b.testimonialPermission as TestimonialPermissionValue)
       : null;
+  const testimonialText =
+    testimonialPermission === "yes-named" || testimonialPermission === "yes-anonymous"
+      ? str(b.testimonialText, 2000)
+      : "";
   const waitTime =
     typeof b.waitTime === "string" && WAIT_VALUES.has(b.waitTime as never) ? b.waitTime : null;
   const patientDuration =
@@ -143,6 +148,10 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
     providerTimeAdequate === null
   ) {
     return { error: "Please answer all required questions." };
+  }
+
+  if (!isTestimonialComplete(testimonialPermission, testimonialText)) {
+    return { error: "Please enter the testimonial you would like us to use." };
   }
 
   const referralSources =
@@ -174,6 +183,7 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
     wouldEncouragePatient,
     recommendationMessage: "",
     testimonialPermission,
+    testimonialText,
     waitTime: waitTime as AppointmentReviewPayload["waitTime"],
     providerTimeAdequate,
     providerTimeComment: "",

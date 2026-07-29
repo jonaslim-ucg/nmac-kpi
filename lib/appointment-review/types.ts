@@ -86,6 +86,7 @@ export type AppointmentReviewPayload = {
   wouldEncouragePatient: boolean | null;
   recommendationMessage: string;
   testimonialPermission: TestimonialPermissionValue;
+  testimonialText: string;
   waitTime: WaitTimeValue;
   providerTimeAdequate: boolean;
   providerTimeComment: string;
@@ -113,6 +114,7 @@ export type AppointmentReviewFormState = {
   wouldEncouragePatient: boolean | null;
   recommendationMessage: string;
   testimonialPermission: TestimonialPermissionValue | null;
+  testimonialText: string;
   waitTime: WaitTimeValue | null;
   providerTimeAdequate: boolean | null;
   providerTimeComment: string;
@@ -142,6 +144,21 @@ export function areServiceTypesComplete(
   if (serviceTypes.length === 0) return false;
   if (serviceTypes.includes("other") && !other.trim()) return false;
   return true;
+}
+
+export function isTestimonialPermissionGranted(
+  permission: TestimonialPermissionValue | null,
+): permission is "yes-named" | "yes-anonymous" {
+  return permission === "yes-named" || permission === "yes-anonymous";
+}
+
+export function isTestimonialComplete(
+  permission: TestimonialPermissionValue | null,
+  testimonialText: string,
+): boolean {
+  if (!permission) return false;
+  if (!isTestimonialPermissionGranted(permission)) return true;
+  return testimonialText.trim().length > 0;
 }
 
 export function areProviderRatingsComplete(
@@ -196,6 +213,7 @@ export const EMPTY_APPOINTMENT_REVIEW_FORM: AppointmentReviewFormState = {
   wouldEncouragePatient: null,
   recommendationMessage: "",
   testimonialPermission: null,
+  testimonialText: "",
   waitTime: null,
   providerTimeAdequate: null,
   providerTimeComment: "",

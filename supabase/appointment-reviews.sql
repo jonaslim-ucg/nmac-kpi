@@ -21,6 +21,7 @@ create table if not exists public.appointment_reviews (
   recommendation_rating smallint check (recommendation_rating between 1 and 5),
   would_encourage_patient boolean,
   testimonial_permission text not null check (testimonial_permission in ('yes-named', 'yes-anonymous', 'confidential')),
+  testimonial_text text not null default '',
   wait_time text not null check (wait_time in ('0-5', '10-15', '20-30', 'over-30')),
   provider_time_adequate boolean not null,
   provider_time_comment text not null default '',

@@ -38,6 +38,10 @@ import {
   surveyOutreachScanLimit,
   surveySendRetryAt,
 } from "@/lib/survey-outreach/reliability";
+import {
+  schedulerModeAllowsOutreach,
+  type SurveyOutreachSchedulerMode,
+} from "@/lib/survey-outreach/scheduler-eligibility";
 
 export type SchedulerResult = {
   ok: true;
@@ -65,6 +69,7 @@ export type SchedulerResult = {
 
 type SchedulerOptions = {
   allowAnyTestRecipient?: boolean;
+  mode?: SurveyOutreachSchedulerMode;
 };
 
 class ScheduledSendFailure extends Error {
@@ -278,6 +283,7 @@ export async function runSurveyOutreachScheduler(
   options: SchedulerOptions = {},
 ): Promise<SchedulerResult> {
   const sending = await getSurveyOutreachSendingState();
+  const mode = options.mode ?? "production";
   const sendingEnabled = sending.effectiveEnabled;
   const liveStartAt = sending.liveStartAt ? new Date(sending.liveStartAt) : null;
   const sent: SendStageResult[] = [];
@@ -312,6 +318,7 @@ export async function runSurveyOutreachScheduler(
   const productionSyncHealthy = sync.syncErrors.length === 0;
 
   for (const row of rows) {
+    if (!schedulerModeAllowsOutreach(row, mode)) continue;
     if (!sending.appEnabled) continue;
     if (!sendingEnabled && !row.is_test) continue;
     if (!row.is_test && !productionSyncHealthy) {

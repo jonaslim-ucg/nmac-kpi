@@ -41,7 +41,10 @@ export async function POST() {
   }
 
   try {
-    const result = await runSurveyOutreachScheduler(new Date(), { allowAnyTestRecipient: true });
+    const result = await runSurveyOutreachScheduler(new Date(), {
+      allowAnyTestRecipient: true,
+      mode: "test",
+    });
     return NextResponse.json({
       ...result,
       testOnly: true,

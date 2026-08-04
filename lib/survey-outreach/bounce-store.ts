@@ -1,5 +1,9 @@
 import { APP_SETTINGS_ID } from "@/lib/auth/app-settings";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
+import {
+  summarizeUniqueSurveyBounces,
+  uniqueSurveyBounceRows,
+} from "@/lib/survey-outreach/bounce-dedupe";
 import type { SurveyOutreachRow, SurveyOutreachStage } from "@/lib/survey-outreach/types";
 
 const STAGE_SENT_COLUMN: Record<SurveyOutreachStage, keyof SurveyOutreachRow> = {
@@ -251,28 +255,36 @@ export async function listSurveyOutreachBounces(limit = 20): Promise<SurveyOutre
     .from("survey_outreach_bounces")
     .select("*")
     .order("received_at", { ascending: false })
-    .limit(Math.min(Math.max(limit, 1), 100));
+    .limit(1_000);
   if (error) {
     if (schemaMissing(error.message)) return [];
     throw new Error(error.message);
   }
-  return (data ?? []) as SurveyOutreachBounceRow[];
+  return uniqueSurveyBounceRows((data ?? []) as SurveyOutreachBounceRow[])
+    .slice(0, Math.min(Math.max(limit, 1), 100));
 }
 
 export async function getSurveyOutreachBounceSummary(): Promise<SurveyOutreachBounceSummary> {
   const supabase = createServiceRoleClient();
-  const results = await Promise.all([
-    supabase.from("survey_outreach_bounces").select("*", { count: "exact", head: true }),
-    supabase.from("survey_outreach_bounces").select("*", { count: "exact", head: true }).eq("is_test", false),
-    supabase.from("survey_outreach_bounces").select("*", { count: "exact", head: true }).eq("is_test", true),
-    supabase.from("survey_outreach_bounces").select("*", { count: "exact", head: true }).is("outreach_id", null),
-    supabase.from("survey_outreach_bounces").select("*", { count: "exact", head: true }).eq("hard_bounce", true),
-  ]);
-  const firstError = results.find((result) => result.error)?.error;
-  if (firstError) {
-    if (schemaMissing(firstError.message)) return { total: 0, production: 0, tests: 0, unmatched: 0, hard: 0 };
-    throw new Error(firstError.message);
+  const rows: Pick<
+    SurveyOutreachBounceRow,
+    "graph_message_id" | "recipient_email" | "outreach_id" | "is_test" | "hard_bounce"
+  >[] = [];
+  const pageSize = 1_000;
+
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from("survey_outreach_bounces")
+      .select("graph_message_id,recipient_email,outreach_id,is_test,hard_bounce")
+      .order("received_at", { ascending: false })
+      .range(offset, offset + pageSize - 1);
+    if (error) {
+      if (schemaMissing(error.message)) return { total: 0, production: 0, tests: 0, unmatched: 0, hard: 0 };
+      throw new Error(error.message);
+    }
+    rows.push(...((data ?? []) as typeof rows));
+    if ((data?.length ?? 0) < pageSize) break;
   }
-  const [total, production, tests, unmatched, hard] = results.map((result) => result.count ?? 0);
-  return { total, production, tests, unmatched, hard };
+
+  return summarizeUniqueSurveyBounces(rows);
 }

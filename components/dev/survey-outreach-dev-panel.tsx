@@ -1071,7 +1071,7 @@ export function SurveyOutreachDevPanel() {
                 ["Production sends", stats.withInitialSent - stats.testRows],
                 ["Test sends", stats.testRows],
                 ["Send failures", stats.failedRows],
-                ["Undelivered emails", bounceSummary?.production ?? 0],
+                ["Undelivered recipients", bounceSummary?.production ?? 0],
               ].map(([label, value]) => (
                 <div key={String(label)} className="rounded-lg border border-border bg-surface-muted/30 px-3 py-2">
                   <p className="text-xs text-muted-foreground">{label}</p>
@@ -1086,7 +1086,10 @@ export function SurveyOutreachDevPanel() {
               <div className="flex flex-col gap-1 border-b border-amber-500/30 bg-amber-500/10 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2">
                   <TriangleAlert className="h-4 w-4 text-amber-700 dark:text-amber-300" />
-                  <h3 className="text-sm font-semibold text-foreground">Undelivered emails</h3>
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">Undelivered recipients</h3>
+                    <p className="text-[11px] text-muted-foreground">Each email address is counted once.</p>
+                  </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {bounceSummary?.production ?? 0} production · {bounceSummary?.tests ?? 0} test

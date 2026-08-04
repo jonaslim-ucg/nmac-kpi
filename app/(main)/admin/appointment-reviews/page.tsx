@@ -254,10 +254,10 @@ export default function AdminAppointmentReviewsPage() {
       title="Survey Results"
       subtitle="Provider experience survey from /appointment-review"
     >
-      <div className="dashboard-card mb-6 p-3 sm:p-4">
+      <div className="dashboard-card mb-5 p-3">
         <span className="dashboard-card-accent" aria-hidden />
-        <div className="flex flex-col gap-4">
-          <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-end lg:gap-6">
+        <div className="flex flex-col gap-3">
+          <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-end md:gap-4">
             <div className="shrink-0">
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 View
@@ -290,12 +290,12 @@ export default function AdminAppointmentReviewsPage() {
               </div>
             </div>
 
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 Date range
               </p>
               <div className="flex flex-col gap-2 sm:flex-row">
-                <div className="relative min-w-0 sm:w-52">
+                <div className="relative min-w-0 sm:min-w-44 sm:flex-1">
                   <CalendarDays
                     className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
                     aria-hidden
@@ -329,7 +329,7 @@ export default function AdminAppointmentReviewsPage() {
                 </div>
 
                 {periodControlValue === "quarter" && quarterOptions.length > 0 ? (
-                  <div className="relative min-w-0 sm:w-52">
+                  <div className="relative min-w-0 sm:min-w-44 sm:flex-1">
                     <select
                       aria-label="Survey quarter"
                       value={selectedQuarter ?? quarter?.id ?? currentQuarter?.id ?? ""}

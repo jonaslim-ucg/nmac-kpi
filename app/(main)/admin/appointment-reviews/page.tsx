@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, RefreshCw } from "lucide-react";
+import { CalendarDays, ChevronDown, Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppointmentReviewDashboard } from "@/components/appointment-review/appointment-review-dashboard";
 import { AppointmentReviewDetailModal } from "@/components/appointment-review/appointment-review-detail-modal";
@@ -99,6 +99,7 @@ export default function AdminAppointmentReviewsPage() {
   );
   const selectedReview = selectedIndex >= 0 ? reviews[selectedIndex] : null;
   const quarterOptions = useMemo(() => availableQuarters(currentQuarter), [currentQuarter]);
+  const periodControlValue: ReviewPeriod = customRangeOpen ? "custom" : period;
 
   const periodLabel = useMemo(() => {
     switch (period) {
@@ -253,165 +254,186 @@ export default function AdminAppointmentReviewsPage() {
       title="Survey Results"
       subtitle="Provider experience survey from /appointment-review"
     >
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="-mx-1 max-w-full overflow-x-auto px-1 pb-1">
-          <div className="flex w-max items-center gap-2">
-            {(
-              [
-                { id: "overview", label: "Overview" },
-                { id: "reviews", label: "Survey results" },
-              ] as const
-            ).map(({ id, label }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setTab(id)}
-                className={
-                  "shrink-0 rounded-lg border px-3 py-1.5 text-sm font-medium transition " +
-                  (tab === id
-                    ? "border-accent bg-nav-active-bg text-nav-active-fg"
-                    : "border-border bg-card text-muted-foreground hover:text-foreground")
-                }
-              >
-                {label}
-              </button>
-            ))}
-            <span className="mx-1 hidden h-5 w-px bg-border sm:inline" aria-hidden />
-            {(
-              [
-                { id: "all", label: "All time" },
-                { id: "quarter", label: "Quarterly" },
-                { id: "30", label: "Last 30 days" },
-                { id: "90", label: "Last 90 days" },
-              ] as const
-            ).map(({ id, label }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => {
-                  setPeriod(id);
-                  setCustomRangeOpen(false);
-                  setCustomRangeError(null);
-                  setSelectedId(null);
-                }}
-                className={
-                  "shrink-0 rounded-lg border px-3 py-1.5 text-sm font-medium transition " +
-                  (period === id
-                    ? "border-accent bg-nav-active-bg text-nav-active-fg"
-                    : "border-border bg-card text-muted-foreground hover:text-foreground")
-                }
-              >
-                {label}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => {
-                setCustomRangeOpen(true);
-                setCustomRangeError(null);
-              }}
-              className={
-                "shrink-0 rounded-lg border px-3 py-1.5 text-sm font-medium transition " +
-                (period === "custom" || customRangeOpen
-                  ? "border-accent bg-nav-active-bg text-nav-active-fg"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground")
-              }
-            >
-              Custom dates
-            </button>
-            {period === "quarter" && quarterOptions.length > 0 ? (
-              <select
-                aria-label="Survey quarter"
-                value={selectedQuarter ?? quarter?.id ?? currentQuarter?.id ?? ""}
-                onChange={(event) => {
-                  setSelectedQuarter(event.target.value);
-                  setSelectedId(null);
-                }}
-                className="h-[34px] rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground outline-none transition focus:border-accent"
-              >
-                {quarterOptions.map((option) => (
-                  <option key={option.id} value={option.id}>{option.label}</option>
-                ))}
-              </select>
-            ) : null}
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => void load(period, selectedQuarter, customRange, showTestResponses, true)}
-          disabled={refreshing}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-surface-muted/80 disabled:opacity-50 sm:w-auto"
-        >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} aria-hidden />
-          Refresh
-        </button>
-      </div>
-
-      {customRangeOpen || period === "custom" ? (
-        <div className="dashboard-card mb-6 p-4 sm:p-5">
-          <span className="dashboard-card-accent" aria-hidden />
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-foreground">Custom date range</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Includes survey responses submitted on both selected dates.
+      <div className="dashboard-card mb-6 p-3 sm:p-4">
+        <span className="dashboard-card-accent" aria-hidden />
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-end lg:gap-6">
+            <div className="shrink-0">
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                View
               </p>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <label className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground">
-                Start date
-                <input
-                  type="date"
-                  value={customDateStart}
-                  onChange={(event) => {
-                    setCustomDateStart(event.target.value);
-                    setCustomRangeError(null);
-                  }}
-                  className="h-10 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none transition focus:border-accent"
-                />
-              </label>
-              <label className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground">
-                End date
-                <input
-                  type="date"
-                  value={customDateEnd}
-                  min={customDateStart || undefined}
-                  onChange={(event) => {
-                    setCustomDateEnd(event.target.value);
-                    setCustomRangeError(null);
-                  }}
-                  className="h-10 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none transition focus:border-accent"
-                />
-              </label>
-              <button
-                type="button"
-                onClick={applyCustomRange}
-                disabled={refreshing}
-                className="inline-flex h-10 items-center justify-center rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
+              <div
+                className="inline-flex w-full rounded-xl border border-border bg-surface-muted/40 p-1 sm:w-auto"
+                aria-label="Survey view"
               >
-                Apply dates
-              </button>
-              {period !== "custom" ? (
+                {(
+                  [
+                    { id: "overview", label: "Overview" },
+                    { id: "reviews", label: "Survey results" },
+                  ] as const
+                ).map(({ id, label }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={tab === id}
+                    onClick={() => setTab(id)}
+                    className={
+                      "min-h-9 flex-1 rounded-lg px-4 text-sm font-medium transition sm:flex-none " +
+                      (tab === id
+                        ? "bg-card text-foreground shadow-sm ring-1 ring-border"
+                        : "text-muted-foreground hover:text-foreground")
+                    }
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="min-w-0">
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                Date range
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <div className="relative min-w-0 sm:w-52">
+                  <CalendarDays
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden
+                  />
+                  <select
+                    aria-label="Survey date range"
+                    value={periodControlValue}
+                    onChange={(event) => {
+                      const nextPeriod = event.target.value as ReviewPeriod;
+                      setCustomRangeError(null);
+                      setSelectedId(null);
+                      if (nextPeriod === "custom") {
+                        setCustomRangeOpen(true);
+                        return;
+                      }
+                      setCustomRangeOpen(false);
+                      setPeriod(nextPeriod);
+                    }}
+                    className="h-10 w-full appearance-none rounded-lg border border-border bg-card pl-10 pr-9 text-sm font-medium text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  >
+                    <option value="all">All time</option>
+                    <option value="quarter">Quarterly</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="custom">Custom dates</option>
+                  </select>
+                  <ChevronDown
+                    className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden
+                  />
+                </div>
+
+                {periodControlValue === "quarter" && quarterOptions.length > 0 ? (
+                  <div className="relative min-w-0 sm:w-52">
+                    <select
+                      aria-label="Survey quarter"
+                      value={selectedQuarter ?? quarter?.id ?? currentQuarter?.id ?? ""}
+                      onChange={(event) => {
+                        setSelectedQuarter(event.target.value);
+                        setSelectedId(null);
+                      }}
+                      className="h-10 w-full appearance-none rounded-lg border border-border bg-card px-3 pr-9 text-sm font-medium text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                    >
+                      {quarterOptions.map((option) => (
+                        <option key={option.id} value={option.id}>{option.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                      aria-hidden
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void load(period, selectedQuarter, customRange, showTestResponses, true)}
+            disabled={refreshing}
+            className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition hover:bg-surface-muted/80 disabled:opacity-50 sm:w-auto"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} aria-hidden />
+            Refresh
+          </button>
+        </div>
+
+        {customRangeOpen || period === "custom" ? (
+          <div className="mt-4 border-t border-border pt-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-lg bg-accent/10 p-2 text-accent">
+                  <CalendarDays className="h-4 w-4" aria-hidden />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Custom date range</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Includes survey responses submitted on both selected dates.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <label className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground">
+                  Start date
+                  <input
+                    type="date"
+                    value={customDateStart}
+                    onChange={(event) => {
+                      setCustomDateStart(event.target.value);
+                      setCustomRangeError(null);
+                    }}
+                    className="h-10 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  />
+                </label>
+                <label className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground">
+                  End date
+                  <input
+                    type="date"
+                    value={customDateEnd}
+                    min={customDateStart || undefined}
+                    onChange={(event) => {
+                      setCustomDateEnd(event.target.value);
+                      setCustomRangeError(null);
+                    }}
+                    className="h-10 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  />
+                </label>
                 <button
                   type="button"
-                  onClick={() => {
-                    setCustomRangeOpen(false);
-                    setCustomRangeError(null);
-                  }}
-                  className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition hover:bg-surface-muted/80"
+                  onClick={applyCustomRange}
+                  disabled={refreshing}
+                  className="inline-flex h-10 items-center justify-center rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
                 >
-                  Cancel
+                  Apply dates
                 </button>
-              ) : null}
+                {period !== "custom" ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomRangeOpen(false);
+                      setCustomRangeError(null);
+                    }}
+                    className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition hover:bg-surface-muted/80"
+                  >
+                    Cancel
+                  </button>
+                ) : null}
+              </div>
             </div>
+            {customRangeError ? (
+              <p className="mt-3 text-xs font-medium text-red-600 dark:text-red-400" role="alert">
+                {customRangeError}
+              </p>
+            ) : null}
           </div>
-          {customRangeError ? (
-            <p className="mt-3 text-xs font-medium text-red-600 dark:text-red-400" role="alert">
-              {customRangeError}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       {period === "quarter" && quarter && eligibleEntries !== null ? (
         <QuarterlyDrawSummary quarter={quarter} eligibleEntries={eligibleEntries} />

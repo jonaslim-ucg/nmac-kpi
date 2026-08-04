@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { ChevronDown } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { Check, ChevronDown, Menu, X } from "lucide-react";
 import { AppBrand } from "@/components/dashboard/app-logo";
 import { SIDEBAR_SECTIONS, type SidebarLink, type SidebarSection } from "@/components/dashboard/nmac-2026-nav";
 import { useSession } from "@/components/auth/session-provider";
@@ -79,7 +80,7 @@ function buildSections(
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { user, loading } = useSession();
   const { hideLegacyNav, ready: prefsReady, roleNmacNav, customRoles } = useDashboardPreferences();
 
@@ -90,65 +91,109 @@ export function AppSidebar() {
   );
   const activeMobileNavItem =
     mobileNavItems.find(({ item }) => linkActive(pathname, item.href)) ?? mobileNavItems[0] ?? null;
-  const ActiveMobileIcon = activeMobileNavItem?.item.icon;
-  const activeMobileHref = activeMobileNavItem?.item.href ?? "";
 
   return (
     <>
-      <div className="border-b border-border bg-sidebar lg:hidden">
-        <div className="px-3 py-2">
+      <div
+        className="relative z-50 border-b border-border bg-sidebar lg:hidden"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") setMobileNavOpen(false);
+        }}
+      >
+        <div className="px-3 py-1.5 sm:py-2">
           {!navReady ? (
             <div
-              className="h-[58px] animate-pulse rounded-xl border border-border bg-muted-foreground/10"
+              className="h-12 animate-pulse rounded-xl border border-border bg-muted-foreground/10"
               aria-busy="true"
               aria-label="Loading navigation"
             />
           ) : (
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-border bg-card/80 p-1.5 shadow-sm">
-              <div className="flex min-w-0 items-center gap-2 px-2">
-                {ActiveMobileIcon ? (
-                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-muted text-nav-active-fg ring-1 ring-border">
-                    <ActiveMobileIcon className="h-4 w-4" aria-hidden />
-                  </span>
-                ) : null}
-                <div className="min-w-0">
-                  <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    {activeMobileNavItem?.sectionTitle ?? "Navigation"}
-                  </p>
-                  <p className="truncate text-sm font-semibold text-foreground">
-                    {activeMobileNavItem?.item.label ?? "Navigation"}
-                  </p>
-                </div>
-              </div>
-              <div className="relative">
-                <select
-                  aria-label="Dashboard navigation"
-                  value={activeMobileHref}
-                  onChange={(event) => {
-                    const href = event.currentTarget.value;
-                    if (!mobileNavItems.some(({ item }) => item.href === href)) return;
-                    router.push(href);
-                  }}
-                  className="h-10 w-[132px] appearance-none rounded-lg border border-border bg-surface-muted px-3 pr-8 text-xs font-semibold text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25 sm:w-52"
-                >
-                  {sections.map((section) => (
-                    <optgroup key={section.title} label={section.title}>
-                      {section.items.map((item) => (
-                        <option key={item.href + item.label} value={item.href}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
+            <div className="flex h-12 items-center justify-between gap-3 rounded-xl border border-border bg-card/80 px-3 shadow-sm">
+              <AppBrand layout="sidebar" />
+              <button
+                type="button"
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-surface-muted px-3 text-xs font-semibold text-foreground shadow-sm transition hover:border-accent hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                aria-expanded={mobileNavOpen}
+                aria-controls="mobile-dashboard-navigation"
+                onClick={() => setMobileNavOpen((open) => !open)}
+              >
+                <Menu className="h-4 w-4" aria-hidden />
+                Menu
                 <ChevronDown
-                  className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                  className={`h-4 w-4 text-muted-foreground transition-transform ${mobileNavOpen ? "rotate-180" : ""}`}
                   aria-hidden
                 />
-              </div>
+              </button>
             </div>
           )}
         </div>
+
+        {navReady && mobileNavOpen ? (
+          <>
+            <button
+              type="button"
+              className="fixed inset-0 z-40 cursor-default bg-black/20 backdrop-blur-[1px]"
+              aria-label="Close navigation"
+              onClick={() => setMobileNavOpen(false)}
+            />
+            <div
+              id="mobile-dashboard-navigation"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Dashboard navigation"
+              className="absolute left-3 right-3 top-[calc(100%+0.25rem)] z-50 mx-auto max-h-[min(72vh,34rem)] max-w-5xl overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl"
+            >
+              <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-card/95 px-4 py-3 backdrop-blur-md">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Navigation</p>
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {activeMobileNavItem?.item.label ?? "Choose a page"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-muted text-muted-foreground transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  aria-label="Close navigation"
+                  onClick={() => setMobileNavOpen(false)}
+                >
+                  <X className="h-4 w-4" aria-hidden />
+                </button>
+              </div>
+              <div className="grid gap-3 p-3 sm:grid-cols-2 md:grid-cols-3">
+                {sections.map((section) => (
+                  <section key={section.title} className="rounded-xl border border-border bg-surface-muted/35 p-2">
+                    <p className="px-2 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">
+                      {section.title}
+                    </p>
+                    <div className="space-y-0.5">
+                      {section.items.map((item) => {
+                        const Icon = item.icon;
+                        const active = linkActive(pathname, item.href);
+                        return (
+                          <Link
+                            key={item.href + item.label}
+                            href={item.href}
+                            onClick={() => setMobileNavOpen(false)}
+                            className={
+                              "flex min-h-10 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition " +
+                              (active
+                                ? "bg-nav-active-bg text-nav-active-fg"
+                                : "text-muted-foreground hover:bg-card hover:text-foreground")
+                            }
+                          >
+                            <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                            <span className="min-w-0 flex-1 leading-snug">{item.label}</span>
+                            {active ? <Check className="h-4 w-4 shrink-0" aria-hidden /> : null}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </div>
+          </>
+        ) : null}
       </div>
 
       <aside className="hidden w-[220px] shrink-0 flex-col border-r border-border bg-sidebar lg:flex">

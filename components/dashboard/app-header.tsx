@@ -9,7 +9,7 @@ type Props = { title: string; subtitle?: string };
 export function AppHeader({ title, subtitle }: Props) {
   return (
     <header
-      className="sticky top-0 z-40 flex min-h-[4.25rem] shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3 backdrop-blur-md sm:px-6"
+      className="sticky top-0 z-40 flex min-h-[3.75rem] shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2.5 backdrop-blur-md sm:px-5 lg:min-h-[4.25rem] lg:px-6 lg:py-3"
       style={{
         background: `linear-gradient(135deg, var(--header-gradient-start) 0%, var(--header-gradient-end) 100%)`,
       }}
@@ -21,7 +21,7 @@ export function AppHeader({ title, subtitle }: Props) {
         ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-        <span className="hidden rounded-full border border-border bg-surface-muted px-3.5 py-1 font-mono text-xs font-medium text-accent sm:inline-block">
+        <span className="hidden rounded-full border border-border bg-surface-muted px-3.5 py-1 font-mono text-xs font-medium text-accent lg:inline-block">
           FY 2023-2026
         </span>
         <Link

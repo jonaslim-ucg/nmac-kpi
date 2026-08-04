@@ -15,7 +15,7 @@ export function MainShell({ title, subtitle, children }: Props) {
       <AppSidebar />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <AppHeader title={title} subtitle={subtitle} />
-        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-background/80 px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
+        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-background/80 px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6 xl:px-8 xl:py-8">
           {children}
         </main>
       </div>

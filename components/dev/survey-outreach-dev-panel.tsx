@@ -53,9 +53,9 @@ type SentRow = {
 
 type SentStats = {
   totalRows: number;
-  withInitialSent: number;
-  uniqueRecipients: number;
-  testRows: number;
+  initialRecipients: number;
+  productionInitialRecipients: number;
+  testInitialRecipients: number;
   failedRows: number;
 };
 
@@ -1058,18 +1058,17 @@ export function SurveyOutreachDevPanel() {
             <h2 className="text-sm font-semibold text-foreground">Emails sent</h2>
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Survey outreach rows with at least one email delivered.
+            Initial survey recipients only. Reminders do not increase these totals.
           </p>
         </div>
 
         <div className="space-y-4 px-4 py-4 sm:px-5">
           {stats && (
-            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {[
-                ["Initial emails sent", stats.withInitialSent],
-                ["Unique recipients", stats.uniqueRecipients],
-                ["Production sends", stats.withInitialSent - stats.testRows],
-                ["Test sends", stats.testRows],
+                ["Initial surveys sent", stats.initialRecipients],
+                ["Production recipients", stats.productionInitialRecipients],
+                ["Test recipients", stats.testInitialRecipients],
                 ["Send failures", stats.failedRows],
                 ["Undelivered recipients", bounceSummary?.production ?? 0],
               ].map(([label, value]) => (

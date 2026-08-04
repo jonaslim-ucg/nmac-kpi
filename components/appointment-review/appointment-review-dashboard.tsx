@@ -149,9 +149,9 @@ export function AppointmentReviewDashboard({ stats, numberSent, onViewReview }: 
       <SummaryCards
         cards={[
           {
-            label: "Survey emails sent",
+            label: "Initial surveys sent",
             value: String(numberSent),
-            hint: "Live survey outreach emails sent in this period",
+            hint: "One per patient email in this period; reminders excluded",
           },
           {
             label: "Total responses",

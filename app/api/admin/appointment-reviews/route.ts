@@ -18,6 +18,7 @@ import {
   listSurveyOutreachForReport,
 } from "@/lib/survey-outreach/store";
 import { isScheduledTestRecipientAllowed } from "@/lib/survey-outreach/config";
+import { summarizeUniqueInitialRecipients } from "@/lib/survey-outreach/sent-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -131,13 +132,14 @@ export async function GET(req: Request) {
     outreachProviderReport,
     responseOnlyProviderReport,
   );
+  const initialRecipients = summarizeUniqueInitialRecipients(outreachResult.rows);
 
   return NextResponse.json(
     {
       dateStart: range.dateStart,
       dateEnd: range.dateEnd,
       includeTests,
-      numberSent: outreachResult.rows.length,
+      numberSent: initialRecipients.total,
       numberResponses: rows.length,
       quarter: range.quarter ?? null,
       currentQuarter: currentAppointmentReviewQuarter(now),

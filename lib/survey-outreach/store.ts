@@ -1,4 +1,5 @@
 import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { summarizeUniqueInitialRecipients } from "@/lib/survey-outreach/sent-stats";
 import type { DailyOutreachGroup } from "@/lib/survey-outreach/daily-group";
 import type { SurveyOutreachLookup, SurveyOutreachRow, SurveyOutreachStage } from "@/lib/survey-outreach/types";
 
@@ -493,9 +494,9 @@ export type SurveyOutreachListResult = {
   total: number;
   stats: {
     totalRows: number;
-    withInitialSent: number;
-    uniqueRecipients: number;
-    testRows: number;
+    initialRecipients: number;
+    productionInitialRecipients: number;
+    testInitialRecipients: number;
     failedRows: number;
   };
 };
@@ -637,39 +638,33 @@ export async function listSurveyOutreachForDev(
     .from("survey_outreach")
     .select("*", { count: "exact", head: true });
 
-  const { count: withInitialSent } = await supabase
-    .from("survey_outreach")
-    .select("*", { count: "exact", head: true })
-    .not("initial_sent_at", "is", null);
-
-  const { count: testRows } = await supabase
-    .from("survey_outreach")
-    .select("*", { count: "exact", head: true })
-    .eq("is_test", true)
-    .not("initial_sent_at", "is", null);
-
   const { count: failedRows } = await supabase
     .from("survey_outreach")
     .select("*", { count: "exact", head: true })
     .eq("status", "failed");
 
-  const { data: uniqueEmails } = await supabase
-    .from("survey_outreach")
-    .select("patient_email")
-    .not("initial_sent_at", "is", null);
-
-  const uniqueRecipients = new Set(
-    (uniqueEmails ?? []).map((r) => String(r.patient_email).toLowerCase()),
-  ).size;
+  const initialRows: { patient_email: string | null; is_test: boolean }[] = [];
+  const pageSize = 1_000;
+  for (let pageOffset = 0; ; pageOffset += pageSize) {
+    const { data: initialPage, error: initialPageError } = await supabase
+      .from("survey_outreach")
+      .select("patient_email,is_test")
+      .not("initial_sent_at", "is", null)
+      .range(pageOffset, pageOffset + pageSize - 1);
+    if (initialPageError) throw new Error(initialPageError.message);
+    initialRows.push(...((initialPage ?? []) as typeof initialRows));
+    if ((initialPage?.length ?? 0) < pageSize) break;
+  }
+  const initialRecipients = summarizeUniqueInitialRecipients(initialRows);
 
   return {
     rows: (data ?? []) as SurveyOutreachRow[],
     total: count ?? 0,
     stats: {
       totalRows: totalRows ?? 0,
-      withInitialSent: withInitialSent ?? 0,
-      uniqueRecipients,
-      testRows: testRows ?? 0,
+      initialRecipients: initialRecipients.total,
+      productionInitialRecipients: initialRecipients.production,
+      testInitialRecipients: initialRecipients.tests,
       failedRows: failedRows ?? 0,
     },
   };

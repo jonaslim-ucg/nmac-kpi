@@ -256,7 +256,7 @@ export default function AdminAppointmentReviewsPage() {
     >
       <div className="dashboard-card mb-6 p-3 sm:p-4">
         <span className="dashboard-card-accent" aria-hidden />
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div className="flex flex-col gap-4">
           <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-end lg:gap-6">
             <div className="shrink-0">
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
@@ -349,19 +349,19 @@ export default function AdminAppointmentReviewsPage() {
                     />
                   </div>
                 ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => void load(period, selectedQuarter, customRange, showTestResponses, true)}
+                  disabled={refreshing}
+                  className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition hover:bg-surface-muted/80 disabled:opacity-50 sm:w-auto"
+                >
+                  <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} aria-hidden />
+                  Refresh
+                </button>
               </div>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={() => void load(period, selectedQuarter, customRange, showTestResponses, true)}
-            disabled={refreshing}
-            className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition hover:bg-surface-muted/80 disabled:opacity-50 sm:w-auto"
-          >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} aria-hidden />
-            Refresh
-          </button>
         </div>
 
         {customRangeOpen || period === "custom" ? (

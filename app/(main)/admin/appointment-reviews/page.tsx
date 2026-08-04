@@ -15,12 +15,18 @@ import type { AppointmentReviewQuarter } from "@/lib/appointment-review/report";
 import { APPOINTMENT_REVIEWS_SETUP_SQL } from "@/lib/appointment-review/store";
 import { isNmacNavHrefAllowed } from "@/lib/auth/role-nmac-nav";
 
-type ReviewPeriod = "all" | "quarter" | "30" | "90";
+type ReviewPeriod = "all" | "quarter" | "30" | "90" | "custom";
 type Tab = "overview" | "reviews";
+
+type CustomDateRange = {
+  start: string;
+  end: string;
+};
 
 type ApiResponse = {
   stats?: AppointmentReviewStats;
   reviews?: AppointmentReviewDetail[];
+  numberSent?: number;
   quarter?: AppointmentReviewQuarter | null;
   currentQuarter?: AppointmentReviewQuarter;
   eligibleEntries?: number | null;
@@ -46,11 +52,24 @@ function availableQuarters(current: AppointmentReviewQuarter | null): { id: stri
   return options;
 }
 
+function formatCalendarDate(value: string): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(`${value}T12:00:00`));
+  } catch {
+    return value;
+  }
+}
+
 export default function AdminAppointmentReviewsPage() {
   const { user, loading } = useSession();
   const { ready: prefsReady, roleNmacNav } = useDashboardPreferences();
   const [stats, setStats] = useState<AppointmentReviewStats | null>(null);
   const [reviews, setReviews] = useState<AppointmentReviewDetail[]>([]);
+  const [numberSent, setNumberSent] = useState(0);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -63,6 +82,11 @@ export default function AdminAppointmentReviewsPage() {
   const [tab, setTab] = useState<Tab>("overview");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showTestResponses, setShowTestResponses] = useState(false);
+  const [customRangeOpen, setCustomRangeOpen] = useState(false);
+  const [customDateStart, setCustomDateStart] = useState("");
+  const [customDateEnd, setCustomDateEnd] = useState("");
+  const [customRange, setCustomRange] = useState<CustomDateRange | null>(null);
+  const [customRangeError, setCustomRangeError] = useState<string | null>(null);
   const hasLoaded = useRef(false);
   const latestLoadRequest = useRef(0);
 
@@ -84,14 +108,19 @@ export default function AdminAppointmentReviewsPage() {
         return "Last 30 days";
       case "90":
         return "Last 90 days";
+      case "custom":
+        return customRange
+          ? `${formatCalendarDate(customRange.start)} – ${formatCalendarDate(customRange.end)}`
+          : "Custom dates";
       default:
         return "All";
     }
-  }, [period, quarter]);
+  }, [customRange, period, quarter]);
 
   const load = useCallback(async (
     filter: ReviewPeriod,
     quarterId: string | null,
+    customDateRange: CustomDateRange | null,
     includeTestResponses: boolean,
     silent = false,
   ) => {
@@ -109,6 +138,10 @@ export default function AdminAppointmentReviewsPage() {
         else params.set("range", "quarter");
       }
       if (filter === "30" || filter === "90") params.set("days", filter);
+      if (filter === "custom" && customDateRange) {
+        params.set("dateStart", customDateRange.start);
+        params.set("dateEnd", customDateRange.end);
+      }
 
       const liveParams = new URLSearchParams(params);
       liveParams.set("includeTests", "false");
@@ -131,6 +164,7 @@ export default function AdminAppointmentReviewsPage() {
         }
         setStats(null);
         setReviews([]);
+        setNumberSent(0);
         setQuarter(null);
         setEligibleEntries(null);
         return;
@@ -149,6 +183,7 @@ export default function AdminAppointmentReviewsPage() {
 
       setStats(liveData.stats ?? null);
       setReviews(displayedReviews);
+      setNumberSent(typeof liveData.numberSent === "number" ? liveData.numberSent : 0);
       setQuarter(liveData.quarter ?? null);
       setCurrentQuarter(liveData.currentQuarter ?? null);
       setEligibleEntries(
@@ -159,6 +194,7 @@ export default function AdminAppointmentReviewsPage() {
       setLoadError("Could not load results.");
       setStats(null);
       setReviews([]);
+      setNumberSent(0);
       setQuarter(null);
       setEligibleEntries(null);
     } finally {
@@ -171,8 +207,23 @@ export default function AdminAppointmentReviewsPage() {
 
   useEffect(() => {
     if (loading || !allowed) return;
-    void load(period, selectedQuarter, showTestResponses, hasLoaded.current);
-  }, [allowed, load, loading, period, selectedQuarter, showTestResponses]);
+    void load(period, selectedQuarter, customRange, showTestResponses, hasLoaded.current);
+  }, [allowed, customRange, load, loading, period, selectedQuarter, showTestResponses]);
+
+  const applyCustomRange = useCallback(() => {
+    if (!customDateStart || !customDateEnd) {
+      setCustomRangeError("Choose both a start date and an end date.");
+      return;
+    }
+    if (customDateStart > customDateEnd) {
+      setCustomRangeError("The start date must be on or before the end date.");
+      return;
+    }
+    setCustomRangeError(null);
+    setCustomRange({ start: customDateStart, end: customDateEnd });
+    setPeriod("custom");
+    setSelectedId(null);
+  }, [customDateEnd, customDateStart]);
 
   const viewReview = useCallback((id: string) => {
     setSelectedId(id);
@@ -239,6 +290,8 @@ export default function AdminAppointmentReviewsPage() {
                 type="button"
                 onClick={() => {
                   setPeriod(id);
+                  setCustomRangeOpen(false);
+                  setCustomRangeError(null);
                   setSelectedId(null);
                 }}
                 className={
@@ -251,6 +304,21 @@ export default function AdminAppointmentReviewsPage() {
                 {label}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => {
+                setCustomRangeOpen(true);
+                setCustomRangeError(null);
+              }}
+              className={
+                "shrink-0 rounded-lg border px-3 py-1.5 text-sm font-medium transition " +
+                (period === "custom" || customRangeOpen
+                  ? "border-accent bg-nav-active-bg text-nav-active-fg"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground")
+              }
+            >
+              Custom dates
+            </button>
             {period === "quarter" && quarterOptions.length > 0 ? (
               <select
                 aria-label="Survey quarter"
@@ -270,7 +338,7 @@ export default function AdminAppointmentReviewsPage() {
         </div>
         <button
           type="button"
-          onClick={() => void load(period, selectedQuarter, showTestResponses, true)}
+          onClick={() => void load(period, selectedQuarter, customRange, showTestResponses, true)}
           disabled={refreshing}
           className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-surface-muted/80 disabled:opacity-50 sm:w-auto"
         >
@@ -278,6 +346,72 @@ export default function AdminAppointmentReviewsPage() {
           Refresh
         </button>
       </div>
+
+      {customRangeOpen || period === "custom" ? (
+        <div className="dashboard-card mb-6 p-4 sm:p-5">
+          <span className="dashboard-card-accent" aria-hidden />
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Custom date range</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Includes survey responses submitted on both selected dates.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <label className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground">
+                Start date
+                <input
+                  type="date"
+                  value={customDateStart}
+                  onChange={(event) => {
+                    setCustomDateStart(event.target.value);
+                    setCustomRangeError(null);
+                  }}
+                  className="h-10 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none transition focus:border-accent"
+                />
+              </label>
+              <label className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground">
+                End date
+                <input
+                  type="date"
+                  value={customDateEnd}
+                  min={customDateStart || undefined}
+                  onChange={(event) => {
+                    setCustomDateEnd(event.target.value);
+                    setCustomRangeError(null);
+                  }}
+                  className="h-10 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none transition focus:border-accent"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={applyCustomRange}
+                disabled={refreshing}
+                className="inline-flex h-10 items-center justify-center rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
+              >
+                Apply dates
+              </button>
+              {period !== "custom" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomRangeOpen(false);
+                    setCustomRangeError(null);
+                  }}
+                  className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition hover:bg-surface-muted/80"
+                >
+                  Cancel
+                </button>
+              ) : null}
+            </div>
+          </div>
+          {customRangeError ? (
+            <p className="mt-3 text-xs font-medium text-red-600 dark:text-red-400" role="alert">
+              {customRangeError}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {period === "quarter" && quarter && eligibleEntries !== null ? (
         <QuarterlyDrawSummary quarter={quarter} eligibleEntries={eligibleEntries} />
@@ -296,7 +430,11 @@ export default function AdminAppointmentReviewsPage() {
       ) : null}
 
       {tab === "overview" && stats ? (
-        <AppointmentReviewDashboard stats={stats} onViewReview={viewReview} />
+        <AppointmentReviewDashboard
+          stats={stats}
+          numberSent={numberSent}
+          onViewReview={viewReview}
+        />
       ) : null}
 
       {tab === "reviews" ? (

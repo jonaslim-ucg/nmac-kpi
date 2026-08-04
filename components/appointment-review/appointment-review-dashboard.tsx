@@ -131,9 +131,13 @@ function YesNoPie({ title, data }: { title: string; data: AppointmentReviewStats
   );
 }
 
-type Props = { stats: AppointmentReviewStats; onViewReview?: (id: string) => void };
+type Props = {
+  stats: AppointmentReviewStats;
+  numberSent: number;
+  onViewReview?: (id: string) => void;
+};
 
-export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
+export function AppointmentReviewDashboard({ stats, numberSent, onViewReview }: Props) {
   const empty = stats.total === 0;
   const ratingScores = stats.ratingScores.map((score) => ({
     ...score,
@@ -144,6 +148,11 @@ export function AppointmentReviewDashboard({ stats, onViewReview }: Props) {
     <div className="space-y-6">
       <SummaryCards
         cards={[
+          {
+            label: "Survey emails sent",
+            value: String(numberSent),
+            hint: "Live survey outreach emails sent in this period",
+          },
           {
             label: "Total responses",
             value: String(stats.total),

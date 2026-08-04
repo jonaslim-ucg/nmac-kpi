@@ -32,6 +32,8 @@ export type SurveyOutreachSchedulerHealth = ReturnType<typeof schedulerConfigura
     errors: number;
     syncErrors: number;
     deferredDue: number;
+    bounces?: number;
+    bounceErrors?: number;
   } | null;
 };
 

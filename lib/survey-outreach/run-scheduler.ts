@@ -42,6 +42,10 @@ import {
   schedulerModeAllowsOutreach,
   type SurveyOutreachSchedulerMode,
 } from "@/lib/survey-outreach/scheduler-eligibility";
+import {
+  trackSurveyEmailBounces,
+  type SurveyBounceTrackingResult,
+} from "@/lib/survey-outreach/bounce-tracker";
 
 export type SchedulerResult = {
   ok: true;
@@ -65,6 +69,7 @@ export type SchedulerResult = {
     retryAt: string | null;
     permanent: boolean;
   }[];
+  bounceTracking: SurveyBounceTrackingResult;
 };
 
 type SchedulerOptions = {
@@ -375,6 +380,23 @@ export async function runSurveyOutreachScheduler(
     }
   }
 
+  let bounceTracking: SurveyBounceTrackingResult = {
+    scanned: 0,
+    recorded: 0,
+    matched: 0,
+    suppressed: 0,
+    duplicates: 0,
+    ignored: 0,
+    errors: [],
+  };
+  try {
+    bounceTracking = await trackSurveyEmailBounces(now);
+  } catch (error) {
+    bounceTracking.errors.push(
+      error instanceof Error ? error.message : "Survey bounce tracking failed.",
+    );
+  }
+
   const result: SchedulerResult = {
     ok: true,
     sendingEnabled,
@@ -391,20 +413,30 @@ export async function runSurveyOutreachScheduler(
     sent,
     skipped,
     errors,
+    bounceTracking,
   };
 
   await recordSurveyOutreachSchedulerRun({
     at: now.toISOString(),
     successful:
-      configurationErrors.length === 0 && sync.syncErrors.length === 0 && errors.length === 0,
+      configurationErrors.length === 0
+      && sync.syncErrors.length === 0
+      && errors.length === 0
+      && bounceTracking.errors.length === 0,
     error:
-      configurationErrors[0] ?? errors[0]?.error ?? sync.syncErrors[0]?.error ?? null,
+      configurationErrors[0]
+      ?? errors[0]?.error
+      ?? sync.syncErrors[0]?.error
+      ?? bounceTracking.errors[0]
+      ?? null,
     result: {
       sent: sent.length,
       skipped: skipped.length,
       errors: errors.length + configurationErrors.length,
       syncErrors: sync.syncErrors.length,
       deferredDue,
+      bounces: bounceTracking.recorded,
+      bounceErrors: bounceTracking.errors.length,
     },
   }).catch(() => undefined);
 

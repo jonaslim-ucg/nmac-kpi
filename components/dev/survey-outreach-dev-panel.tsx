@@ -59,6 +59,26 @@ type SentStats = {
   failedRows: number;
 };
 
+type BounceSummary = {
+  total: number;
+  production: number;
+  tests: number;
+  unmatched: number;
+  hard: number;
+};
+
+type BounceRow = {
+  id: string;
+  recipientEmail: string | null;
+  stage: SurveyOutreachStage | null;
+  isTest: boolean | null;
+  receivedAt: string;
+  statusCode: string | null;
+  reason: string;
+  hardBounce: boolean;
+  matched: boolean;
+};
+
 type SchedulerHealth = {
   ready: boolean;
   cronAuthConfigured: boolean;
@@ -158,6 +178,8 @@ export function SurveyOutreachDevPanel() {
 
   const [rows, setRows] = useState<SentRow[]>([]);
   const [stats, setStats] = useState<SentStats | null>(null);
+  const [bounceSummary, setBounceSummary] = useState<BounceSummary | null>(null);
+  const [bounces, setBounces] = useState<BounceRow[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [search, setSearch] = useState("");
@@ -271,6 +293,8 @@ export function SurveyOutreachDevPanel() {
         rows?: SentRow[];
         total?: number;
         stats?: SentStats;
+        bounceSummary?: BounceSummary;
+        bounces?: BounceRow[];
         error?: string;
       };
       if (!r.ok) {
@@ -280,6 +304,8 @@ export function SurveyOutreachDevPanel() {
       setRows(j.rows ?? []);
       setTotal(j.total ?? 0);
       setStats(j.stats ?? null);
+      setBounceSummary(j.bounceSummary ?? null);
+      setBounces(j.bounces ?? []);
     } finally {
       setSentLoading(false);
     }
@@ -1038,19 +1064,74 @@ export function SurveyOutreachDevPanel() {
 
         <div className="space-y-4 px-4 py-4 sm:px-5">
           {stats && (
-            <div className="grid gap-3 sm:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
               {[
                 ["Initial emails sent", stats.withInitialSent],
                 ["Unique recipients", stats.uniqueRecipients],
                 ["Production sends", stats.withInitialSent - stats.testRows],
                 ["Test sends", stats.testRows],
-                ["Failed messages", stats.failedRows],
+                ["Send failures", stats.failedRows],
+                ["Undelivered emails", bounceSummary?.production ?? 0],
               ].map(([label, value]) => (
                 <div key={String(label)} className="rounded-lg border border-border bg-surface-muted/30 px-3 py-2">
                   <p className="text-xs text-muted-foreground">{label}</p>
                   <p className="text-lg font-semibold text-foreground">{value}</p>
                 </div>
               ))}
+            </div>
+          )}
+
+          {bounces.length > 0 && (
+            <div className="overflow-hidden rounded-lg border border-amber-500/30">
+              <div className="flex flex-col gap-1 border-b border-amber-500/30 bg-amber-500/10 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <TriangleAlert className="h-4 w-4 text-amber-700 dark:text-amber-300" />
+                  <h3 className="text-sm font-semibold text-foreground">Undelivered emails</h3>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {bounceSummary?.production ?? 0} production · {bounceSummary?.tests ?? 0} test
+                  {(bounceSummary?.unmatched ?? 0) > 0 ? ` · ${bounceSummary?.unmatched} unmatched` : ""}
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="border-b border-border bg-surface-muted/40 text-xs text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Recipient</th>
+                      <th className="px-3 py-2 font-medium">Message</th>
+                      <th className="px-3 py-2 font-medium">Reported</th>
+                      <th className="px-3 py-2 font-medium">Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bounces.map((bounce) => (
+                      <tr key={bounce.id} className="border-b border-border/60 last:border-0">
+                        <td className="px-3 py-2">
+                          <span className="text-foreground">{bounce.recipientEmail ?? "Unknown recipient"}</span>
+                          <span className="mt-0.5 block text-[10px] font-medium uppercase text-muted-foreground">
+                            {bounce.isTest ? "Test" : bounce.matched ? "Production" : "Unmatched"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-xs capitalize text-muted-foreground">
+                          {bounce.stage ? bounce.stage.replace("reminder", "Reminder ") : "Unknown stage"}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
+                          {formatWhen(bounce.receivedAt)}
+                        </td>
+                        <td className="min-w-64 px-3 py-2 text-xs text-muted-foreground">
+                          <span className="text-foreground">{bounce.reason}</span>
+                          {bounce.statusCode && <span className="ml-1 font-mono">({bounce.statusCode})</span>}
+                          {bounce.hardBounce && (
+                            <span className="mt-1 block text-[10px] font-medium uppercase text-amber-700 dark:text-amber-300">
+                              Future reminders stopped
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 

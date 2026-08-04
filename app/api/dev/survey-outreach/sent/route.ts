@@ -9,6 +9,10 @@ import {
   updateManualNextScheduledAt,
 } from "@/lib/survey-outreach/store";
 import type { SurveyOutreachRow } from "@/lib/survey-outreach/types";
+import {
+  getSurveyOutreachBounceSummary,
+  listSurveyOutreachBounces,
+} from "@/lib/survey-outreach/bounce-store";
 
 export const dynamic = "force-dynamic";
 
@@ -66,14 +70,28 @@ export async function GET(req: Request) {
   const sentOnly = url.searchParams.get("sentOnly") !== "false";
 
   try {
-    const [result, schedule] = await Promise.all([
+    const [result, schedule, bounceSummary, bounces] = await Promise.all([
       listSurveyOutreachForDev({ limit, offset, search, testOnly, sentOnly }),
       getSurveyOutreachSchedule(),
+      getSurveyOutreachBounceSummary(),
+      listSurveyOutreachBounces(20),
     ]);
     return NextResponse.json({
       rows: result.rows.map((row) => toDevRow(row, schedule)),
       total: result.total,
       stats: result.stats,
+      bounceSummary,
+      bounces: bounces.map((bounce) => ({
+        id: bounce.id,
+        recipientEmail: bounce.recipient_email,
+        stage: bounce.stage,
+        isTest: bounce.is_test,
+        receivedAt: bounce.received_at,
+        statusCode: bounce.status_code,
+        reason: bounce.reason,
+        hardBounce: bounce.hard_bounce,
+        matched: Boolean(bounce.outreach_id),
+      })),
     });
   } catch (e) {
     return NextResponse.json(

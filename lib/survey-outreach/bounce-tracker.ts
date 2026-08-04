@@ -1,5 +1,9 @@
 import { getGraphAccessToken } from "@/lib/graph/send-mail";
 import {
+  graphRetryDelayMs,
+  isRetryableGraphReadStatus,
+} from "@/lib/graph/retry";
+import {
   bounceDiagnostic,
   bounceReason,
   bounceRecipient,
@@ -12,8 +16,8 @@ import {
   type GraphInternetMessageHeader,
 } from "@/lib/survey-outreach/bounce-parser";
 import {
+  claimSurveyBounceScan,
   existingSurveyBounceMessageIds,
-  getSurveyBounceScanState,
   recordSurveyBounce,
   recordSurveyBounceScan,
 } from "@/lib/survey-outreach/bounce-store";
@@ -23,7 +27,8 @@ const GRAPH_TIMEOUT_MS = 15_000;
 const INITIAL_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
 const CHECKPOINT_OVERLAP_MS = 10 * 60 * 1000;
 const MAX_LIST_PAGES = 20;
-const PROCESSING_BATCH_SIZE = 5;
+const GRAPH_MAX_ATTEMPTS = 4;
+const MESSAGE_PACING_MS = 100;
 const DELIVERY_KEY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type GraphMessage = {
@@ -50,6 +55,7 @@ export type SurveyBounceTrackingResult = {
   suppressed: number;
   duplicates: number;
   ignored: number;
+  skippedLocked: boolean;
   errors: string[];
 };
 
@@ -67,17 +73,42 @@ function graphHeaders(token: string): HeadersInit {
   };
 }
 
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function graphJson<T>(token: string, url: string): Promise<T> {
   if (!url.startsWith(`${GRAPH_ROOT}/`)) throw new Error("Microsoft Graph returned an invalid page URL.");
-  const response = await fetch(url, {
-    headers: graphHeaders(token),
-    signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
-  });
-  if (!response.ok) {
+
+  for (let attempt = 0; attempt < GRAPH_MAX_ATTEMPTS; attempt++) {
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: graphHeaders(token),
+        signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+      });
+    } catch (error) {
+      if (attempt + 1 < GRAPH_MAX_ATTEMPTS) {
+        await wait(Math.min(30_000, 2_000 * 2 ** attempt));
+        continue;
+      }
+      throw new Error(
+        error instanceof Error
+          ? `Microsoft Graph mailbox read failed: ${error.message}`
+          : "Microsoft Graph mailbox read failed.",
+      );
+    }
+
+    if (response.ok) return (await response.json()) as T;
     const detail = (await response.text()).replace(/\s+/g, " ").trim().slice(0, 500);
+    if (isRetryableGraphReadStatus(response.status) && attempt + 1 < GRAPH_MAX_ATTEMPTS) {
+      await wait(graphRetryDelayMs(response.headers, attempt));
+      continue;
+    }
     throw new Error(`Microsoft Graph mailbox read failed: ${response.status} ${detail}`);
   }
-  return (await response.json()) as T;
+
+  throw new Error("Microsoft Graph mailbox read failed after retries.");
 }
 
 function graphUrl(path: string, params: URLSearchParams): string {
@@ -186,11 +217,6 @@ async function processNdr(token: string, sender: string, summary: GraphMessage) 
 export async function trackSurveyEmailBounces(now = new Date()): Promise<SurveyBounceTrackingResult> {
   const sender = process.env.GRAPH_SENDER_EMAIL?.trim();
   if (!sender) throw new Error("GRAPH_SENDER_EMAIL is not configured for bounce tracking.");
-  const state = await getSurveyBounceScanState();
-  const previous = state.lastCheckedAt ? new Date(state.lastCheckedAt) : null;
-  const from = previous && Number.isFinite(previous.getTime())
-    ? new Date(previous.getTime() - CHECKPOINT_OVERLAP_MS)
-    : new Date(now.getTime() - INITIAL_LOOKBACK_MS);
   const result: SurveyBounceTrackingResult = {
     scanned: 0,
     recorded: 0,
@@ -198,8 +224,19 @@ export async function trackSurveyEmailBounces(now = new Date()): Promise<SurveyB
     suppressed: 0,
     duplicates: 0,
     ignored: 0,
+    skippedLocked: false,
     errors: [],
   };
+  const lease = await claimSurveyBounceScan(now);
+  if (!lease) {
+    result.skippedLocked = true;
+    return result;
+  }
+  const state = lease.state;
+  const previous = state.lastCheckedAt ? new Date(state.lastCheckedAt) : null;
+  const from = previous && Number.isFinite(previous.getTime())
+    ? new Date(previous.getTime() - CHECKPOINT_OVERLAP_MS)
+    : new Date(now.getTime() - INITIAL_LOOKBACK_MS);
 
   try {
     const token = await getGraphAccessToken();
@@ -207,37 +244,31 @@ export async function trackSurveyEmailBounces(now = new Date()): Promise<SurveyB
     result.scanned = summaries.length;
     const existing = await existingSurveyBounceMessageIds(summaries.map((message) => message.id));
 
-    for (let offset = 0; offset < summaries.length; offset += PROCESSING_BATCH_SIZE) {
-      const outcomes = await Promise.all(
-        summaries.slice(offset, offset + PROCESSING_BATCH_SIZE).map(async (summary) => {
-          if (existing.has(summary.id)) return { kind: "duplicate" as const };
-          try {
-            const recorded = await processNdr(token, sender, summary);
-            return recorded ? { kind: "recorded" as const, recorded } : { kind: "ignored" as const };
-          } catch (error) {
-            return { kind: "error" as const, error: compactError(error) };
-          }
-        }),
-      );
-
-      for (const outcome of outcomes) {
-        if (outcome.kind === "duplicate") result.duplicates++;
-        if (outcome.kind === "ignored") result.ignored++;
-        if (outcome.kind === "error") result.errors.push(outcome.error);
-        if (outcome.kind === "recorded") {
-          if (!outcome.recorded.created) {
-            result.duplicates++;
-            continue;
-          }
-          result.recorded++;
-          if (outcome.recorded.matched) result.matched++;
-          if (outcome.recorded.suppressed) result.suppressed++;
-        }
+    for (const [index, summary] of summaries.entries()) {
+      if (existing.has(summary.id)) {
+        result.duplicates++;
+        continue;
       }
+      try {
+        const recorded = await processNdr(token, sender, summary);
+        if (!recorded) {
+          result.ignored++;
+        } else if (!recorded.created) {
+          result.duplicates++;
+        } else {
+          result.recorded++;
+          if (recorded.matched) result.matched++;
+          if (recorded.suppressed) result.suppressed++;
+        }
+      } catch (error) {
+        result.errors.push(compactError(error));
+      }
+      if (index + 1 < summaries.length) await wait(MESSAGE_PACING_MS);
     }
 
     const successful = result.errors.length === 0;
     await recordSurveyBounceScan({
+      lockToken: lease.token,
       checkedAt: successful ? now.toISOString() : state.lastCheckedAt ?? from.toISOString(),
       successful,
       error: result.errors[0] ?? null,
@@ -248,6 +279,7 @@ export async function trackSurveyEmailBounces(now = new Date()): Promise<SurveyB
     const message = compactError(error);
     result.errors.push(message);
     await recordSurveyBounceScan({
+      lockToken: lease.token,
       checkedAt: state.lastCheckedAt ?? from.toISOString(),
       successful: false,
       error: message,

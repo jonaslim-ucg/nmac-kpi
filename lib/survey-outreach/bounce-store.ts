@@ -41,6 +41,11 @@ export type SurveyOutreachBounceScanState = {
   lastError: string | null;
 };
 
+export type SurveyOutreachBounceScanLease = {
+  token: string;
+  state: SurveyOutreachBounceScanState;
+};
+
 export type RecordSurveyBounceInput = {
   graphMessageId: string;
   graphSentMessageId: string | null;
@@ -181,16 +186,11 @@ export async function recordSurveyBounce(input: RecordSurveyBounceInput): Promis
   return { created: true, matched: Boolean(outreach), suppressed };
 }
 
-export async function getSurveyBounceScanState(): Promise<SurveyOutreachBounceScanState> {
-  const supabase = createServiceRoleClient();
-  const { data, error } = await supabase
-    .from("app_settings")
-    .select(
-      "survey_outreach_bounce_last_checked_at,survey_outreach_bounce_last_success_at,survey_outreach_bounce_last_error",
-    )
-    .eq("id", APP_SETTINGS_ID)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
+function bounceScanState(data: {
+  survey_outreach_bounce_last_checked_at?: string | null;
+  survey_outreach_bounce_last_success_at?: string | null;
+  survey_outreach_bounce_last_error?: string | null;
+} | null): SurveyOutreachBounceScanState {
   return {
     lastCheckedAt: data?.survey_outreach_bounce_last_checked_at ?? null,
     lastSuccessAt: data?.survey_outreach_bounce_last_success_at ?? null,
@@ -198,7 +198,32 @@ export async function getSurveyBounceScanState(): Promise<SurveyOutreachBounceSc
   };
 }
 
+export async function claimSurveyBounceScan(
+  now: Date,
+  lockMs = 5 * 60 * 1_000,
+): Promise<SurveyOutreachBounceScanLease | null> {
+  const supabase = createServiceRoleClient();
+  const token = crypto.randomUUID();
+  const { data, error } = await supabase
+    .from("app_settings")
+    .update({
+      survey_outreach_bounce_lock_token: token,
+      survey_outreach_bounce_lock_until: new Date(now.getTime() + lockMs).toISOString(),
+    })
+    .eq("id", APP_SETTINGS_ID)
+    .or(
+      `survey_outreach_bounce_lock_until.is.null,survey_outreach_bounce_lock_until.lt.${now.toISOString()}`,
+    )
+    .select(
+      "survey_outreach_bounce_last_checked_at,survey_outreach_bounce_last_success_at,survey_outreach_bounce_last_error",
+    )
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? { token, state: bounceScanState(data) } : null;
+}
+
 export async function recordSurveyBounceScan(input: {
+  lockToken: string;
   checkedAt: string;
   successful: boolean;
   error: string | null;
@@ -212,8 +237,11 @@ export async function recordSurveyBounceScan(input: {
       ...(input.successful ? { survey_outreach_bounce_last_success_at: input.checkedAt } : {}),
       survey_outreach_bounce_last_error: input.error,
       survey_outreach_bounce_last_result: input.result,
+      survey_outreach_bounce_lock_token: null,
+      survey_outreach_bounce_lock_until: null,
     })
-    .eq("id", APP_SETTINGS_ID);
+    .eq("id", APP_SETTINGS_ID)
+    .eq("survey_outreach_bounce_lock_token", input.lockToken);
   if (error) throw new Error(error.message);
 }
 

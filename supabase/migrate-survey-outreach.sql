@@ -119,4 +119,6 @@ alter table public.app_settings
   add column if not exists survey_outreach_bounce_last_checked_at timestamptz,
   add column if not exists survey_outreach_bounce_last_success_at timestamptz,
   add column if not exists survey_outreach_bounce_last_error text,
-  add column if not exists survey_outreach_bounce_last_result jsonb;
+  add column if not exists survey_outreach_bounce_last_result jsonb,
+  add column if not exists survey_outreach_bounce_lock_token uuid,
+  add column if not exists survey_outreach_bounce_lock_until timestamptz;

@@ -387,6 +387,7 @@ export async function runSurveyOutreachScheduler(
     suppressed: 0,
     duplicates: 0,
     ignored: 0,
+    skippedLocked: false,
     errors: [],
   };
   try {

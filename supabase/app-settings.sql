@@ -14,6 +14,8 @@ create table if not exists public.app_settings (
   survey_outreach_bounce_last_success_at timestamptz,
   survey_outreach_bounce_last_error text,
   survey_outreach_bounce_last_result jsonb,
+  survey_outreach_bounce_lock_token uuid,
+  survey_outreach_bounce_lock_until timestamptz,
   nmac_month_cache_revision bigint not null default 0,
   hidden_nmac_kpi_ids jsonb not null default '["call_answered","call_missed","leakage","eod","checkin_checkout","appt_confirm","sop","engage","revenue","net_margin","revenue_trend"]'::jsonb,
   updated_at timestamptz not null default now(),
@@ -49,7 +51,9 @@ alter table public.app_settings
   add column if not exists survey_outreach_bounce_last_checked_at timestamptz,
   add column if not exists survey_outreach_bounce_last_success_at timestamptz,
   add column if not exists survey_outreach_bounce_last_error text,
-  add column if not exists survey_outreach_bounce_last_result jsonb;
+  add column if not exists survey_outreach_bounce_last_result jsonb,
+  add column if not exists survey_outreach_bounce_lock_token uuid,
+  add column if not exists survey_outreach_bounce_lock_until timestamptz;
 
 insert into public.app_settings (id)
 values ('default')

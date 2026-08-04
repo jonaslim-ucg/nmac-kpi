@@ -38,6 +38,7 @@ test("uses the NDR reply reference to identify the original message", () => {
 
 test("maps every survey subject to its stage", () => {
   assert.equal(surveyStageFromSubject("How was your recent visit to NMAC?"), "initial");
+  assert.equal(surveyStageFromSubject("How were your recent visits to NMAC?"), "initial");
   assert.equal(surveyStageFromSubject("Survey answers needed: Reminder about your NMAC visit"), "reminder1");
   assert.equal(surveyStageFromSubject("Survey answers needed: Second reminder about your NMAC visit"), "reminder2");
   assert.equal(surveyStageFromSubject("Survey answers needed: Final reminder about your NMAC visit"), "final");

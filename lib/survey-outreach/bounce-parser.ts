@@ -37,7 +37,10 @@ export function originalSubjectFromNdr(subject: string | null | undefined): stri
 
 export function surveyStageFromSubject(subject: string | null | undefined): SurveyOutreachStage | null {
   const normalized = (subject ?? "").trim().toLowerCase();
-  if (normalized === "how was your recent visit to nmac?") return "initial";
+  if (
+    normalized === "how was your recent visit to nmac?"
+    || normalized === "how were your recent visits to nmac?"
+  ) return "initial";
   if (normalized.includes("final reminder about your nmac visit")) return "final";
   if (normalized.includes("second reminder about your nmac visit")) return "reminder2";
   if (normalized.includes("reminder about your nmac visit")) return "reminder1";

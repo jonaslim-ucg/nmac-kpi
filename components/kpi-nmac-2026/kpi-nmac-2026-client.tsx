@@ -143,7 +143,7 @@ export function KpiNmac2026Client({ view }: Props) {
   }, [crmKpiDb, db]);
 
   const monthLabel = useMemo(
-    () => `Showing: ${MONTHS[selectedMonth]} ${selectedYear} data — click a month tab to switch`,
+    () => `Showing ${MONTHS[selectedMonth]} ${selectedYear}`,
     [selectedMonth, selectedYear],
   );
 
@@ -521,7 +521,7 @@ export function KpiNmac2026Client({ view }: Props) {
   const allKpisVisible = (ids: readonly string[]) => ids.every(kpiVisible);
 
   return (
-    <div className="nk26-root nk26-shell">
+    <div className={`nk26-root nk26-shell${v !== "threecx" ? " nk26-has-year" : ""}`}>
       {v !== "threecx" ? (
         <div className="nk26-year-bar">
           <label className="nk26-year-label" htmlFor="nk26-reporting-year">

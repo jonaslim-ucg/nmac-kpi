@@ -41,7 +41,7 @@ export function MonthTabs({
   }, [selectedMonth]);
 
   return (
-    <div className="nk26-tabs" ref={scrollRef}>
+    <div className="nk26-tabs" ref={scrollRef} role="group" aria-label="Reporting month">
       {MONTHS.map((m, i) => (
         <button
           key={m}

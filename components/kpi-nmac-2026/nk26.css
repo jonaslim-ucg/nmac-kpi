@@ -55,10 +55,13 @@
 }
 
 .nk26-shell {
+  position: relative;
   width: 100%;
   max-width: 1440px;
   min-width: 0;
   margin-inline: auto;
+  container-name: nk26-dashboard;
+  container-type: inline-size;
 }
 
 .nk26-year-bar {
@@ -1162,6 +1165,176 @@
 
 .nk26-page-head {
   margin-bottom: 0;
+}
+
+/* ---- Compact embedded dashboard layout ---- */
+
+@container nk26-dashboard (max-width: 1100px) {
+  .nk26-has-year .nk26-page-head {
+    min-height: 48px;
+    padding-right: 176px;
+  }
+
+  .nk26-page-head .nk26-section-title {
+    display: none;
+  }
+
+  .nk26-page-head .nk26-section-sub {
+    margin-bottom: 18px;
+    padding-top: 5px;
+  }
+
+  .nk26-year-bar {
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    right: 0;
+    gap: 8px;
+    margin: 0;
+  }
+
+  .nk26-year-select {
+    min-height: 38px;
+    min-width: 96px;
+    padding-block: 6px;
+  }
+
+  .nk26-tabs {
+    gap: 5px;
+    margin-bottom: 20px;
+    padding: 6px;
+    scroll-padding-inline: 6px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+
+  .nk26-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nk26-tab {
+    flex: 0 0 68px;
+    min-width: 68px;
+    min-height: 36px;
+    padding: 7px 9px;
+    scroll-snap-align: center;
+  }
+
+  .nk26-overview-more-intro {
+    margin-top: 0;
+  }
+
+  .nk26-grid-mini {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+
+  .nk26-mini {
+    min-height: 138px;
+    padding: 14px;
+  }
+
+  .nk26-charts,
+  .nk26-charts-featured {
+    gap: 16px;
+  }
+
+  .nk26-card {
+    padding: 18px;
+  }
+
+  .nk26-card-full .nk26-canvas-trend {
+    min-height: 240px;
+    height: 240px;
+  }
+}
+
+@container nk26-dashboard (max-width: 960px) {
+  .nk26-charts,
+  .nk26-charts-featured {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nk26-stats-cols-6,
+  .nk26-stats-cols-5,
+  .nk26-stats-cols-4,
+  .nk26-stats-cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container nk26-dashboard (max-width: 720px) {
+  .nk26-has-year .nk26-page-head {
+    min-height: 0;
+    padding-right: 0;
+  }
+
+  .nk26-year-bar {
+    position: static;
+    justify-content: space-between;
+    min-height: 48px;
+    margin-bottom: 14px;
+    padding: 5px 5px 5px 12px;
+    border: 1px solid var(--nk26-border);
+    border-radius: 10px;
+    background: var(--nk26-surface);
+    box-shadow: var(--nk26-card-shadow);
+  }
+
+  .nk26-page-head .nk26-section-sub {
+    margin-bottom: 16px;
+    padding-top: 0;
+  }
+
+  .nk26-grid-mini {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nk26-card {
+    padding: 16px;
+  }
+
+  .nk26-chd {
+    margin-bottom: 14px;
+  }
+}
+
+@container nk26-dashboard (max-width: 480px) {
+  .nk26-grid-mini,
+  .nk26-stats-cols-6,
+  .nk26-stats-cols-5,
+  .nk26-stats-cols-4,
+  .nk26-stats-cols-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nk26-tab {
+    flex-basis: 62px;
+    min-width: 62px;
+  }
+
+  .nk26-mini {
+    min-height: 132px;
+  }
+}
+
+@media (max-height: 780px) and (min-width: 700px) {
+  .nk26-section-sub,
+  .nk26-tabs,
+  .nk26-grid-mini,
+  .nk26-stats {
+    margin-bottom: 18px;
+  }
+
+  .nk26-mini {
+    min-height: 132px;
+  }
+
+  .nk26-card-full .nk26-canvas-trend {
+    min-height: 220px;
+    height: 220px;
+  }
 }
 
 /* ---- 3CX queue performance controls ---- */

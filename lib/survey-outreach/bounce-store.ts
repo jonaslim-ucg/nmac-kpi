@@ -39,6 +39,15 @@ export type SurveyOutreachBounceSummary = {
   hard: number;
 };
 
+export type InitialSurveyBounceReportRow = Pick<
+  SurveyOutreachBounceRow,
+  "outreach_id" | "recipient_email" | "stage" | "is_test"
+>;
+
+export type InitialSurveyBounceReportResult =
+  | { ok: true; rows: InitialSurveyBounceReportRow[] }
+  | { ok: false; error: string; setupRequired?: boolean };
+
 export type SurveyOutreachBounceScanState = {
   lastCheckedAt: string | null;
   lastSuccessAt: string | null;
@@ -287,4 +296,44 @@ export async function getSurveyOutreachBounceSummary(): Promise<SurveyOutreachBo
   }
 
   return summarizeUniqueSurveyBounces(rows);
+}
+
+/** Initial-message non-delivery reports used to calculate delivered-recipient KPIs. */
+export async function listInitialSurveyBouncesForReport(): Promise<InitialSurveyBounceReportResult> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return { ok: false, error: "Survey bounce storage is not available." };
+  }
+
+  try {
+    const supabase = createServiceRoleClient();
+    const rows: InitialSurveyBounceReportRow[] = [];
+    const pageSize = 1_000;
+
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await supabase
+        .from("survey_outreach_bounces")
+        .select("outreach_id,recipient_email,stage,is_test")
+        .eq("stage", "initial")
+        .order("received_at", { ascending: false })
+        .range(offset, offset + pageSize - 1);
+      if (error) {
+        if (schemaMissing(error.message)) {
+          return {
+            ok: false,
+            error: "Survey bounce tracking is not configured.",
+            setupRequired: true,
+          };
+        }
+        return { ok: false, error: "Could not load undelivered initial surveys." };
+      }
+
+      const page = (data ?? []) as InitialSurveyBounceReportRow[];
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
+
+    return { ok: true, rows };
+  } catch {
+    return { ok: false, error: "Could not load undelivered initial surveys." };
+  }
 }

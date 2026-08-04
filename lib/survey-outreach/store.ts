@@ -1,4 +1,5 @@
 import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { listInitialSurveyBouncesForReport } from "@/lib/survey-outreach/bounce-store";
 import { summarizeUniqueInitialRecipients } from "@/lib/survey-outreach/sent-stats";
 import type { DailyOutreachGroup } from "@/lib/survey-outreach/daily-group";
 import type { SurveyOutreachLookup, SurveyOutreachRow, SurveyOutreachStage } from "@/lib/survey-outreach/types";
@@ -643,19 +644,21 @@ export async function listSurveyOutreachForDev(
     .select("*", { count: "exact", head: true })
     .eq("status", "failed");
 
-  const initialRows: { patient_email: string | null; is_test: boolean }[] = [];
+  const initialRows: { id: string; patient_email: string | null; is_test: boolean }[] = [];
   const pageSize = 1_000;
   for (let pageOffset = 0; ; pageOffset += pageSize) {
     const { data: initialPage, error: initialPageError } = await supabase
       .from("survey_outreach")
-      .select("patient_email,is_test")
+      .select("id,patient_email,is_test")
       .not("initial_sent_at", "is", null)
       .range(pageOffset, pageOffset + pageSize - 1);
     if (initialPageError) throw new Error(initialPageError.message);
     initialRows.push(...((initialPage ?? []) as typeof initialRows));
     if ((initialPage?.length ?? 0) < pageSize) break;
   }
-  const initialRecipients = summarizeUniqueInitialRecipients(initialRows);
+  const initialBounceResult = await listInitialSurveyBouncesForReport();
+  if (!initialBounceResult.ok) throw new Error(initialBounceResult.error);
+  const initialRecipients = summarizeUniqueInitialRecipients(initialRows, initialBounceResult.rows);
 
   return {
     rows: (data ?? []) as SurveyOutreachRow[],

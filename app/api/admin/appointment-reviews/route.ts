@@ -19,6 +19,7 @@ import {
 } from "@/lib/survey-outreach/store";
 import { isScheduledTestRecipientAllowed } from "@/lib/survey-outreach/config";
 import { summarizeUniqueInitialRecipients } from "@/lib/survey-outreach/sent-stats";
+import { listInitialSurveyBouncesForReport } from "@/lib/survey-outreach/bounce-store";
 
 export const dynamic = "force-dynamic";
 
@@ -53,13 +54,14 @@ export async function GET(req: Request) {
   }
   const includeTests = includeTestsParam === "true";
 
-  const [reviewsResult, outreachResult] = await Promise.all([
+  const [reviewsResult, outreachResult, initialBounceResult] = await Promise.all([
     listAppointmentReviews({ createdFrom: range.startAt, createdBefore: range.endBefore }),
     listSurveyOutreachForReport({
       sentFrom: range.startAt,
       sentBefore: range.endBefore,
       includeTests,
     }),
+    listInitialSurveyBouncesForReport(),
   ]);
   if (!reviewsResult.ok) {
     if (reviewsResult.setupRequired) {
@@ -81,6 +83,15 @@ export async function GET(req: Request) {
         error: outreachResult.error ?? "Could not load sent survey data.",
       },
       { status: outreachResult.setupRequired ? 503 : 500 },
+    );
+  }
+  if (!initialBounceResult.ok) {
+    return NextResponse.json(
+      {
+        setupRequired: initialBounceResult.setupRequired ?? false,
+        error: initialBounceResult.error,
+      },
+      { status: initialBounceResult.setupRequired ? 503 : 500 },
     );
   }
 
@@ -132,7 +143,10 @@ export async function GET(req: Request) {
     outreachProviderReport,
     responseOnlyProviderReport,
   );
-  const initialRecipients = summarizeUniqueInitialRecipients(outreachResult.rows);
+  const initialRecipients = summarizeUniqueInitialRecipients(
+    outreachResult.rows,
+    initialBounceResult.rows,
+  );
 
   return NextResponse.json(
     {

@@ -1055,10 +1055,10 @@ export function SurveyOutreachDevPanel() {
         <div className="border-b border-border bg-surface-muted/40 px-4 py-3 sm:px-5">
           <div className="flex items-center gap-2">
             <Mail className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold text-foreground">Emails sent</h2>
+            <h2 className="text-sm font-semibold text-foreground">Email delivery</h2>
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Initial survey recipients only. Reminders do not increase these totals.
+            Unique initial survey recipients only. Failed deliveries and reminders are excluded.
           </p>
         </div>
 
@@ -1066,9 +1066,9 @@ export function SurveyOutreachDevPanel() {
           {stats && (
             <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {[
-                ["Initial surveys sent", stats.initialRecipients],
-                ["Production recipients", stats.productionInitialRecipients],
-                ["Test recipients", stats.testInitialRecipients],
+                ["Initial surveys delivered", stats.initialRecipients],
+                ["Production delivered", stats.productionInitialRecipients],
+                ["Test delivered", stats.testInitialRecipients],
                 ["Send failures", stats.failedRows],
                 ["Undelivered recipients", bounceSummary?.production ?? 0],
               ].map(([label, value]) => (

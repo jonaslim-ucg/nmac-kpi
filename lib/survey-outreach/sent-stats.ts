@@ -17,6 +17,11 @@ export type PermanentInitialSurveyFailureRow = {
   initial_sent_at: string | null;
 };
 
+export type DailyInitialSurveySendPoint = {
+  date: string;
+  count: number;
+};
+
 function normalizedEmail(value: string | null): string | null {
   const email = value?.trim().toLowerCase();
   return email || null;
@@ -78,6 +83,26 @@ export function classifyInitialSurveySends<T extends InitialSurveyRecipientRow>(
   }
 
   return { successfulRows, failedRows };
+}
+
+/** Successful initial surveys grouped by their checkout date. */
+export function buildDailyInitialSurveySendTrend<
+  T extends InitialSurveyRecipientRow & { appointment_date: string | null },
+>(
+  rows: readonly T[],
+  bounces: readonly InitialSurveyBounceRow[] = [],
+): DailyInitialSurveySendPoint[] {
+  const { successfulRows } = classifyInitialSurveySends(rows, bounces);
+  const countsByDate = new Map<string, number>();
+
+  for (const row of successfulRows) {
+    const date = row.appointment_date?.slice(0, 10) ?? "";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    countsByDate.set(date, (countsByDate.get(date) ?? 0) + 1);
+  }
+
+  return Array.from(countsByDate, ([date, count]) => ({ date, count }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /** Count every initial send record while excluding known delivery failures. */

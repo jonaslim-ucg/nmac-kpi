@@ -20,6 +20,7 @@ import {
 import type { AppointmentReviewStats } from "@/lib/appointment-review/analytics";
 import { APPOINTMENT_REVIEW_MAX_SCORE } from "@/lib/appointment-review/types";
 import type { DailyCheckoutPoint } from "@/lib/survey-outreach/checkout-stats";
+import type { DailyInitialSurveySendPoint } from "@/lib/survey-outreach/sent-stats";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 
 const CHART_COLORS = [
@@ -104,6 +105,31 @@ function formatWhen(iso: string): string {
   }
 }
 
+function mergeDailyPatientVolume(
+  checkouts: readonly DailyCheckoutPoint[],
+  surveySends: readonly DailyInitialSurveySendPoint[],
+) {
+  const points = new Map<
+    string,
+    { date: string; checkouts: number; surveysSent: number }
+  >();
+
+  for (const point of checkouts) {
+    points.set(point.date, { date: point.date, checkouts: point.count, surveysSent: 0 });
+  }
+  for (const point of surveySends) {
+    const current = points.get(point.date) ?? {
+      date: point.date,
+      checkouts: 0,
+      surveysSent: 0,
+    };
+    current.surveysSent = point.count;
+    points.set(point.date, current);
+  }
+
+  return Array.from(points.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
 function YesNoPie({ title, data }: { title: string; data: AppointmentReviewStats["providerTimeAdequate"] }) {
   const chartData = data.filter((d) => d.count > 0);
   return (
@@ -143,6 +169,7 @@ type Props = {
   periodLabel: string;
   refreshing: boolean;
   dailyCheckouts: DailyCheckoutPoint[];
+  dailySurveySends: DailyInitialSurveySendPoint[];
   onViewReview?: (id: string) => void;
 };
 
@@ -156,6 +183,7 @@ export function AppointmentReviewDashboard({
   periodLabel,
   refreshing,
   dailyCheckouts,
+  dailySurveySends,
   onViewReview,
 }: Props) {
   const empty = stats.total === 0;
@@ -163,6 +191,7 @@ export function AppointmentReviewDashboard({
     ...score,
     shortMetric: shortRatingMetric(score.metric),
   }));
+  const dailyPatientVolume = mergeDailyPatientVolume(dailyCheckouts, dailySurveySends);
 
   return (
     <div className="space-y-6">
@@ -236,15 +265,19 @@ export function AppointmentReviewDashboard({
         />
       </div>
 
-      <ChartCard title="Patient check-outs per day" subtitle="Daily checked-out appointments from the CRM" tall>
-        {dailyCheckouts.length === 0 ? (
+      <ChartCard
+        title="Patient check-outs and surveys sent per day"
+        subtitle="Successful initial surveys are grouped by the patient's checkout date"
+        tall
+      >
+        {dailyPatientVolume.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <p className="text-sm text-muted-foreground">No checkout data is available for this period.</p>
           </div>
         ) : (
           <ChartViewport minWidth="34rem">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={dailyCheckouts} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <LineChart data={dailyPatientVolume} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis
                   dataKey="date"
@@ -263,16 +296,25 @@ export function AppointmentReviewDashboard({
                 <Tooltip
                   {...TOOLTIP_STYLE}
                   labelFormatter={(label) => formatDay(String(label ?? ""))}
-                  formatter={(value) => [Number(value).toLocaleString(), "Check-outs"]}
+                  formatter={(value, name) => [Number(value).toLocaleString(), String(name)]}
                 />
                 <Legend wrapperStyle={{ color: "var(--foreground)", fontSize: 12 }} />
                 <Line
                   type="monotone"
-                  dataKey="count"
+                  dataKey="checkouts"
                   name="Check-outs"
                   stroke="var(--chart-this-year)"
                   strokeWidth={2.5}
-                  dot={dailyCheckouts.length <= 31 ? { r: 3 } : false}
+                  dot={dailyPatientVolume.length <= 31 ? { r: 3 } : false}
+                  activeDot={{ r: 5 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="surveysSent"
+                  name="Initial surveys sent"
+                  stroke="var(--chart-target)"
+                  strokeWidth={2.5}
+                  dot={dailyPatientVolume.length <= 31 ? { r: 3 } : false}
                   activeDot={{ r: 5 }}
                 />
               </LineChart>

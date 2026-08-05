@@ -2,12 +2,58 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildDailyInitialSurveySendTrend,
   classifyInitialSurveySends,
   countSuccessfulInitialSurveySends,
   summarizeInitialSurveyKpis,
   summarizeInitialSurveySends,
   summarizeUniqueInitialRecipients,
 } from "../../lib/survey-outreach/sent-stats.ts";
+
+test("groups successful initial surveys by checkout date", () => {
+  assert.deepEqual(
+    buildDailyInitialSurveySendTrend(
+      [
+        {
+          id: "outreach-1",
+          patient_email: "first@example.com",
+          is_test: false,
+          appointment_date: "2026-08-02",
+        },
+        {
+          id: "outreach-2",
+          patient_email: "second@example.com",
+          is_test: false,
+          appointment_date: "2026-08-01",
+        },
+        {
+          id: "outreach-3",
+          patient_email: "third@example.com",
+          is_test: false,
+          appointment_date: "2026-08-02",
+        },
+        {
+          id: "outreach-4",
+          patient_email: "bounced@example.com",
+          is_test: false,
+          appointment_date: "2026-08-01",
+        },
+      ],
+      [
+        {
+          outreach_id: "outreach-4",
+          recipient_email: "bounced@example.com",
+          stage: "initial",
+          is_test: false,
+        },
+      ],
+    ),
+    [
+      { date: "2026-08-01", count: 1 },
+      { date: "2026-08-02", count: 2 },
+    ],
+  );
+});
 
 test("summarizes successful, failed, and repeat initial send events", () => {
   assert.deepEqual(

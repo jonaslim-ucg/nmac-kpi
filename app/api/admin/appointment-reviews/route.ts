@@ -23,6 +23,7 @@ import {
 } from "@/lib/survey-outreach/store";
 import { isScheduledTestRecipientAllowed } from "@/lib/survey-outreach/config";
 import {
+  buildDailyInitialSurveySendTrend,
   classifyInitialSurveySends,
   summarizeInitialSurveyKpis,
 } from "@/lib/survey-outreach/sent-stats";
@@ -252,6 +253,10 @@ export async function GET(req: Request) {
   );
   const dailyCheckoutRows = dailyCheckoutResult.ok ? dailyCheckoutResult.rows : [];
   const dailyCheckouts = buildDailyCheckoutTrend(dailyCheckoutRows);
+  const dailySurveySends = buildDailyInitialSurveySendTrend(
+    outreachResult.rows,
+    initialBounceResult.rows,
+  );
   const numberCheckouts = dailyCheckouts.reduce((total, point) => total + point.count, 0);
   const deliveryFailureStats = summarizeTrackedSurveyEmailFailures(
     deliveryBounceResult.rows,
@@ -276,6 +281,7 @@ export async function GET(req: Request) {
         initialSurveyKpis: "appointment_date",
         providerAppointmentsAndSends: "appointment_date",
         dailyCheckouts: "appointment_date",
+        dailySurveySends: "appointment_date",
         responses: "submitted_at",
         deliveryFailureEvents: "failure_event_at",
         checkoutReconciliation: "appointment_date_from_first_production_send",
@@ -307,6 +313,7 @@ export async function GET(req: Request) {
       numberBounceReports: deliveryFailureStats.bounceReports,
       numberPermanentSendFailures: deliveryFailureStats.permanentSendFailures,
       dailyCheckouts,
+      dailySurveySends,
       checkoutReconciliation,
       discrepancies: checkoutReconciliation.discrepancies,
       numberResponses: rows.length,

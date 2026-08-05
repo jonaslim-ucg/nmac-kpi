@@ -13,6 +13,7 @@ import type { AppointmentReviewStats } from "@/lib/appointment-review/analytics"
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
 import type { AppointmentReviewQuarter } from "@/lib/appointment-review/report";
 import type { DailyCheckoutPoint } from "@/lib/survey-outreach/checkout-stats";
+import type { DailyInitialSurveySendPoint } from "@/lib/survey-outreach/sent-stats";
 import { APPOINTMENT_REVIEWS_SETUP_SQL } from "@/lib/appointment-review/store";
 import { isNmacNavHrefAllowed } from "@/lib/auth/role-nmac-nav";
 
@@ -36,6 +37,7 @@ type ApiResponse = {
   numberNotSent?: number | null;
   numberFailedEmails?: number;
   dailyCheckouts?: DailyCheckoutPoint[];
+  dailySurveySends?: DailyInitialSurveySendPoint[];
   quarter?: AppointmentReviewQuarter | null;
   currentQuarter?: AppointmentReviewQuarter;
   eligibleEntries?: number | null;
@@ -95,6 +97,7 @@ export default function AdminAppointmentReviewsPage() {
   const [numberNoEmail, setNumberNoEmail] = useState<number | null>(null);
   const [numberNotSent, setNumberNotSent] = useState<number | null>(null);
   const [dailyCheckouts, setDailyCheckouts] = useState<DailyCheckoutPoint[]>([]);
+  const [dailySurveySends, setDailySurveySends] = useState<DailyInitialSurveySendPoint[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -213,6 +216,7 @@ export default function AdminAppointmentReviewsPage() {
         setNumberNoEmail(null);
         setNumberNotSent(null);
         setDailyCheckouts([]);
+        setDailySurveySends([]);
         setAppliedDateRange(null);
         setQuarter(null);
         setEligibleEntries(null);
@@ -250,6 +254,7 @@ export default function AdminAppointmentReviewsPage() {
         typeof liveData.numberNotSent === "number" ? liveData.numberNotSent : null,
       );
       setDailyCheckouts(liveData.dailyCheckouts ?? []);
+      setDailySurveySends(liveData.dailySurveySends ?? []);
       setAppliedDateRange(
         liveData.dateStart || liveData.dateEnd
           ? { start: liveData.dateStart ?? "", end: liveData.dateEnd ?? "" }
@@ -271,6 +276,7 @@ export default function AdminAppointmentReviewsPage() {
       setNumberNoEmail(null);
       setNumberNotSent(null);
       setDailyCheckouts([]);
+      setDailySurveySends([]);
       setAppliedDateRange(null);
       setQuarter(null);
       setEligibleEntries(null);
@@ -549,6 +555,7 @@ export default function AdminAppointmentReviewsPage() {
           periodLabel={appliedPeriodLabel}
           refreshing={refreshing}
           dailyCheckouts={dailyCheckouts}
+          dailySurveySends={dailySurveySends}
           onViewReview={viewReview}
         />
       ) : null}

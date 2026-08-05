@@ -16,12 +16,17 @@ import { getAppDashboardSettings } from "@/lib/auth/app-settings";
 import {
   findTestSurveyOutreachTokens,
   listDailyCheckoutCountsForReport,
+  listPermanentSurveyDeliveryFailuresForReport,
   listSurveyOutreachForReport,
 } from "@/lib/survey-outreach/store";
 import { isScheduledTestRecipientAllowed } from "@/lib/survey-outreach/config";
 import { summarizeInitialSurveySends } from "@/lib/survey-outreach/sent-stats";
-import { listInitialSurveyBouncesForReport } from "@/lib/survey-outreach/bounce-store";
+import {
+  listInitialSurveyBouncesForReport,
+  listSurveyOutreachBouncesForReport,
+} from "@/lib/survey-outreach/bounce-store";
 import { buildDailyCheckoutTrend } from "@/lib/survey-outreach/checkout-stats";
+import { summarizeTrackedSurveyEmailFailures } from "@/lib/survey-outreach/failure-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +61,14 @@ export async function GET(req: Request) {
   }
   const includeTests = includeTestsParam === "true";
 
-  const [reviewsResult, outreachResult, initialBounceResult, dailyCheckoutResult] = await Promise.all([
+  const [
+    reviewsResult,
+    outreachResult,
+    initialBounceResult,
+    deliveryBounceResult,
+    permanentFailureResult,
+    dailyCheckoutResult,
+  ] = await Promise.all([
     listAppointmentReviews({ createdFrom: range.startAt, createdBefore: range.endBefore }),
     listSurveyOutreachForReport({
       sentFrom: range.startAt,
@@ -64,6 +76,16 @@ export async function GET(req: Request) {
       includeTests,
     }),
     listInitialSurveyBouncesForReport(),
+    listSurveyOutreachBouncesForReport({
+      receivedFrom: range.startAt,
+      receivedBefore: range.endBefore,
+      includeTests,
+    }),
+    listPermanentSurveyDeliveryFailuresForReport({
+      failedFrom: range.startAt,
+      failedBefore: range.endBefore,
+      includeTests,
+    }),
     listDailyCheckoutCountsForReport({
       dateStart: range.dateStart,
       dateEnd: range.dateEnd,
@@ -98,6 +120,24 @@ export async function GET(req: Request) {
         error: initialBounceResult.error,
       },
       { status: initialBounceResult.setupRequired ? 503 : 500 },
+    );
+  }
+  if (!deliveryBounceResult.ok) {
+    return NextResponse.json(
+      {
+        setupRequired: deliveryBounceResult.setupRequired ?? false,
+        error: deliveryBounceResult.error,
+      },
+      { status: deliveryBounceResult.setupRequired ? 503 : 500 },
+    );
+  }
+  if (!permanentFailureResult.ok) {
+    return NextResponse.json(
+      {
+        setupRequired: permanentFailureResult.setupRequired ?? false,
+        error: permanentFailureResult.error,
+      },
+      { status: permanentFailureResult.setupRequired ? 503 : 500 },
     );
   }
   const testTokenResult = await findTestSurveyOutreachTokens(
@@ -155,6 +195,10 @@ export async function GET(req: Request) {
     outreachResult.rows,
     initialBounceResult.rows,
   );
+  const deliveryFailureStats = summarizeTrackedSurveyEmailFailures(
+    deliveryBounceResult.rows,
+    permanentFailureResult.rows,
+  );
 
   return NextResponse.json(
     {
@@ -164,6 +208,9 @@ export async function GET(req: Request) {
       numberSent: initialSendStats.successful,
       numberRepeatInitialSends: initialSendStats.repeatSuccessful,
       numberFailedInitialSends: initialSendStats.failed,
+      numberFailedEmails: deliveryFailureStats.total,
+      numberBounceReports: deliveryFailureStats.bounceReports,
+      numberPermanentSendFailures: deliveryFailureStats.permanentSendFailures,
       dailyCheckouts,
       numberResponses: rows.length,
       quarter: range.quarter ?? null,

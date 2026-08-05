@@ -27,6 +27,7 @@ import {
 import type { SurveyOutreachRow, SurveyOutreachStage } from "@/lib/survey-outreach/types";
 import { isSurveyEmailSuppressed } from "@/lib/survey-outreach/recall";
 import { buildSurveyUrl } from "@/lib/survey-outreach/urls";
+import { assertSurveyEmailCanReceiveMail } from "@/lib/survey-outreach/email-validation";
 import { sendMailViaGraph } from "@/lib/graph/send-mail";
 
 const DELIVERY_UNCERTAINTY_LOCK_MS = 2 * 60 * 60 * 1000;
@@ -218,6 +219,8 @@ export async function sendSurveyStage(input: {
     };
   }
 
+  const emailValidation = await assertSurveyEmailCanReceiveMail(row.patient_email);
+  const recipientEmail = emailValidation.normalizedEmail ?? row.patient_email;
   const { subject, textBody, htmlBody } = buildSurveyEmail(
     stage,
     row.patient_name,
@@ -234,7 +237,7 @@ export async function sendSurveyStage(input: {
   }
 
   await sendMailViaGraph({
-    to: row.patient_email,
+    to: recipientEmail,
     subject,
     textBody,
     htmlBody,
@@ -252,7 +255,7 @@ export async function sendSurveyStage(input: {
   return {
     ok: true,
     stage,
-    to: row.patient_email,
+    to: recipientEmail,
     surveyUrl: buildSurveyUrl(row.survey_token),
     outreachId: row.id,
   };

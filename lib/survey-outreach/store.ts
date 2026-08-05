@@ -509,6 +509,15 @@ export type SurveyOutreachReportFilters = {
   includeTests?: boolean;
 };
 
+export type PermanentSurveyDeliveryFailureRow = Pick<
+  SurveyOutreachRow,
+  "id" | "failed_stage" | "is_test" | "permanently_failed_at" | "last_send_error"
+>;
+
+export type PermanentSurveyDeliveryFailureReportResult =
+  | { ok: true; rows: PermanentSurveyDeliveryFailureRow[] }
+  | { ok: false; error: string; setupRequired?: boolean };
+
 type SurveyOutreachReportResult =
   | { ok: true; rows: SurveyOutreachRow[] }
   | { ok: false; error: string; setupRequired?: boolean };
@@ -560,6 +569,60 @@ export async function listSurveyOutreachForReport(
     return { ok: true, rows };
   } catch {
     return { ok: false, error: "Could not load sent survey data." };
+  }
+}
+
+/** Permanent pre-send or immediate provider failures in the requested interval. */
+export async function listPermanentSurveyDeliveryFailuresForReport(
+  filters: {
+    failedFrom?: string;
+    failedBefore?: string;
+    includeTests?: boolean;
+  } = {},
+): Promise<PermanentSurveyDeliveryFailureReportResult> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return { ok: false, error: "Survey outreach storage is not available." };
+  }
+
+  try {
+    const supabase = createServiceRoleClient();
+    const rows: PermanentSurveyDeliveryFailureRow[] = [];
+    const pageSize = 1_000;
+
+    for (let offset = 0; ; offset += pageSize) {
+      let query = supabase
+        .from("survey_outreach")
+        .select("id,failed_stage,is_test,permanently_failed_at,last_send_error")
+        .is("merged_into_outreach_id", null)
+        .not("permanently_failed_at", "is", null)
+        .not("failed_stage", "is", null)
+        .order("permanently_failed_at", { ascending: false })
+        .range(offset, offset + pageSize - 1);
+      if (!filters.includeTests) query = query.eq("is_test", false);
+      if (filters.failedFrom) query = query.gte("permanently_failed_at", filters.failedFrom);
+      if (filters.failedBefore) query = query.lt("permanently_failed_at", filters.failedBefore);
+
+      const { data, error } = await query;
+      if (error) {
+        const setupRequired = /survey_outreach|permanently_failed_at|failed_stage/i.test(error.message)
+          && /does not exist|schema cache|could not find/i.test(error.message);
+        return {
+          ok: false,
+          error: setupRequired
+            ? "Survey delivery failure tracking is not configured."
+            : "Could not load permanent survey delivery failures.",
+          setupRequired,
+        };
+      }
+
+      const page = (data ?? []) as PermanentSurveyDeliveryFailureRow[];
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
+
+    return { ok: true, rows };
+  } catch {
+    return { ok: false, error: "Could not load permanent survey delivery failures." };
   }
 }
 

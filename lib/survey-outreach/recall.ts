@@ -18,6 +18,48 @@ export async function isSurveyEmailSuppressed(email: string): Promise<boolean> {
   return Boolean(data);
 }
 
+/** Prevent future production outreach to an address that failed pre-send validation. */
+export async function suppressInvalidSurveyEmail(
+  email: string,
+  reason: string,
+  excludeOutreachId?: string,
+): Promise<number> {
+  const supabase = createServiceRoleClient();
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return 0;
+
+  const suppressionReason = `Pre-send email validation: ${reason}`.slice(0, 500);
+  const { error: suppressionError } = await supabase
+    .from("survey_email_suppressions")
+    .upsert(
+      { patient_email: normalized, reason: suppressionReason },
+      { onConflict: "patient_email" },
+    );
+  if (suppressionError) throw new Error(suppressionError.message);
+
+  let query = supabase
+    .from("survey_outreach")
+    .update({
+      status: "skipped",
+      recalled_at: new Date().toISOString(),
+      recall_reason: suppressionReason,
+      send_lock_token: null,
+      send_lock_stage: null,
+      send_lock_until: null,
+      next_retry_at: null,
+    })
+    .eq("is_test", false)
+    .ilike("patient_email", normalized)
+    .is("completed_at", null)
+    .is("recalled_at", null)
+    .is("permanently_failed_at", null);
+  if (excludeOutreachId) query = query.neq("id", excludeOutreachId);
+
+  const { data, error } = await query.select("id");
+  if (error) throw new Error(error.message);
+  return data?.length ?? 0;
+}
+
 /** Stop all future survey emails and mark existing production outreach as recalled. */
 export async function recallAllProductionSurveyOutreach(
   reason = "Recalled after accidental send before go-live.",

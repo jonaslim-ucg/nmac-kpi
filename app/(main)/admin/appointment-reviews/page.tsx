@@ -25,11 +25,14 @@ type CustomDateRange = {
 };
 
 type ApiResponse = {
+  dateStart?: string | null;
+  dateEnd?: string | null;
   stats?: AppointmentReviewStats;
   reviews?: AppointmentReviewDetail[];
   numberSent?: number;
   numberRepeatInitialSends?: number;
   numberFailedInitialSends?: number;
+  numberFailedEmails?: number;
   dailyCheckouts?: DailyCheckoutPoint[];
   quarter?: AppointmentReviewQuarter | null;
   currentQuarter?: AppointmentReviewQuarter;
@@ -68,6 +71,17 @@ function formatCalendarDate(value: string): string {
   }
 }
 
+function clinicToday(): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Atlantic/Bermuda",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 export default function AdminAppointmentReviewsPage() {
   const { user, loading } = useSession();
   const { ready: prefsReady, roleNmacNav } = useDashboardPreferences();
@@ -75,7 +89,7 @@ export default function AdminAppointmentReviewsPage() {
   const [reviews, setReviews] = useState<AppointmentReviewDetail[]>([]);
   const [numberSent, setNumberSent] = useState(0);
   const [numberRepeatInitialSends, setNumberRepeatInitialSends] = useState(0);
-  const [numberFailedInitialSends, setNumberFailedInitialSends] = useState(0);
+  const [numberFailedEmails, setNumberFailedEmails] = useState(0);
   const [dailyCheckouts, setDailyCheckouts] = useState<DailyCheckoutPoint[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -93,6 +107,7 @@ export default function AdminAppointmentReviewsPage() {
   const [customDateStart, setCustomDateStart] = useState("");
   const [customDateEnd, setCustomDateEnd] = useState("");
   const [customRange, setCustomRange] = useState<CustomDateRange | null>(null);
+  const [appliedDateRange, setAppliedDateRange] = useState<CustomDateRange | null>(null);
   const [customRangeError, setCustomRangeError] = useState<string | null>(null);
   const hasLoaded = useRef(false);
   const latestLoadRequest = useRef(0);
@@ -107,6 +122,7 @@ export default function AdminAppointmentReviewsPage() {
   const selectedReview = selectedIndex >= 0 ? reviews[selectedIndex] : null;
   const quarterOptions = useMemo(() => availableQuarters(currentQuarter), [currentQuarter]);
   const periodControlValue: ReviewPeriod = customRangeOpen ? "custom" : period;
+  const latestClinicDate = useMemo(() => clinicToday(), []);
 
   const periodLabel = useMemo(() => {
     switch (period) {
@@ -124,6 +140,15 @@ export default function AdminAppointmentReviewsPage() {
         return "All";
     }
   }, [customRange, period, quarter]);
+
+  const appliedPeriodLabel = useMemo(() => {
+    if (appliedDateRange?.start && appliedDateRange.end) {
+      return `${formatCalendarDate(appliedDateRange.start)} – ${formatCalendarDate(appliedDateRange.end)}`;
+    }
+    if (appliedDateRange?.start) return `From ${formatCalendarDate(appliedDateRange.start)}`;
+    if (appliedDateRange?.end) return `Through ${formatCalendarDate(appliedDateRange.end)}`;
+    return periodLabel;
+  }, [appliedDateRange, periodLabel]);
 
   const load = useCallback(async (
     filter: ReviewPeriod,
@@ -156,9 +181,15 @@ export default function AdminAppointmentReviewsPage() {
       const testParams = new URLSearchParams(params);
       testParams.set("includeTests", "true");
       const [liveResponse, inclusiveResponse] = await Promise.all([
-        fetch(`/api/admin/appointment-reviews?${liveParams}`, { credentials: "include" }),
+        fetch(`/api/admin/appointment-reviews?${liveParams}`, {
+          credentials: "include",
+          cache: "no-store",
+        }),
         includeTestResponses
-          ? fetch(`/api/admin/appointment-reviews?${testParams}`, { credentials: "include" })
+          ? fetch(`/api/admin/appointment-reviews?${testParams}`, {
+              credentials: "include",
+              cache: "no-store",
+            })
           : Promise.resolve(null),
       ]);
       const liveData = (await liveResponse.json()) as ApiResponse;
@@ -174,8 +205,9 @@ export default function AdminAppointmentReviewsPage() {
         setReviews([]);
         setNumberSent(0);
         setNumberRepeatInitialSends(0);
-        setNumberFailedInitialSends(0);
+        setNumberFailedEmails(0);
         setDailyCheckouts([]);
+        setAppliedDateRange(null);
         setQuarter(null);
         setEligibleEntries(null);
         return;
@@ -200,12 +232,19 @@ export default function AdminAppointmentReviewsPage() {
           ? liveData.numberRepeatInitialSends
           : 0,
       );
-      setNumberFailedInitialSends(
-        typeof liveData.numberFailedInitialSends === "number"
-          ? liveData.numberFailedInitialSends
-          : 0,
+      setNumberFailedEmails(
+        typeof liveData.numberFailedEmails === "number"
+          ? liveData.numberFailedEmails
+          : typeof liveData.numberFailedInitialSends === "number"
+            ? liveData.numberFailedInitialSends
+            : 0,
       );
       setDailyCheckouts(liveData.dailyCheckouts ?? []);
+      setAppliedDateRange(
+        liveData.dateStart || liveData.dateEnd
+          ? { start: liveData.dateStart ?? "", end: liveData.dateEnd ?? "" }
+          : null,
+      );
       setQuarter(liveData.quarter ?? null);
       setCurrentQuarter(liveData.currentQuarter ?? null);
       setEligibleEntries(
@@ -218,8 +257,9 @@ export default function AdminAppointmentReviewsPage() {
       setReviews([]);
       setNumberSent(0);
       setNumberRepeatInitialSends(0);
-      setNumberFailedInitialSends(0);
+      setNumberFailedEmails(0);
       setDailyCheckouts([]);
+      setAppliedDateRange(null);
       setQuarter(null);
       setEligibleEntries(null);
     } finally {
@@ -244,11 +284,15 @@ export default function AdminAppointmentReviewsPage() {
       setCustomRangeError("The start date must be on or before the end date.");
       return;
     }
+    if (customDateStart > latestClinicDate || customDateEnd > latestClinicDate) {
+      setCustomRangeError("Dates cannot be later than today in Bermuda.");
+      return;
+    }
     setCustomRangeError(null);
     setCustomRange({ start: customDateStart, end: customDateEnd });
     setPeriod("custom");
     setSelectedId(null);
-  }, [customDateEnd, customDateStart]);
+  }, [customDateEnd, customDateStart, latestClinicDate]);
 
   const viewReview = useCallback((id: string) => {
     setSelectedId(id);
@@ -398,7 +442,7 @@ export default function AdminAppointmentReviewsPage() {
                 <div>
                   <p className="text-sm font-semibold text-foreground">Custom date range</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Includes survey responses submitted on both selected dates.
+                    Every KPI reloads for events recorded on both selected dates.
                   </p>
                 </div>
               </div>
@@ -408,6 +452,7 @@ export default function AdminAppointmentReviewsPage() {
                   <input
                     type="date"
                     value={customDateStart}
+                    max={latestClinicDate}
                     onChange={(event) => {
                       setCustomDateStart(event.target.value);
                       setCustomRangeError(null);
@@ -421,6 +466,7 @@ export default function AdminAppointmentReviewsPage() {
                     type="date"
                     value={customDateEnd}
                     min={customDateStart || undefined}
+                    max={latestClinicDate}
                     onChange={(event) => {
                       setCustomDateEnd(event.target.value);
                       setCustomRangeError(null);
@@ -434,7 +480,12 @@ export default function AdminAppointmentReviewsPage() {
                   disabled={refreshing}
                   className="inline-flex h-10 items-center justify-center rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
                 >
-                  Apply dates
+                  {refreshing && period === "custom" ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                      Applying…
+                    </>
+                  ) : "Apply dates"}
                 </button>
                 {period !== "custom" ? (
                   <button
@@ -480,7 +531,9 @@ export default function AdminAppointmentReviewsPage() {
           stats={stats}
           numberSent={numberSent}
           numberRepeatInitialSends={numberRepeatInitialSends}
-          numberFailedInitialSends={numberFailedInitialSends}
+          numberFailedEmails={numberFailedEmails}
+          periodLabel={appliedPeriodLabel}
+          refreshing={refreshing}
           dailyCheckouts={dailyCheckouts}
           onViewReview={viewReview}
         />

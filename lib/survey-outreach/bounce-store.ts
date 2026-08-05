@@ -44,6 +44,28 @@ export type InitialSurveyBounceReportRow = Pick<
   "outreach_id" | "recipient_email" | "stage" | "is_test"
 >;
 
+export type SurveyBounceReportRow = Pick<
+  SurveyOutreachBounceRow,
+  | "graph_message_id"
+  | "outreach_id"
+  | "recipient_email"
+  | "stage"
+  | "is_test"
+  | "received_at"
+  | "hard_bounce"
+>;
+
+export type SurveyBounceReportFilters = {
+  receivedFrom?: string;
+  receivedBefore?: string;
+  includeTests?: boolean;
+  stage?: SurveyOutreachStage;
+};
+
+export type SurveyBounceReportResult =
+  | { ok: true; rows: SurveyBounceReportRow[] }
+  | { ok: false; error: string; setupRequired?: boolean };
+
 export type InitialSurveyBounceReportResult =
   | { ok: true; rows: InitialSurveyBounceReportRow[] }
   | { ok: false; error: string; setupRequired?: boolean };
@@ -298,24 +320,31 @@ export async function getSurveyOutreachBounceSummary(): Promise<SurveyOutreachBo
   return summarizeUniqueSurveyBounces(rows);
 }
 
-/** Initial-message non-delivery reports used to calculate delivered-recipient KPIs. */
-export async function listInitialSurveyBouncesForReport(): Promise<InitialSurveyBounceReportResult> {
+/** Delivery reports used by survey email KPIs. */
+export async function listSurveyOutreachBouncesForReport(
+  filters: SurveyBounceReportFilters = {},
+): Promise<SurveyBounceReportResult> {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return { ok: false, error: "Survey bounce storage is not available." };
   }
 
   try {
     const supabase = createServiceRoleClient();
-    const rows: InitialSurveyBounceReportRow[] = [];
+    const rows: SurveyBounceReportRow[] = [];
     const pageSize = 1_000;
 
     for (let offset = 0; ; offset += pageSize) {
-      const { data, error } = await supabase
+      let query = supabase
         .from("survey_outreach_bounces")
-        .select("outreach_id,recipient_email,stage,is_test")
-        .eq("stage", "initial")
+        .select("graph_message_id,outreach_id,recipient_email,stage,is_test,received_at,hard_bounce")
         .order("received_at", { ascending: false })
         .range(offset, offset + pageSize - 1);
+      if (filters.receivedFrom) query = query.gte("received_at", filters.receivedFrom);
+      if (filters.receivedBefore) query = query.lt("received_at", filters.receivedBefore);
+      if (filters.includeTests === false) query = query.eq("is_test", false);
+      if (filters.stage) query = query.eq("stage", filters.stage);
+
+      const { data, error } = await query;
       if (error) {
         if (schemaMissing(error.message)) {
           return {
@@ -324,16 +353,31 @@ export async function listInitialSurveyBouncesForReport(): Promise<InitialSurvey
             setupRequired: true,
           };
         }
-        return { ok: false, error: "Could not load undelivered initial surveys." };
+        return { ok: false, error: "Could not load survey delivery failures." };
       }
 
-      const page = (data ?? []) as InitialSurveyBounceReportRow[];
+      const page = (data ?? []) as SurveyBounceReportRow[];
       rows.push(...page);
       if (page.length < pageSize) break;
     }
 
     return { ok: true, rows };
   } catch {
-    return { ok: false, error: "Could not load undelivered initial surveys." };
+    return { ok: false, error: "Could not load survey delivery failures." };
   }
+}
+
+/** Initial-message non-delivery reports used to calculate successful initial sends. */
+export async function listInitialSurveyBouncesForReport(): Promise<InitialSurveyBounceReportResult> {
+  const result = await listSurveyOutreachBouncesForReport({ stage: "initial" });
+  if (!result.ok) return result;
+  return {
+    ok: true,
+    rows: result.rows.map((row) => ({
+      outreach_id: row.outreach_id,
+      recipient_email: row.recipient_email,
+      stage: row.stage,
+      is_test: row.is_test,
+    })),
+  };
 }

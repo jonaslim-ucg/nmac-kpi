@@ -1,5 +1,6 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -136,7 +137,9 @@ type Props = {
   stats: AppointmentReviewStats;
   numberSent: number;
   numberRepeatInitialSends: number;
-  numberFailedInitialSends: number;
+  numberFailedEmails: number;
+  periodLabel: string;
+  refreshing: boolean;
   dailyCheckouts: DailyCheckoutPoint[];
   onViewReview?: (id: string) => void;
 };
@@ -145,7 +148,9 @@ export function AppointmentReviewDashboard({
   stats,
   numberSent,
   numberRepeatInitialSends,
-  numberFailedInitialSends,
+  numberFailedEmails,
+  periodLabel,
+  refreshing,
   dailyCheckouts,
   onViewReview,
 }: Props) {
@@ -157,8 +162,20 @@ export function AppointmentReviewDashboard({
 
   return (
     <div className="space-y-6">
-      <SummaryCards
-        cards={[
+      <div className="flex min-h-6 items-center justify-between gap-3" aria-live="polite">
+        <p className="min-w-0 text-sm text-muted-foreground">
+          KPIs for <span className="font-semibold text-foreground">{periodLabel}</span>
+        </p>
+        {refreshing ? (
+          <span className="inline-flex shrink-0 items-center gap-2 text-xs font-medium text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            Updating
+          </span>
+        ) : null}
+      </div>
+      <div className={refreshing ? "opacity-60 transition-opacity" : "transition-opacity"} aria-busy={refreshing}>
+        <SummaryCards
+          cards={[
           {
             label: "Initial surveys sent",
             value: String(numberSent),
@@ -171,8 +188,8 @@ export function AppointmentReviewDashboard({
           },
           {
             label: "Failed / bounced",
-            value: String(numberFailedInitialSends),
-            hint: "Known initial-message failures excluded from the sent total",
+            value: String(numberFailedEmails),
+            hint: "All tracked initial and reminder failures, including pre-send rejections",
           },
           {
             label: "Total responses",
@@ -199,8 +216,9 @@ export function AppointmentReviewDashboard({
             value: empty || !stats.averages.recommendationRating ? "—" : `${stats.averages.recommendationRating}/${APPOINTMENT_REVIEW_MAX_SCORE}`,
             hint: "Likelihood to recommend NMAC",
           },
-        ]}
-      />
+          ]}
+        />
+      </div>
 
       <ChartCard title="Patient check-outs per day" subtitle="Daily checked-out appointments from the CRM" tall>
         {dailyCheckouts.length === 0 ? (

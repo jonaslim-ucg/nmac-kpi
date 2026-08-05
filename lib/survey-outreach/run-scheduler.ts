@@ -47,6 +47,8 @@ import {
   trackSurveyEmailBounces,
   type SurveyBounceTrackingResult,
 } from "@/lib/survey-outreach/bounce-tracker";
+import { SurveyEmailValidationError } from "@/lib/survey-outreach/email-validation";
+import { suppressInvalidSurveyEmail } from "@/lib/survey-outreach/recall";
 
 export type SchedulerResult = {
   ok: true;
@@ -81,22 +83,29 @@ type SchedulerOptions = {
 class ScheduledSendFailure extends Error {
   readonly retryAt: string | null;
   readonly permanent: boolean;
+  readonly breaksCircuit: boolean;
 
-  constructor(message: string, retryAt: string | null, permanent: boolean) {
+  constructor(
+    message: string,
+    retryAt: string | null,
+    permanent: boolean,
+    breaksCircuit = true,
+  ) {
     super(message);
     this.name = "ScheduledSendFailure";
     this.retryAt = retryAt;
     this.permanent = permanent;
+    this.breaksCircuit = breaksCircuit;
   }
 }
 
-function isValidEmail(email: string | null | undefined): boolean {
-  return Boolean(email?.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()));
+function hasEmailAddress(email: string | null | undefined): email is string {
+  return Boolean(email?.trim());
 }
 
 function crmRowToOutreach(row: CrmAppointmentRow): DailyOutreachAppointment | null {
   if (!row.id) return null;
-  if (!isValidEmail(row.patient_email)) return null;
+  if (!hasEmailAddress(row.patient_email)) return null;
 
   const appointmentAt = parseCrmAppointmentAt(row.appointment_date, row.appointment_time);
   if (!appointmentAt) return null;
@@ -256,6 +265,7 @@ async function sendDueForRow(
   } catch (e) {
     const error = compactSendError(e, dueStage.stage);
     const graphError = e instanceof GraphMailError ? e : null;
+    const validationError = e instanceof SurveyEmailValidationError ? e : null;
     if (e instanceof DeliveryStateUncertainError || graphError?.deliveryUncertain) {
       try {
         await markStageDeliveryUncertain({
@@ -271,13 +281,15 @@ async function sendDueForRow(
       throw new ScheduledSendFailure(error, null, true);
     }
 
-    const retryAt = graphError?.retryable === false
+    const retryAt = validationError && !validationError.retryable
       ? null
-      : surveySendRetryAt({
-          attempt: claimed.send_attempt_count,
-          now,
-          retryAfterMs: graphError?.retryAfterMs,
-        });
+      : graphError?.retryable === false
+        ? null
+        : surveySendRetryAt({
+            attempt: claimed.send_attempt_count,
+            now,
+            retryAfterMs: graphError?.retryAfterMs,
+          });
     try {
       await recordStageSendFailure({
         id: row.id,
@@ -290,7 +302,18 @@ async function sendDueForRow(
     } catch {
       await releaseStageSendClaim(row.id, lockToken).catch(() => undefined);
     }
-    throw new ScheduledSendFailure(error, retryAt?.toISOString() ?? null, !retryAt);
+    if (validationError && !validationError.retryable && !row.is_test) {
+      await suppressInvalidSurveyEmail(row.patient_email, validationError.result.reason, row.id)
+        .catch((suppressionError) => {
+          console.error("Could not suppress an invalid survey email address.", suppressionError);
+        });
+    }
+    throw new ScheduledSendFailure(
+      error,
+      retryAt?.toISOString() ?? null,
+      !retryAt,
+      !validationError,
+    );
   }
 }
 
@@ -380,7 +403,7 @@ export async function runSurveyOutreachScheduler(
       if (result.skipped) skipped.push(result.skipped);
       if (result.sent) sent.push(result.sent);
     } catch (e) {
-      sendCircuitOpen = true;
+      if (!(e instanceof ScheduledSendFailure) || e.breaksCircuit) sendCircuitOpen = true;
       errors.push({
         outreachId: row.id,
         stage: dueStage.stage,

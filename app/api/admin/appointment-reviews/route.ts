@@ -21,7 +21,7 @@ import {
 import { isScheduledTestRecipientAllowed } from "@/lib/survey-outreach/config";
 import { summarizeUniqueInitialRecipients } from "@/lib/survey-outreach/sent-stats";
 import { listInitialSurveyBouncesForReport } from "@/lib/survey-outreach/bounce-store";
-import { summarizeDailyCheckouts } from "@/lib/survey-outreach/checkout-stats";
+import { buildDailyCheckoutTrend } from "@/lib/survey-outreach/checkout-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -153,7 +153,7 @@ export async function GET(req: Request) {
     outreachResult.rows,
     initialBounceResult.rows,
   );
-  const checkoutStats = summarizeDailyCheckouts(
+  const dailyCheckouts = buildDailyCheckoutTrend(
     dailyCheckoutResult.ok ? dailyCheckoutResult.rows : [],
   );
 
@@ -163,7 +163,7 @@ export async function GET(req: Request) {
       dateEnd: range.dateEnd,
       includeTests,
       numberSent: initialRecipients.total,
-      checkoutStats,
+      dailyCheckouts,
       numberResponses: rows.length,
       quarter: range.quarter ?? null,
       currentQuarter: currentAppointmentReviewQuarter(now),

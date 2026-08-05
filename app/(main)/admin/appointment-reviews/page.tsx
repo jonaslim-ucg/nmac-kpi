@@ -546,6 +546,7 @@ export default function AdminAppointmentReviewsPage() {
 
       {tab === "overview" && stats ? (
         <AppointmentReviewDashboard
+          key={appliedPeriodLabel}
           stats={stats}
           numberSent={numberSent}
           numberBouncedInitialSends={numberBouncedInitialSends}

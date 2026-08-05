@@ -202,8 +202,7 @@ export function buildAppointmentReviewStats(rows: AppointmentReviewRow[]): Appoi
         .map(({ kind, pick }) => ({ id: row.id, createdAt: row.created_at, kind, text: pick(row).trim() }))
         .filter((c) => c.text.length > 0),
     )
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, 12);
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   const newPatients = rows.filter((r) => r.is_new_patient);
 

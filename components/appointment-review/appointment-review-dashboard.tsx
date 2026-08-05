@@ -1,6 +1,7 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { useState } from "react";
 import {
   Bar,
   BarChart,
@@ -30,6 +31,7 @@ const CHART_COLORS = [
 ];
 
 const YES_NO_COLORS = ["var(--chart-this-year)", "#64748b"];
+const PATIENT_RESPONSE_PAGE_SIZE = 8;
 
 const TOOLTIP_STYLE = {
   contentStyle: {
@@ -186,12 +188,27 @@ export function AppointmentReviewDashboard({
   dailySurveySends,
   onViewReview,
 }: Props) {
+  const [patientResponsePage, setPatientResponsePage] = useState(1);
   const empty = stats.total === 0;
   const ratingScores = stats.ratingScores.map((score) => ({
     ...score,
     shortMetric: shortRatingMetric(score.metric),
   }));
   const dailyPatientVolume = mergeDailyPatientVolume(dailyCheckouts, dailySurveySends);
+  const patientResponsePageCount = Math.max(
+    1,
+    Math.ceil(stats.recentComments.length / PATIENT_RESPONSE_PAGE_SIZE),
+  );
+  const currentPatientResponsePage = Math.min(
+    patientResponsePage,
+    patientResponsePageCount,
+  );
+  const patientResponseStart =
+    (currentPatientResponsePage - 1) * PATIENT_RESPONSE_PAGE_SIZE;
+  const visiblePatientResponses = stats.recentComments.slice(
+    patientResponseStart,
+    patientResponseStart + PATIENT_RESPONSE_PAGE_SIZE,
+  );
 
   return (
     <div className="space-y-6">
@@ -521,7 +538,7 @@ export function AppointmentReviewDashboard({
                 {onViewReview ? "Click a response to open the full review" : "Written responses from the survey"}
               </p>
               <ul className="mt-4 divide-y divide-border">
-                {stats.recentComments.map((c) => (
+                {visiblePatientResponses.map((c) => (
                   <li key={`${c.id}-${c.kind}`} className="py-3 first:pt-0 last:pb-0">
                     {onViewReview ? (
                       <button
@@ -551,6 +568,42 @@ export function AppointmentReviewDashboard({
                   </li>
                 ))}
               </ul>
+              <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-muted-foreground">
+                  Showing {patientResponseStart + 1}–
+                  {Math.min(
+                    patientResponseStart + PATIENT_RESPONSE_PAGE_SIZE,
+                    stats.recentComments.length,
+                  )}{" "}
+                  of {stats.recentComments.length} response
+                  {stats.recentComments.length === 1 ? "" : "s"} · Page{" "}
+                  {currentPatientResponsePage} of {patientResponsePageCount}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={currentPatientResponsePage === 1}
+                    onClick={() => setPatientResponsePage((page) => Math.max(1, page - 1))}
+                    className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 font-medium text-foreground transition hover:bg-surface-muted/80 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ChevronLeft className="h-4 w-4" aria-hidden />
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    disabled={currentPatientResponsePage === patientResponsePageCount}
+                    onClick={() =>
+                      setPatientResponsePage((page) =>
+                        Math.min(patientResponsePageCount, page + 1),
+                      )
+                    }
+                    className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 font-medium text-foreground transition hover:bg-surface-muted/80 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" aria-hidden />
+                  </button>
+                </div>
+              </div>
             </div>
           ) : null}
         </>

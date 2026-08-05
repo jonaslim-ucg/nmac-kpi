@@ -329,11 +329,13 @@ export function AppointmentReviewDashboard({
             value: String(numberBouncedInitialSends),
             hint: "Initial messages later reported as undeliverable by Outlook",
           },
-          {
-            label: "Failed before send",
-            value: String(numberPermanentInitialFailures),
-            hint: "Initial messages rejected before the mail provider accepted them",
-          },
+          ...(numberPermanentInitialFailures > 0
+            ? [{
+                label: "Failed before send",
+                value: String(numberPermanentInitialFailures),
+                hint: "Initial messages rejected before the mail provider accepted them",
+              }]
+            : []),
           {
             label: "No email",
             value: numberNoEmail === null ? "—" : String(numberNoEmail),

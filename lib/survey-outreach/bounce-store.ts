@@ -4,6 +4,7 @@ import {
   summarizeUniqueSurveyBounces,
   uniqueSurveyBounceRows,
 } from "@/lib/survey-outreach/bounce-dedupe";
+import { resolvedSurveyBounceStage } from "@/lib/survey-outreach/bounce-parser";
 import type { SurveyOutreachRow, SurveyOutreachStage } from "@/lib/survey-outreach/types";
 
 const STAGE_SENT_COLUMN: Record<SurveyOutreachStage, keyof SurveyOutreachRow> = {
@@ -54,6 +55,9 @@ export type SurveyBounceReportRow = Pick<
   | "received_at"
   | "hard_bounce"
 >;
+
+type StoredSurveyBounceReportRow = SurveyBounceReportRow &
+  Pick<SurveyOutreachBounceRow, "original_subject">;
 
 export type SurveyBounceReportFilters = {
   receivedFrom?: string;
@@ -336,13 +340,12 @@ export async function listSurveyOutreachBouncesForReport(
     for (let offset = 0; ; offset += pageSize) {
       let query = supabase
         .from("survey_outreach_bounces")
-        .select("graph_message_id,outreach_id,recipient_email,stage,is_test,received_at,hard_bounce")
+        .select("graph_message_id,outreach_id,recipient_email,original_subject,stage,is_test,received_at,hard_bounce")
         .order("received_at", { ascending: false })
         .range(offset, offset + pageSize - 1);
       if (filters.receivedFrom) query = query.gte("received_at", filters.receivedFrom);
       if (filters.receivedBefore) query = query.lt("received_at", filters.receivedBefore);
       if (filters.includeTests === false) query = query.eq("is_test", false);
-      if (filters.stage) query = query.eq("stage", filters.stage);
 
       const { data, error } = await query;
       if (error) {
@@ -356,8 +359,14 @@ export async function listSurveyOutreachBouncesForReport(
         return { ok: false, error: "Could not load survey delivery failures." };
       }
 
-      const page = (data ?? []) as SurveyBounceReportRow[];
-      rows.push(...page);
+      const page = (data ?? []) as StoredSurveyBounceReportRow[];
+      rows.push(
+        ...page.flatMap(({ original_subject: originalSubject, ...row }) => {
+          const stage = resolvedSurveyBounceStage(row.stage, originalSubject);
+          if (filters.stage && stage !== filters.stage) return [];
+          return [{ ...row, stage }];
+        }),
+      );
       if (page.length < pageSize) break;
     }
 

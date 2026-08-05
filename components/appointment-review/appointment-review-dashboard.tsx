@@ -137,7 +137,7 @@ type Props = {
   stats: AppointmentReviewStats;
   numberSent: number;
   numberRepeatInitialSends: number;
-  numberFailedEmails: number;
+  numberFailedInitialSends: number;
   periodLabel: string;
   refreshing: boolean;
   dailyCheckouts: DailyCheckoutPoint[];
@@ -148,7 +148,7 @@ export function AppointmentReviewDashboard({
   stats,
   numberSent,
   numberRepeatInitialSends,
-  numberFailedEmails,
+  numberFailedInitialSends,
   periodLabel,
   refreshing,
   dailyCheckouts,
@@ -187,9 +187,9 @@ export function AppointmentReviewDashboard({
             hint: "Additional successful sends to an address already counted in this period",
           },
           {
-            label: "Failed / bounced",
-            value: String(numberFailedEmails),
-            hint: "All tracked initial and reminder failures, including pre-send rejections",
+            label: "Failed initial sends",
+            value: String(numberFailedInitialSends),
+            hint: "Initial survey attempts in this period with a known delivery failure",
           },
           {
             label: "Total responses",

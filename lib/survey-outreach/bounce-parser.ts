@@ -41,10 +41,20 @@ export function surveyStageFromSubject(subject: string | null | undefined): Surv
     normalized === "how was your recent visit to nmac?"
     || normalized === "how were your recent visits to nmac?"
   ) return "initial";
+  if (normalized === "final reminder: nmac visit survey") return "final";
+  if (normalized === "second reminder: nmac provider experience survey") return "reminder2";
+  if (normalized === "reminder: share your nmac visit feedback") return "reminder1";
   if (normalized.includes("final reminder about your nmac visit")) return "final";
   if (normalized.includes("second reminder about your nmac visit")) return "reminder2";
   if (normalized.includes("reminder about your nmac visit")) return "reminder1";
   return null;
+}
+
+export function resolvedSurveyBounceStage(
+  storedStage: SurveyOutreachStage | null | undefined,
+  originalSubject: string | null | undefined,
+): SurveyOutreachStage | null {
+  return storedStage ?? surveyStageFromSubject(originalSubject);
 }
 
 export function bounceRecipient(

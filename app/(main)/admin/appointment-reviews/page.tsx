@@ -89,7 +89,7 @@ export default function AdminAppointmentReviewsPage() {
   const [reviews, setReviews] = useState<AppointmentReviewDetail[]>([]);
   const [numberSent, setNumberSent] = useState(0);
   const [numberRepeatInitialSends, setNumberRepeatInitialSends] = useState(0);
-  const [numberFailedEmails, setNumberFailedEmails] = useState(0);
+  const [numberFailedInitialSends, setNumberFailedInitialSends] = useState(0);
   const [dailyCheckouts, setDailyCheckouts] = useState<DailyCheckoutPoint[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -205,7 +205,7 @@ export default function AdminAppointmentReviewsPage() {
         setReviews([]);
         setNumberSent(0);
         setNumberRepeatInitialSends(0);
-        setNumberFailedEmails(0);
+        setNumberFailedInitialSends(0);
         setDailyCheckouts([]);
         setAppliedDateRange(null);
         setQuarter(null);
@@ -232,12 +232,10 @@ export default function AdminAppointmentReviewsPage() {
           ? liveData.numberRepeatInitialSends
           : 0,
       );
-      setNumberFailedEmails(
-        typeof liveData.numberFailedEmails === "number"
-          ? liveData.numberFailedEmails
-          : typeof liveData.numberFailedInitialSends === "number"
-            ? liveData.numberFailedInitialSends
-            : 0,
+      setNumberFailedInitialSends(
+        typeof liveData.numberFailedInitialSends === "number"
+          ? liveData.numberFailedInitialSends
+          : 0,
       );
       setDailyCheckouts(liveData.dailyCheckouts ?? []);
       setAppliedDateRange(
@@ -257,7 +255,7 @@ export default function AdminAppointmentReviewsPage() {
       setReviews([]);
       setNumberSent(0);
       setNumberRepeatInitialSends(0);
-      setNumberFailedEmails(0);
+      setNumberFailedInitialSends(0);
       setDailyCheckouts([]);
       setAppliedDateRange(null);
       setQuarter(null);
@@ -531,7 +529,7 @@ export default function AdminAppointmentReviewsPage() {
           stats={stats}
           numberSent={numberSent}
           numberRepeatInitialSends={numberRepeatInitialSends}
-          numberFailedEmails={numberFailedEmails}
+          numberFailedInitialSends={numberFailedInitialSends}
           periodLabel={appliedPeriodLabel}
           refreshing={refreshing}
           dailyCheckouts={dailyCheckouts}

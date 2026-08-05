@@ -9,6 +9,7 @@ import {
   isHardBounce,
   originalInternetMessageId,
   originalSubjectFromNdr,
+  resolvedSurveyBounceStage,
   surveyStageFromSubject,
 } from "../../lib/survey-outreach/bounce-parser.ts";
 
@@ -39,10 +40,24 @@ test("uses the NDR reply reference to identify the original message", () => {
 test("maps every survey subject to its stage", () => {
   assert.equal(surveyStageFromSubject("How was your recent visit to NMAC?"), "initial");
   assert.equal(surveyStageFromSubject("How were your recent visits to NMAC?"), "initial");
+  assert.equal(surveyStageFromSubject("Reminder: Share your NMAC visit feedback"), "reminder1");
+  assert.equal(surveyStageFromSubject("Second reminder: NMAC provider experience survey"), "reminder2");
+  assert.equal(surveyStageFromSubject("Final reminder: NMAC visit survey"), "final");
   assert.equal(surveyStageFromSubject("Survey answers needed: Reminder about your NMAC visit"), "reminder1");
   assert.equal(surveyStageFromSubject("Survey answers needed: Second reminder about your NMAC visit"), "reminder2");
   assert.equal(surveyStageFromSubject("Survey answers needed: Final reminder about your NMAC visit"), "final");
   assert.equal(surveyStageFromSubject("Automatic reply"), null);
+});
+
+test("infers a missing stored stage from a legacy subject", () => {
+  assert.equal(
+    resolvedSurveyBounceStage(null, "How were your recent visits to NMAC?"),
+    "initial",
+  );
+  assert.equal(
+    resolvedSurveyBounceStage("reminder2", "Reminder: Share your NMAC visit feedback"),
+    "reminder2",
+  );
 });
 
 test("removes only the Outlook undeliverable prefix", () => {

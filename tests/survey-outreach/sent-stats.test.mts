@@ -1,7 +1,76 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { summarizeUniqueInitialRecipients } from "../../lib/survey-outreach/sent-stats.ts";
+import {
+  countSuccessfulInitialSurveySends,
+  summarizeInitialSurveySends,
+  summarizeUniqueInitialRecipients,
+} from "../../lib/survey-outreach/sent-stats.ts";
+
+test("summarizes successful, failed, and repeat initial send events", () => {
+  assert.deepEqual(
+    summarizeInitialSurveySends(
+      [
+        { id: "outreach-1", patient_email: "patient@example.com", is_test: false },
+        { id: "outreach-2", patient_email: " Patient@example.com ", is_test: false },
+        { id: "outreach-3", patient_email: "failed@example.com", is_test: false },
+        { id: "outreach-4", patient_email: "other@example.com", is_test: false },
+      ],
+      [
+        {
+          outreach_id: "outreach-3",
+          recipient_email: "failed@example.com",
+          stage: "initial",
+          is_test: false,
+        },
+      ],
+    ),
+    {
+      total: 4,
+      successful: 3,
+      failed: 1,
+      repeatSuccessful: 1,
+    },
+  );
+});
+
+test("counts repeat initial sends while excluding the specific failed message", () => {
+  assert.equal(
+    countSuccessfulInitialSurveySends(
+      [
+        { id: "outreach-1", patient_email: "patient@example.com", is_test: false },
+        { id: "outreach-2", patient_email: "patient@example.com", is_test: false },
+        { id: "outreach-3", patient_email: "other@example.com", is_test: false },
+      ],
+      [
+        {
+          outreach_id: "outreach-1",
+          recipient_email: "patient@example.com",
+          stage: "initial",
+          is_test: false,
+        },
+      ],
+    ),
+    2,
+  );
+});
+
+test("does not remove an initial send for a reminder failure", () => {
+  assert.equal(
+    countSuccessfulInitialSurveySends(
+      [{ id: "outreach-1", patient_email: "patient@example.com", is_test: false }],
+      [
+        {
+          outreach_id: "outreach-1",
+          recipient_email: "patient@example.com",
+          stage: "reminder1",
+          is_test: false,
+        },
+      ],
+    ),
+    1,
+  );
+});
 
 test("counts one initial survey per normalized recipient email", () => {
   assert.deepEqual(

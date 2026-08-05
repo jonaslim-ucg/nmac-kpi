@@ -19,7 +19,7 @@ import {
   listSurveyOutreachForReport,
 } from "@/lib/survey-outreach/store";
 import { isScheduledTestRecipientAllowed } from "@/lib/survey-outreach/config";
-import { summarizeUniqueInitialRecipients } from "@/lib/survey-outreach/sent-stats";
+import { summarizeInitialSurveySends } from "@/lib/survey-outreach/sent-stats";
 import { listInitialSurveyBouncesForReport } from "@/lib/survey-outreach/bounce-store";
 import { buildDailyCheckoutTrend } from "@/lib/survey-outreach/checkout-stats";
 
@@ -100,7 +100,6 @@ export async function GET(req: Request) {
       { status: initialBounceResult.setupRequired ? 503 : 500 },
     );
   }
-
   const testTokenResult = await findTestSurveyOutreachTokens(
     reviewsResult.rows
       .map((row) => row.survey_token)
@@ -149,12 +148,12 @@ export async function GET(req: Request) {
     outreachProviderReport,
     responseOnlyProviderReport,
   );
-  const initialRecipients = summarizeUniqueInitialRecipients(
-    outreachResult.rows,
-    initialBounceResult.rows,
-  );
   const dailyCheckouts = buildDailyCheckoutTrend(
     dailyCheckoutResult.ok ? dailyCheckoutResult.rows : [],
+  );
+  const initialSendStats = summarizeInitialSurveySends(
+    outreachResult.rows,
+    initialBounceResult.rows,
   );
 
   return NextResponse.json(
@@ -162,7 +161,9 @@ export async function GET(req: Request) {
       dateStart: range.dateStart,
       dateEnd: range.dateEnd,
       includeTests,
-      numberSent: initialRecipients.total,
+      numberSent: initialSendStats.successful,
+      numberRepeatInitialSends: initialSendStats.repeatSuccessful,
+      numberFailedInitialSends: initialSendStats.failed,
       dailyCheckouts,
       numberResponses: rows.length,
       quarter: range.quarter ?? null,

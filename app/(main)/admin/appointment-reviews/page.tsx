@@ -28,6 +28,8 @@ type ApiResponse = {
   stats?: AppointmentReviewStats;
   reviews?: AppointmentReviewDetail[];
   numberSent?: number;
+  numberRepeatInitialSends?: number;
+  numberFailedInitialSends?: number;
   dailyCheckouts?: DailyCheckoutPoint[];
   quarter?: AppointmentReviewQuarter | null;
   currentQuarter?: AppointmentReviewQuarter;
@@ -72,6 +74,8 @@ export default function AdminAppointmentReviewsPage() {
   const [stats, setStats] = useState<AppointmentReviewStats | null>(null);
   const [reviews, setReviews] = useState<AppointmentReviewDetail[]>([]);
   const [numberSent, setNumberSent] = useState(0);
+  const [numberRepeatInitialSends, setNumberRepeatInitialSends] = useState(0);
+  const [numberFailedInitialSends, setNumberFailedInitialSends] = useState(0);
   const [dailyCheckouts, setDailyCheckouts] = useState<DailyCheckoutPoint[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -169,6 +173,8 @@ export default function AdminAppointmentReviewsPage() {
         setStats(null);
         setReviews([]);
         setNumberSent(0);
+        setNumberRepeatInitialSends(0);
+        setNumberFailedInitialSends(0);
         setDailyCheckouts([]);
         setQuarter(null);
         setEligibleEntries(null);
@@ -189,6 +195,16 @@ export default function AdminAppointmentReviewsPage() {
       setStats(liveData.stats ?? null);
       setReviews(displayedReviews);
       setNumberSent(typeof liveData.numberSent === "number" ? liveData.numberSent : 0);
+      setNumberRepeatInitialSends(
+        typeof liveData.numberRepeatInitialSends === "number"
+          ? liveData.numberRepeatInitialSends
+          : 0,
+      );
+      setNumberFailedInitialSends(
+        typeof liveData.numberFailedInitialSends === "number"
+          ? liveData.numberFailedInitialSends
+          : 0,
+      );
       setDailyCheckouts(liveData.dailyCheckouts ?? []);
       setQuarter(liveData.quarter ?? null);
       setCurrentQuarter(liveData.currentQuarter ?? null);
@@ -201,6 +217,8 @@ export default function AdminAppointmentReviewsPage() {
       setStats(null);
       setReviews([]);
       setNumberSent(0);
+      setNumberRepeatInitialSends(0);
+      setNumberFailedInitialSends(0);
       setDailyCheckouts([]);
       setQuarter(null);
       setEligibleEntries(null);
@@ -461,6 +479,8 @@ export default function AdminAppointmentReviewsPage() {
         <AppointmentReviewDashboard
           stats={stats}
           numberSent={numberSent}
+          numberRepeatInitialSends={numberRepeatInitialSends}
+          numberFailedInitialSends={numberFailedInitialSends}
           dailyCheckouts={dailyCheckouts}
           onViewReview={viewReview}
         />

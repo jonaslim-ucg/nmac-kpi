@@ -135,11 +135,20 @@ function YesNoPie({ title, data }: { title: string; data: AppointmentReviewStats
 type Props = {
   stats: AppointmentReviewStats;
   numberSent: number;
+  numberRepeatInitialSends: number;
+  numberFailedInitialSends: number;
   dailyCheckouts: DailyCheckoutPoint[];
   onViewReview?: (id: string) => void;
 };
 
-export function AppointmentReviewDashboard({ stats, numberSent, dailyCheckouts, onViewReview }: Props) {
+export function AppointmentReviewDashboard({
+  stats,
+  numberSent,
+  numberRepeatInitialSends,
+  numberFailedInitialSends,
+  dailyCheckouts,
+  onViewReview,
+}: Props) {
   const empty = stats.total === 0;
   const ratingScores = stats.ratingScores.map((score) => ({
     ...score,
@@ -151,9 +160,19 @@ export function AppointmentReviewDashboard({ stats, numberSent, dailyCheckouts, 
       <SummaryCards
         cards={[
           {
-            label: "Initial surveys delivered",
+            label: "Initial surveys sent",
             value: String(numberSent),
-            hint: "One per patient email; failures and reminders excluded",
+            hint: "Includes repeat visits; delivery failures and reminders excluded",
+          },
+          {
+            label: "Repeat initial sends",
+            value: String(numberRepeatInitialSends),
+            hint: "Additional successful sends to an address already counted in this period",
+          },
+          {
+            label: "Failed / bounced",
+            value: String(numberFailedInitialSends),
+            hint: "Known initial-message failures excluded from the sent total",
           },
           {
             label: "Total responses",

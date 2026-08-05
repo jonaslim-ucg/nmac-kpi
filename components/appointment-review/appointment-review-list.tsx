@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Loader2, MessageSquareText } from "lucide-react";
+import { ArrowUpDown, ChevronLeft, ChevronRight, Loader2, MessageSquareText } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
 import {
@@ -19,7 +19,52 @@ type Props = {
 };
 
 type CommentFilter = "all" | "with-comments";
+type SortOption =
+  | "appointment-desc"
+  | "appointment-asc"
+  | "name-asc"
+  | "name-desc"
+  | "submitted-desc"
+  | "submitted-asc";
+
 const PAGE_SIZE = 10;
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: "appointment-desc", label: "Appointment: newest" },
+  { value: "appointment-asc", label: "Appointment: oldest" },
+  { value: "name-asc", label: "Patient name: A–Z" },
+  { value: "name-desc", label: "Patient name: Z–A" },
+  { value: "submitted-desc", label: "Submitted: newest" },
+  { value: "submitted-asc", label: "Submitted: oldest" },
+];
+
+function compareReviews(
+  first: AppointmentReviewDetail,
+  second: AppointmentReviewDetail,
+  sort: SortOption,
+): number {
+  if (sort.startsWith("appointment")) {
+    if (!first.appointmentDate && !second.appointmentDate) {
+      return second.createdAt.localeCompare(first.createdAt);
+    }
+    if (!first.appointmentDate) return 1;
+    if (!second.appointmentDate) return -1;
+    const order = first.appointmentDate.localeCompare(second.appointmentDate);
+    return (sort === "appointment-desc" ? -order : order)
+      || second.createdAt.localeCompare(first.createdAt);
+  }
+
+  if (sort.startsWith("name")) {
+    const order = first.patientName.localeCompare(second.patientName, undefined, {
+      sensitivity: "base",
+    });
+    return (sort === "name-desc" ? -order : order)
+      || second.createdAt.localeCompare(first.createdAt);
+  }
+
+  const order = first.createdAt.localeCompare(second.createdAt);
+  return sort === "submitted-desc" ? -order : order;
+}
 
 export function AppointmentReviewList({
   reviews,
@@ -30,14 +75,15 @@ export function AppointmentReviewList({
   onShowTestResponsesChange,
 }: Props) {
   const [commentFilter, setCommentFilter] = useState<CommentFilter>("all");
+  const [sortOption, setSortOption] = useState<SortOption>("submitted-desc");
   const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
-    if (commentFilter === "with-comments") {
-      return reviews.filter((r) => r.hasComments);
-    }
-    return reviews;
-  }, [commentFilter, reviews]);
+    const included = commentFilter === "with-comments"
+      ? reviews.filter((review) => review.hasComments)
+      : reviews;
+    return [...included].sort((first, second) => compareReviews(first, second, sortOption));
+  }, [commentFilter, reviews, sortOption]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
   const pageStart = (currentPage - 1) * PAGE_SIZE;
@@ -60,6 +106,25 @@ export function AppointmentReviewList({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <label className="flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm text-muted-foreground">
+            <ArrowUpDown className="h-4 w-4 shrink-0" aria-hidden />
+            <span className="text-xs font-medium">Sort by</span>
+            <select
+              value={sortOption}
+              onChange={(event) => {
+                setSortOption(event.target.value as SortOption);
+                setPage(1);
+              }}
+              aria-label="Sort survey results"
+              className="min-w-0 bg-transparent font-medium text-foreground outline-none"
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="mr-1 flex items-center gap-2 rounded-lg border border-border bg-surface-muted/30 px-3 py-1.5">
             <div>
               <p className="text-xs font-medium text-foreground">Show test responses</p>

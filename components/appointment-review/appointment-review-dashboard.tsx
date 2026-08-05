@@ -273,7 +273,6 @@ function DeliveryDiscrepancies({ reconciliation }: { reconciliation: SurveyCheck
 type Props = {
   stats: AppointmentReviewStats;
   numberSent: number;
-  numberRepeatInitialSends: number;
   numberBouncedInitialSends: number;
   numberPermanentInitialFailures: number;
   numberNoEmail: number | null;
@@ -288,7 +287,6 @@ type Props = {
 export function AppointmentReviewDashboard({
   stats,
   numberSent,
-  numberRepeatInitialSends,
   numberBouncedInitialSends,
   numberPermanentInitialFailures,
   numberNoEmail,
@@ -325,11 +323,6 @@ export function AppointmentReviewDashboard({
             label: "Initial surveys sent",
             value: String(numberSent),
             hint: "Counted by checkout date; repeat visits included, failures and reminders excluded",
-          },
-          {
-            label: "Repeat initial sends",
-            value: String(numberRepeatInitialSends),
-            hint: "Additional successful sends to an address already counted in this period",
           },
           {
             label: "Bounced emails",

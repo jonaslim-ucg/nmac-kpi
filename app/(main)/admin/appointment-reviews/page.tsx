@@ -31,7 +31,6 @@ type ApiResponse = {
   stats?: AppointmentReviewStats;
   reviews?: AppointmentReviewDetail[];
   numberSent?: number;
-  numberRepeatInitialSends?: number;
   numberBouncedInitialSends?: number;
   numberPermanentInitialFailures?: number;
   numberNoEmail?: number | null;
@@ -93,7 +92,6 @@ export default function AdminAppointmentReviewsPage() {
   const [stats, setStats] = useState<AppointmentReviewStats | null>(null);
   const [reviews, setReviews] = useState<AppointmentReviewDetail[]>([]);
   const [numberSent, setNumberSent] = useState(0);
-  const [numberRepeatInitialSends, setNumberRepeatInitialSends] = useState(0);
   const [numberBouncedInitialSends, setNumberBouncedInitialSends] = useState(0);
   const [numberPermanentInitialFailures, setNumberPermanentInitialFailures] = useState(0);
   const [numberNoEmail, setNumberNoEmail] = useState<number | null>(null);
@@ -214,7 +212,6 @@ export default function AdminAppointmentReviewsPage() {
         setStats(null);
         setReviews([]);
         setNumberSent(0);
-        setNumberRepeatInitialSends(0);
         setNumberBouncedInitialSends(0);
         setNumberPermanentInitialFailures(0);
         setNumberNoEmail(null);
@@ -241,11 +238,6 @@ export default function AdminAppointmentReviewsPage() {
       setStats(liveData.stats ?? null);
       setReviews(displayedReviews);
       setNumberSent(typeof liveData.numberSent === "number" ? liveData.numberSent : 0);
-      setNumberRepeatInitialSends(
-        typeof liveData.numberRepeatInitialSends === "number"
-          ? liveData.numberRepeatInitialSends
-          : 0,
-      );
       setNumberBouncedInitialSends(
         typeof liveData.numberBouncedInitialSends === "number"
           ? liveData.numberBouncedInitialSends
@@ -280,7 +272,6 @@ export default function AdminAppointmentReviewsPage() {
       setStats(null);
       setReviews([]);
       setNumberSent(0);
-      setNumberRepeatInitialSends(0);
       setNumberBouncedInitialSends(0);
       setNumberPermanentInitialFailures(0);
       setNumberNoEmail(null);
@@ -558,7 +549,6 @@ export default function AdminAppointmentReviewsPage() {
         <AppointmentReviewDashboard
           stats={stats}
           numberSent={numberSent}
-          numberRepeatInitialSends={numberRepeatInitialSends}
           numberBouncedInitialSends={numberBouncedInitialSends}
           numberPermanentInitialFailures={numberPermanentInitialFailures}
           numberNoEmail={numberNoEmail}

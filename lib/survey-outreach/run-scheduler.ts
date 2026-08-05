@@ -26,6 +26,7 @@ import {
   markStageDeliveryUncertain,
   recordStageSendFailure,
   releaseStageSendClaim,
+  upsertDailyCheckoutCounts,
   upsertCrmOutreachBatch,
 } from "@/lib/survey-outreach/store";
 import type { SurveyOutreachRow, SurveyOutreachStage } from "@/lib/survey-outreach/types";
@@ -139,11 +140,16 @@ export async function syncCheckedOutFromCrm(
     dates.map(async (date) => ({ date, rows: await fetchCrmAppointments(date, "CHK") })),
   );
   const crmRows: CrmAppointmentRow[] = [];
+  const dailyCheckoutCounts: { appointment_date: string; checkout_count: number }[] = [];
   const syncErrors: { date: string; error: string }[] = [];
 
   settled.forEach((result, index) => {
     if (result.status === "fulfilled") {
       crmRows.push(...result.value.rows);
+      dailyCheckoutCounts.push({
+        appointment_date: result.value.date,
+        checkout_count: result.value.rows.length,
+      });
       return;
     }
     syncErrors.push({
@@ -171,6 +177,11 @@ export async function syncCheckedOutFromCrm(
 
   const dailyGroups = groupDailyOutreachAppointments(outreachRows);
   const { synced } = await upsertCrmOutreachBatch(dailyGroups);
+  try {
+    await upsertDailyCheckoutCounts(dailyCheckoutCounts);
+  } catch (error) {
+    console.error("Could not save daily checkout totals.", error);
+  }
 
   return { synced, skippedNoEmail, skippedBeforeLiveStart, syncErrors };
 }

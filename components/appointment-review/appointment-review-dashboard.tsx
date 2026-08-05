@@ -18,6 +18,7 @@ import {
 } from "recharts";
 import type { AppointmentReviewStats } from "@/lib/appointment-review/analytics";
 import { APPOINTMENT_REVIEW_MAX_SCORE } from "@/lib/appointment-review/types";
+import type { DailyCheckoutStats } from "@/lib/survey-outreach/checkout-stats";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 
 const CHART_COLORS = [
@@ -134,10 +135,11 @@ function YesNoPie({ title, data }: { title: string; data: AppointmentReviewStats
 type Props = {
   stats: AppointmentReviewStats;
   numberSent: number;
+  checkoutStats: DailyCheckoutStats | null;
   onViewReview?: (id: string) => void;
 };
 
-export function AppointmentReviewDashboard({ stats, numberSent, onViewReview }: Props) {
+export function AppointmentReviewDashboard({ stats, numberSent, checkoutStats, onViewReview }: Props) {
   const empty = stats.total === 0;
   const ratingScores = stats.ratingScores.map((score) => ({
     ...score,
@@ -148,6 +150,15 @@ export function AppointmentReviewDashboard({ stats, numberSent, onViewReview }: 
     <div className="space-y-6">
       <SummaryCards
         cards={[
+          {
+            label: "Daily patient check-outs",
+            value: checkoutStats?.trackedDays
+              ? `${checkoutStats.averagePerDay.toLocaleString()}/day`
+              : "—",
+            hint: checkoutStats?.trackedDays
+              ? `${checkoutStats.total.toLocaleString()} total across ${checkoutStats.trackedDays.toLocaleString()} tracked days`
+              : "Daily CRM checkout totals are not available yet",
+          },
           {
             label: "Initial surveys delivered",
             value: String(numberSent),

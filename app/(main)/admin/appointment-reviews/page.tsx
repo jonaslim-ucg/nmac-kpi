@@ -12,6 +12,7 @@ import { useSession } from "@/components/auth/session-provider";
 import type { AppointmentReviewStats } from "@/lib/appointment-review/analytics";
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
 import type { AppointmentReviewQuarter } from "@/lib/appointment-review/report";
+import type { DailyCheckoutStats } from "@/lib/survey-outreach/checkout-stats";
 import { APPOINTMENT_REVIEWS_SETUP_SQL } from "@/lib/appointment-review/store";
 import { isNmacNavHrefAllowed } from "@/lib/auth/role-nmac-nav";
 
@@ -27,6 +28,7 @@ type ApiResponse = {
   stats?: AppointmentReviewStats;
   reviews?: AppointmentReviewDetail[];
   numberSent?: number;
+  checkoutStats?: DailyCheckoutStats;
   quarter?: AppointmentReviewQuarter | null;
   currentQuarter?: AppointmentReviewQuarter;
   eligibleEntries?: number | null;
@@ -70,6 +72,7 @@ export default function AdminAppointmentReviewsPage() {
   const [stats, setStats] = useState<AppointmentReviewStats | null>(null);
   const [reviews, setReviews] = useState<AppointmentReviewDetail[]>([]);
   const [numberSent, setNumberSent] = useState(0);
+  const [checkoutStats, setCheckoutStats] = useState<DailyCheckoutStats | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -166,6 +169,7 @@ export default function AdminAppointmentReviewsPage() {
         setStats(null);
         setReviews([]);
         setNumberSent(0);
+        setCheckoutStats(null);
         setQuarter(null);
         setEligibleEntries(null);
         return;
@@ -185,6 +189,7 @@ export default function AdminAppointmentReviewsPage() {
       setStats(liveData.stats ?? null);
       setReviews(displayedReviews);
       setNumberSent(typeof liveData.numberSent === "number" ? liveData.numberSent : 0);
+      setCheckoutStats(liveData.checkoutStats ?? null);
       setQuarter(liveData.quarter ?? null);
       setCurrentQuarter(liveData.currentQuarter ?? null);
       setEligibleEntries(
@@ -196,6 +201,7 @@ export default function AdminAppointmentReviewsPage() {
       setStats(null);
       setReviews([]);
       setNumberSent(0);
+      setCheckoutStats(null);
       setQuarter(null);
       setEligibleEntries(null);
     } finally {
@@ -455,6 +461,7 @@ export default function AdminAppointmentReviewsPage() {
         <AppointmentReviewDashboard
           stats={stats}
           numberSent={numberSent}
+          checkoutStats={checkoutStats}
           onViewReview={viewReview}
         />
       ) : null}

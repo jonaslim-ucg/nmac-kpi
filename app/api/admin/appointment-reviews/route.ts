@@ -15,11 +15,13 @@ import { isNmacNavViewAllowed, SURVEY_RESULTS_NAV_VIEW_ID } from "@/lib/auth/rol
 import { getAppDashboardSettings } from "@/lib/auth/app-settings";
 import {
   findTestSurveyOutreachTokens,
+  listDailyCheckoutCountsForReport,
   listSurveyOutreachForReport,
 } from "@/lib/survey-outreach/store";
 import { isScheduledTestRecipientAllowed } from "@/lib/survey-outreach/config";
 import { summarizeUniqueInitialRecipients } from "@/lib/survey-outreach/sent-stats";
 import { listInitialSurveyBouncesForReport } from "@/lib/survey-outreach/bounce-store";
+import { summarizeDailyCheckouts } from "@/lib/survey-outreach/checkout-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +56,7 @@ export async function GET(req: Request) {
   }
   const includeTests = includeTestsParam === "true";
 
-  const [reviewsResult, outreachResult, initialBounceResult] = await Promise.all([
+  const [reviewsResult, outreachResult, initialBounceResult, dailyCheckoutResult] = await Promise.all([
     listAppointmentReviews({ createdFrom: range.startAt, createdBefore: range.endBefore }),
     listSurveyOutreachForReport({
       sentFrom: range.startAt,
@@ -62,6 +64,10 @@ export async function GET(req: Request) {
       includeTests,
     }),
     listInitialSurveyBouncesForReport(),
+    listDailyCheckoutCountsForReport({
+      dateStart: range.dateStart,
+      dateEnd: range.dateEnd,
+    }),
   ]);
   if (!reviewsResult.ok) {
     if (reviewsResult.setupRequired) {
@@ -147,6 +153,9 @@ export async function GET(req: Request) {
     outreachResult.rows,
     initialBounceResult.rows,
   );
+  const checkoutStats = summarizeDailyCheckouts(
+    dailyCheckoutResult.ok ? dailyCheckoutResult.rows : [],
+  );
 
   return NextResponse.json(
     {
@@ -154,6 +163,7 @@ export async function GET(req: Request) {
       dateEnd: range.dateEnd,
       includeTests,
       numberSent: initialRecipients.total,
+      checkoutStats,
       numberResponses: rows.length,
       quarter: range.quarter ?? null,
       currentQuarter: currentAppointmentReviewQuarter(now),

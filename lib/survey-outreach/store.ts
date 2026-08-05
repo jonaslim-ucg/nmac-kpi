@@ -1,5 +1,6 @@
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { listInitialSurveyBouncesForReport } from "@/lib/survey-outreach/bounce-store";
+import type { DailyCheckoutCountRow } from "@/lib/survey-outreach/checkout-stats";
 import { summarizeUniqueInitialRecipients } from "@/lib/survey-outreach/sent-stats";
 import type { DailyOutreachGroup } from "@/lib/survey-outreach/daily-group";
 import type { SurveyOutreachLookup, SurveyOutreachRow, SurveyOutreachStage } from "@/lib/survey-outreach/types";
@@ -559,6 +560,64 @@ export async function listSurveyOutreachForReport(
     return { ok: true, rows };
   } catch {
     return { ok: false, error: "Could not load sent survey data." };
+  }
+}
+
+export async function upsertDailyCheckoutCounts(
+  rows: readonly DailyCheckoutCountRow[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const syncedAt = new Date().toISOString();
+  const supabase = createServiceRoleClient();
+  const { error } = await supabase
+    .from("survey_outreach_daily_checkouts")
+    .upsert(
+      rows.map((row) => ({
+        appointment_date: row.appointment_date,
+        checkout_count: Math.max(0, Math.trunc(row.checkout_count)),
+        synced_at: syncedAt,
+      })),
+      { onConflict: "appointment_date" },
+    );
+  if (error) throw new Error(error.message);
+}
+
+export type DailyCheckoutCountReportResult =
+  | { ok: true; rows: DailyCheckoutCountRow[] }
+  | { ok: false; error: string; setupRequired?: boolean };
+
+export async function listDailyCheckoutCountsForReport(filters: {
+  dateStart?: string | null;
+  dateEnd?: string | null;
+} = {}): Promise<DailyCheckoutCountReportResult> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return { ok: false, error: "Daily checkout storage is not available." };
+  }
+
+  try {
+    const supabase = createServiceRoleClient();
+    let query = supabase
+      .from("survey_outreach_daily_checkouts")
+      .select("appointment_date,checkout_count")
+      .order("appointment_date", { ascending: true });
+    if (filters.dateStart) query = query.gte("appointment_date", filters.dateStart);
+    if (filters.dateEnd) query = query.lte("appointment_date", filters.dateEnd);
+
+    const { data, error } = await query;
+    if (error) {
+      const setupRequired = /survey_outreach_daily_checkouts/i.test(error.message)
+        && /does not exist|schema cache|could not find/i.test(error.message);
+      return {
+        ok: false,
+        error: setupRequired
+          ? "Daily checkout reporting is not configured."
+          : "Could not load daily checkout totals.",
+        setupRequired,
+      };
+    }
+    return { ok: true, rows: (data ?? []) as DailyCheckoutCountRow[] };
+  } catch {
+    return { ok: false, error: "Could not load daily checkout totals." };
   }
 }
 

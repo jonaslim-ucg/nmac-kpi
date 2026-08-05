@@ -34,7 +34,6 @@ type ApiResponse = {
   numberBouncedInitialSends?: number;
   numberPermanentInitialFailures?: number;
   numberNoEmail?: number | null;
-  numberNotSent?: number | null;
   numberFailedEmails?: number;
   dailyCheckouts?: DailyCheckoutPoint[];
   dailySurveySends?: DailyInitialSurveySendPoint[];
@@ -95,7 +94,6 @@ export default function AdminAppointmentReviewsPage() {
   const [numberBouncedInitialSends, setNumberBouncedInitialSends] = useState(0);
   const [numberPermanentInitialFailures, setNumberPermanentInitialFailures] = useState(0);
   const [numberNoEmail, setNumberNoEmail] = useState<number | null>(null);
-  const [numberNotSent, setNumberNotSent] = useState<number | null>(null);
   const [dailyCheckouts, setDailyCheckouts] = useState<DailyCheckoutPoint[]>([]);
   const [dailySurveySends, setDailySurveySends] = useState<DailyInitialSurveySendPoint[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -214,7 +212,6 @@ export default function AdminAppointmentReviewsPage() {
         setNumberBouncedInitialSends(0);
         setNumberPermanentInitialFailures(0);
         setNumberNoEmail(null);
-        setNumberNotSent(null);
         setDailyCheckouts([]);
         setDailySurveySends([]);
         setAppliedDateRange(null);
@@ -250,9 +247,6 @@ export default function AdminAppointmentReviewsPage() {
       setNumberNoEmail(
         typeof liveData.numberNoEmail === "number" ? liveData.numberNoEmail : null,
       );
-      setNumberNotSent(
-        typeof liveData.numberNotSent === "number" ? liveData.numberNotSent : null,
-      );
       setDailyCheckouts(liveData.dailyCheckouts ?? []);
       setDailySurveySends(liveData.dailySurveySends ?? []);
       setAppliedDateRange(
@@ -274,7 +268,6 @@ export default function AdminAppointmentReviewsPage() {
       setNumberBouncedInitialSends(0);
       setNumberPermanentInitialFailures(0);
       setNumberNoEmail(null);
-      setNumberNotSent(null);
       setDailyCheckouts([]);
       setDailySurveySends([]);
       setAppliedDateRange(null);
@@ -552,7 +545,6 @@ export default function AdminAppointmentReviewsPage() {
           numberBouncedInitialSends={numberBouncedInitialSends}
           numberPermanentInitialFailures={numberPermanentInitialFailures}
           numberNoEmail={numberNoEmail}
-          numberNotSent={numberNotSent}
           periodLabel={appliedPeriodLabel}
           refreshing={refreshing}
           dailyCheckouts={dailyCheckouts}

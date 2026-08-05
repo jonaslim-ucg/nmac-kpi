@@ -167,7 +167,6 @@ type Props = {
   numberBouncedInitialSends: number;
   numberPermanentInitialFailures: number;
   numberNoEmail: number | null;
-  numberNotSent: number | null;
   periodLabel: string;
   refreshing: boolean;
   dailyCheckouts: DailyCheckoutPoint[];
@@ -181,7 +180,6 @@ export function AppointmentReviewDashboard({
   numberBouncedInitialSends,
   numberPermanentInitialFailures,
   numberNoEmail,
-  numberNotSent,
   periodLabel,
   refreshing,
   dailyCheckouts,
@@ -252,11 +250,6 @@ export function AppointmentReviewDashboard({
             label: "No email",
             value: numberNoEmail === null ? "—" : String(numberNoEmail),
             hint: "Checked-out patient-day groups with no email in the CRM",
-          },
-          {
-            label: "Not sent",
-            value: numberNotSent === null ? "—" : String(numberNotSent),
-            hint: "Email available but pending, missing outreach, or suppressed; failures excluded",
           },
           {
             label: "Avg. scheduling ease",

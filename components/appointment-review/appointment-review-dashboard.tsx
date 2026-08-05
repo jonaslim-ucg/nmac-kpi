@@ -325,6 +325,11 @@ export function AppointmentReviewDashboard({
             hint: "Counted by checkout date; repeat visits included, failures and reminders excluded",
           },
           {
+            label: "Total responses",
+            value: String(stats.total),
+            hint: "Provider experience survey submissions",
+          },
+          {
             label: "Bounced emails",
             value: String(numberBouncedInitialSends),
             hint: "Initial messages later reported as undeliverable by Outlook",
@@ -345,11 +350,6 @@ export function AppointmentReviewDashboard({
             label: "Not sent",
             value: numberNotSent === null ? "—" : String(numberNotSent),
             hint: "Email available but pending, missing outreach, or suppressed; failures excluded",
-          },
-          {
-            label: "Total responses",
-            value: String(stats.total),
-            hint: "Provider experience survey submissions",
           },
           {
             label: "Avg. scheduling ease",

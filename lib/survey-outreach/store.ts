@@ -584,7 +584,13 @@ export type SurveyOutreachReportFilters = {
 
 export type PermanentSurveyDeliveryFailureRow = Pick<
   SurveyOutreachRow,
-  "id" | "failed_stage" | "is_test" | "permanently_failed_at" | "last_send_error"
+  | "id"
+  | "appointment_date"
+  | "initial_sent_at"
+  | "failed_stage"
+  | "is_test"
+  | "permanently_failed_at"
+  | "last_send_error"
 >;
 
 export type PermanentSurveyDeliveryFailureReportResult =
@@ -649,11 +655,14 @@ export async function listSurveyOutreachForReport(
   }
 }
 
-/** Permanent pre-send or immediate provider failures in the requested interval. */
+/** Permanent pre-send or immediate provider failures for the requested report filters. */
 export async function listPermanentSurveyDeliveryFailuresForReport(
   filters: {
     failedFrom?: string;
     failedBefore?: string;
+    appointmentDateStart?: string;
+    appointmentDateEnd?: string;
+    stage?: SurveyOutreachStage;
     includeTests?: boolean;
   } = {},
 ): Promise<PermanentSurveyDeliveryFailureReportResult> {
@@ -669,7 +678,7 @@ export async function listPermanentSurveyDeliveryFailuresForReport(
     for (let offset = 0; ; offset += pageSize) {
       let query = supabase
         .from("survey_outreach")
-        .select("id,failed_stage,is_test,permanently_failed_at,last_send_error")
+        .select("id,appointment_date,initial_sent_at,failed_stage,is_test,permanently_failed_at,last_send_error")
         .is("merged_into_outreach_id", null)
         .not("permanently_failed_at", "is", null)
         .not("failed_stage", "is", null)
@@ -678,6 +687,13 @@ export async function listPermanentSurveyDeliveryFailuresForReport(
       if (!filters.includeTests) query = query.eq("is_test", false);
       if (filters.failedFrom) query = query.gte("permanently_failed_at", filters.failedFrom);
       if (filters.failedBefore) query = query.lt("permanently_failed_at", filters.failedBefore);
+      if (filters.appointmentDateStart) {
+        query = query.gte("appointment_date", filters.appointmentDateStart);
+      }
+      if (filters.appointmentDateEnd) {
+        query = query.lte("appointment_date", filters.appointmentDateEnd);
+      }
+      if (filters.stage) query = query.eq("failed_stage", filters.stage);
 
       const { data, error } = await query;
       if (error) {

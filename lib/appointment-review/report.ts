@@ -38,6 +38,7 @@ export type SurveyReportOutreachRow = {
   appointment_providers: Record<string, string> | null;
   provider_names: string[] | null;
   initial_sent_at: string | null;
+  initial_delivery_failed?: boolean;
   completed_at: string | null;
   is_test: boolean;
 };
@@ -64,6 +65,7 @@ export type SurveyAppointmentReport = {
   providerAppointments: { appointmentId: string; providerName: string }[];
   providerMappingComplete: boolean;
   initialSentAt: string | null;
+  initialDeliveryStatus: "successful" | "failed" | "not_sent";
   respondedAt: string | null;
 };
 
@@ -301,6 +303,13 @@ function providerCountsForRow(row: SurveyReportOutreachRow): {
   };
 }
 
+function initialDeliveryStatus(
+  row: SurveyReportOutreachRow,
+): SurveyAppointmentReport["initialDeliveryStatus"] {
+  if (!row.initial_sent_at) return "not_sent";
+  return row.initial_delivery_failed ? "failed" : "successful";
+}
+
 export function buildProviderAppointmentReport(rows: readonly SurveyReportOutreachRow[]): {
   providers: ProviderAppointmentReport[];
   appointments: SurveyAppointmentReport[];
@@ -320,7 +329,9 @@ export function buildProviderAppointmentReport(rows: readonly SurveyReportOutrea
       providerTotals.set(key, {
         providerName: current?.providerName ?? provider.providerName,
         appointmentCount: (current?.appointmentCount ?? 0) + provider.count,
-        surveySentCount: (current?.surveySentCount ?? 0) + (row.initial_sent_at ? 1 : 0),
+        surveySentCount:
+          (current?.surveySentCount ?? 0) +
+          (row.initial_sent_at && !row.initial_delivery_failed ? 1 : 0),
         responseCount: (current?.responseCount ?? 0) + (row.completed_at ? 1 : 0),
         appointmentCountEstimated: Boolean(current?.appointmentCountEstimated || provider.estimated),
       });
@@ -340,6 +351,7 @@ export function buildProviderAppointmentReport(rows: readonly SurveyReportOutrea
       providerAppointments: providerData.assignments,
       providerMappingComplete: providerData.mappingComplete,
       initialSentAt: row.initial_sent_at,
+      initialDeliveryStatus: initialDeliveryStatus(row),
       respondedAt: row.completed_at,
     };
   });
@@ -391,6 +403,7 @@ export function buildResponseOnlyAppointmentReport(
       providerAppointments: [],
       providerMappingComplete: false,
       initialSentAt: null,
+      initialDeliveryStatus: "not_sent" as const,
       respondedAt: response.createdAt,
     };
   });

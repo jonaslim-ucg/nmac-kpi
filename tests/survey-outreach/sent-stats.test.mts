@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  classifyInitialSurveySends,
   countSuccessfulInitialSurveySends,
+  summarizeInitialSurveyKpis,
   summarizeInitialSurveySends,
   summarizeUniqueInitialRecipients,
 } from "../../lib/survey-outreach/sent-stats.ts";
@@ -52,6 +54,57 @@ test("counts repeat initial sends while excluding the specific failed message", 
       ],
     ),
     2,
+  );
+});
+
+test("classifies the exact sent rows with known initial delivery failures", () => {
+  const rows = [
+    { id: "outreach-1", patient_email: "sent@example.com", is_test: false },
+    { id: "outreach-2", patient_email: "failed@example.com", is_test: false },
+  ];
+  const result = classifyInitialSurveySends(rows, [
+    {
+      outreach_id: "outreach-2",
+      recipient_email: "failed@example.com",
+      stage: "initial",
+      is_test: false,
+    },
+  ]);
+
+  assert.deepEqual(result.successfulRows.map((row) => row.id), ["outreach-1"]);
+  assert.deepEqual(result.failedRows.map((row) => row.id), ["outreach-2"]);
+});
+
+test("adds permanent pre-send failures to appointment-date initial survey KPIs", () => {
+  assert.deepEqual(
+    summarizeInitialSurveyKpis(
+      [
+        { id: "outreach-1", patient_email: "patient@example.com", is_test: false },
+        { id: "outreach-2", patient_email: "patient@example.com", is_test: false },
+        { id: "outreach-3", patient_email: "bounced@example.com", is_test: false },
+      ],
+      [
+        {
+          outreach_id: "outreach-3",
+          recipient_email: "bounced@example.com",
+          stage: "initial",
+          is_test: false,
+        },
+      ],
+      [
+        { id: "outreach-4", failed_stage: "initial", initial_sent_at: null },
+        { id: "outreach-5", failed_stage: "reminder1", initial_sent_at: "2026-08-01T12:00:00Z" },
+      ],
+    ),
+    {
+      attempted: 4,
+      successful: 2,
+      uniqueSuccessfulRecipients: 1,
+      repeatSuccessful: 1,
+      failed: 2,
+      bounced: 1,
+      permanentPreSendFailures: 1,
+    },
   );
 });
 

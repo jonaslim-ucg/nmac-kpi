@@ -20,7 +20,10 @@ import {
   listSurveyOutreachForReport,
 } from "@/lib/survey-outreach/store";
 import { isScheduledTestRecipientAllowed } from "@/lib/survey-outreach/config";
-import { summarizeInitialSurveySends } from "@/lib/survey-outreach/sent-stats";
+import {
+  classifyInitialSurveySends,
+  summarizeInitialSurveyKpis,
+} from "@/lib/survey-outreach/sent-stats";
 import {
   listInitialSurveyBouncesForReport,
   listSurveyOutreachBouncesForReport,
@@ -67,6 +70,7 @@ export async function GET(req: Request) {
     initialBounceResult,
     deliveryBounceResult,
     permanentFailureResult,
+    permanentInitialFailureResult,
     dailyCheckoutResult,
   ] = await Promise.all([
     listAppointmentReviews({ createdFrom: range.startAt, createdBefore: range.endBefore }),
@@ -84,6 +88,12 @@ export async function GET(req: Request) {
     listPermanentSurveyDeliveryFailuresForReport({
       failedFrom: range.startAt,
       failedBefore: range.endBefore,
+      includeTests,
+    }),
+    listPermanentSurveyDeliveryFailuresForReport({
+      appointmentDateStart: range.dateStart ?? undefined,
+      appointmentDateEnd: range.dateEnd ?? undefined,
+      stage: "initial",
       includeTests,
     }),
     listDailyCheckoutCountsForReport({
@@ -140,6 +150,15 @@ export async function GET(req: Request) {
       { status: permanentFailureResult.setupRequired ? 503 : 500 },
     );
   }
+  if (!permanentInitialFailureResult.ok) {
+    return NextResponse.json(
+      {
+        setupRequired: permanentInitialFailureResult.setupRequired ?? false,
+        error: permanentInitialFailureResult.error,
+      },
+      { status: permanentInitialFailureResult.setupRequired ? 503 : 500 },
+    );
+  }
   const testTokenResult = await findTestSurveyOutreachTokens(
     reviewsResult.rows
       .map((row) => row.survey_token)
@@ -158,6 +177,21 @@ export async function GET(req: Request) {
   if (!includeTests) rows = rows.filter((row) => !isTestReview(row));
 
   const reviews = rows.map((row) => toAppointmentReviewDetail(row, isTestReview(row)));
+  const responseAtBySurveyToken = new Map(
+    rows.flatMap((row) => row.survey_token ? [[row.survey_token, row.created_at] as const] : []),
+  );
+  const initialSendClassification = classifyInitialSurveySends(
+    outreachResult.rows,
+    initialBounceResult.rows,
+  );
+  const failedInitialOutreachIds = new Set(
+    initialSendClassification.failedRows.map((row) => row.id),
+  );
+  const initialSurveyKpis = summarizeInitialSurveyKpis(
+    outreachResult.rows,
+    initialBounceResult.rows,
+    permanentInitialFailureResult.rows,
+  );
   const providerNamesBySurveyToken = new Map<string, string[]>();
   rows.forEach((row, index) => {
     if (!row.survey_token) return;
@@ -166,6 +200,8 @@ export async function GET(req: Request) {
   });
   const reportOutreachRows = outreachResult.rows.map((row) => ({
     ...row,
+    initial_delivery_failed: failedInitialOutreachIds.has(row.id),
+    completed_at: responseAtBySurveyToken.get(row.survey_token) ?? null,
     provider_names:
       row.provider_names?.length > 0
         ? row.provider_names
@@ -191,10 +227,7 @@ export async function GET(req: Request) {
   const dailyCheckouts = buildDailyCheckoutTrend(
     dailyCheckoutResult.ok ? dailyCheckoutResult.rows : [],
   );
-  const initialSendStats = summarizeInitialSurveySends(
-    outreachResult.rows,
-    initialBounceResult.rows,
-  );
+  const numberCheckouts = dailyCheckouts.reduce((total, point) => total + point.count, 0);
   const deliveryFailureStats = summarizeTrackedSurveyEmailFailures(
     deliveryBounceResult.rows,
     permanentFailureResult.rows,
@@ -205,9 +238,32 @@ export async function GET(req: Request) {
       dateStart: range.dateStart,
       dateEnd: range.dateEnd,
       includeTests,
-      numberSent: initialSendStats.successful,
-      numberRepeatInitialSends: initialSendStats.repeatSuccessful,
-      numberFailedInitialSends: initialSendStats.failed,
+      dateBasis: {
+        initialSurveyKpis: "appointment_date",
+        providerAppointmentsAndSends: "appointment_date",
+        dailyCheckouts: "appointment_date",
+        responses: "submitted_at",
+        deliveryFailureEvents: "failure_event_at",
+      },
+      kpis: {
+        appointmentCheckouts: numberCheckouts,
+        initialSurveyAttempts: initialSurveyKpis.attempted,
+        initialSurveysSent: initialSurveyKpis.successful,
+        uniqueInitialRecipients: initialSurveyKpis.uniqueSuccessfulRecipients,
+        repeatInitialSends: initialSurveyKpis.repeatSuccessful,
+        failedInitialSends: initialSurveyKpis.failed,
+        bouncedInitialSends: initialSurveyKpis.bounced,
+        permanentInitialFailures: initialSurveyKpis.permanentPreSendFailures,
+        totalResponses: rows.length,
+      },
+      numberCheckouts,
+      numberInitialSurveyAttempts: initialSurveyKpis.attempted,
+      numberSent: initialSurveyKpis.successful,
+      numberUniqueInitialRecipients: initialSurveyKpis.uniqueSuccessfulRecipients,
+      numberRepeatInitialSends: initialSurveyKpis.repeatSuccessful,
+      numberFailedInitialSends: initialSurveyKpis.failed,
+      numberBouncedInitialSends: initialSurveyKpis.bounced,
+      numberPermanentInitialFailures: initialSurveyKpis.permanentPreSendFailures,
       numberFailedEmails: deliveryFailureStats.total,
       numberBounceReports: deliveryFailureStats.bounceReports,
       numberPermanentSendFailures: deliveryFailureStats.permanentSendFailures,

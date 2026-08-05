@@ -134,6 +134,7 @@ test("counts exact appointment-to-provider mappings and survey responses", () =>
   assert.equal(result.appointments[0].source, "outreach");
   assert.equal(result.appointments[0].reviewId, null);
   assert.equal(result.appointments[0].isTest, false);
+  assert.equal(result.appointments[0].initialDeliveryStatus, "successful");
   assert.equal(result.appointments[0].providerMappingComplete, true);
   assert.deepEqual(result.appointments[0].providerAppointments, [
     { appointmentId: "101", providerName: "Brown, Kyjuan" },
@@ -179,9 +180,20 @@ test("reports provider appointments inferred from unlinked survey responses", ()
       providerAppointments: [],
       providerMappingComplete: false,
       initialSentAt: null,
+      initialDeliveryStatus: "not_sent",
       respondedAt: "2026-07-22T13:38:03.841684+00:00",
     },
   ]);
+});
+
+test("excludes a known failed initial delivery from provider sent totals", () => {
+  const result = buildProviderAppointmentReport([
+    outreach({ initial_delivery_failed: true }),
+  ]);
+
+  assert.equal(result.providers[0].appointmentCount, 1);
+  assert.equal(result.providers[0].surveySentCount, 0);
+  assert.equal(result.appointments[0].initialDeliveryStatus, "failed");
 });
 
 test("provides an explicit estimate for legacy multi-provider rows", () => {

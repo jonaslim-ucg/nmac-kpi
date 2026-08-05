@@ -11,6 +11,12 @@ export type InitialSurveyBounceRow = {
   is_test: boolean | null;
 };
 
+export type PermanentInitialSurveyFailureRow = {
+  id: string;
+  failed_stage: string | null;
+  initial_sent_at: string | null;
+};
+
 function normalizedEmail(value: string | null): string | null {
   const email = value?.trim().toLowerCase();
   return email || null;
@@ -58,6 +64,22 @@ function isFailedInitialSend(row: InitialSurveyRecipientRow, index: InitialBounc
   );
 }
 
+/** Split sent initial-survey rows by their known delivery outcome. */
+export function classifyInitialSurveySends<T extends InitialSurveyRecipientRow>(
+  rows: readonly T[],
+  bounces: readonly InitialSurveyBounceRow[] = [],
+): { successfulRows: T[]; failedRows: T[] } {
+  const bounceIndex = indexInitialBounces(bounces);
+  const successfulRows: T[] = [];
+  const failedRows: T[] = [];
+
+  for (const row of rows) {
+    (isFailedInitialSend(row, bounceIndex) ? failedRows : successfulRows).push(row);
+  }
+
+  return { successfulRows, failedRows };
+}
+
 /** Count every initial send record while excluding known delivery failures. */
 export function countSuccessfulInitialSurveySends(
   rows: readonly InitialSurveyRecipientRow[],
@@ -70,8 +92,7 @@ export function summarizeInitialSurveySends(
   rows: readonly InitialSurveyRecipientRow[],
   bounces: readonly InitialSurveyBounceRow[] = [],
 ) {
-  const bounceIndex = indexInitialBounces(bounces);
-  const successfulRows = rows.filter((row) => !isFailedInitialSend(row, bounceIndex));
+  const { successfulRows } = classifyInitialSurveySends(rows, bounces);
   const successfulRecipients = new Set<string>();
 
   successfulRows.forEach((row, index) => {
@@ -88,6 +109,30 @@ export function summarizeInitialSurveySends(
     successful: successfulRows.length,
     failed: rows.length - successfulRows.length,
     repeatSuccessful: successfulRows.length - successfulRecipients.size,
+  };
+}
+
+/** Initial-survey KPIs attributed to the selected appointment dates. */
+export function summarizeInitialSurveyKpis(
+  rows: readonly InitialSurveyRecipientRow[],
+  bounces: readonly InitialSurveyBounceRow[] = [],
+  permanentFailures: readonly PermanentInitialSurveyFailureRow[] = [],
+) {
+  const sent = summarizeInitialSurveySends(rows, bounces);
+  const permanentFailureIds = new Set(
+    permanentFailures
+      .filter((failure) => failure.failed_stage === "initial" && !failure.initial_sent_at)
+      .map((failure) => failure.id),
+  );
+
+  return {
+    attempted: sent.total + permanentFailureIds.size,
+    successful: sent.successful,
+    uniqueSuccessfulRecipients: sent.successful - sent.repeatSuccessful,
+    repeatSuccessful: sent.repeatSuccessful,
+    failed: sent.failed + permanentFailureIds.size,
+    bounced: sent.failed,
+    permanentPreSendFailures: permanentFailureIds.size,
   };
 }
 

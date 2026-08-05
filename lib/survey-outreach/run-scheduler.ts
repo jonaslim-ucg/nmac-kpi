@@ -15,6 +15,7 @@ import {
   groupDailyOutreachAppointments,
   type DailyOutreachAppointment,
 } from "@/lib/survey-outreach/daily-group";
+import { isCheckedOutCrmAppointment } from "@/lib/survey-outreach/crm-status";
 import {
   getSurveyOutreachSchedule,
   getSurveyOutreachSendingState,
@@ -32,6 +33,7 @@ import {
   markStageDeliveryUncertain,
   recordStageSendFailure,
   releaseStageSendClaim,
+  suppressUnsentOutreachNoLongerCheckedOut,
   upsertDailyCheckoutCounts,
   upsertCrmOutreachBatch,
 } from "@/lib/survey-outreach/store";
@@ -65,6 +67,7 @@ export type SchedulerResult = {
   synced: number;
   skippedNoEmail: number;
   skippedBeforeLiveStart: number;
+  suppressedNoLongerCheckedOut: number;
   syncErrors: { date: string; error: string }[];
   configurationErrors: string[];
   attempted: number;
@@ -132,12 +135,14 @@ export async function syncCheckedOutFromCrm(now?: Date): Promise<{
   synced: number;
   skippedNoEmail: number;
   skippedBeforeLiveStart: number;
+  suppressedNoLongerCheckedOut: number;
   syncErrors: { date: string; error: string }[];
 }>;
 export async function syncCheckedOutFromCrm(now: Date, liveStartAt: Date | string | null): Promise<{
   synced: number;
   skippedNoEmail: number;
   skippedBeforeLiveStart: number;
+  suppressedNoLongerCheckedOut: number;
   syncErrors: { date: string; error: string }[];
 }>;
 export async function syncCheckedOutFromCrm(
@@ -147,23 +152,31 @@ export async function syncCheckedOutFromCrm(
   synced: number;
   skippedNoEmail: number;
   skippedBeforeLiveStart: number;
+  suppressedNoLongerCheckedOut: number;
   syncErrors: { date: string; error: string }[];
 }> {
   const lookbackDays = crmSyncLookbackDays(now);
   const dates = crmSyncDates(now, lookbackDays);
   const settled = await Promise.allSettled(
-    dates.map(async (date) => ({ date, rows: await fetchCrmAppointments(date, "CHK") })),
+    dates.map(async (date) => ({ date, rows: await fetchCrmAppointments(date, "all") })),
   );
   const crmRows: CrmAppointmentRow[] = [];
   const dailyCheckoutCounts: { appointment_date: string; checkout_count: number }[] = [];
   const syncErrors: { date: string; error: string }[] = [];
+  const currentStatusByAppointmentId = new Map<string, string>();
+  const successfullyFetchedDates: string[] = [];
 
   settled.forEach((result, index) => {
     if (result.status === "fulfilled") {
-      crmRows.push(...result.value.rows);
+      const checkedOutRows = result.value.rows.filter(isCheckedOutCrmAppointment);
+      crmRows.push(...checkedOutRows);
+      successfullyFetchedDates.push(result.value.date);
+      for (const row of result.value.rows) {
+        if (row.id) currentStatusByAppointmentId.set(String(row.id), row.visit_status);
+      }
       dailyCheckoutCounts.push({
         appointment_date: result.value.date,
-        checkout_count: result.value.rows.length,
+        checkout_count: checkedOutRows.length,
       });
       return;
     }
@@ -197,13 +210,24 @@ export async function syncCheckedOutFromCrm(
       `CRM survey sync accounted for ${synced + exists} of ${dailyGroups.length} eligible daily groups.`,
     );
   }
+  const suppressedNoLongerCheckedOut = await suppressUnsentOutreachNoLongerCheckedOut({
+    appointmentDates: successfullyFetchedDates,
+    currentStatusByAppointmentId,
+    at: now.toISOString(),
+  });
   try {
     await upsertDailyCheckoutCounts(dailyCheckoutCounts);
   } catch (error) {
     console.error("Could not save daily checkout totals.", error);
   }
 
-  return { synced, skippedNoEmail, skippedBeforeLiveStart, syncErrors };
+  return {
+    synced,
+    skippedNoEmail,
+    skippedBeforeLiveStart,
+    suppressedNoLongerCheckedOut,
+    syncErrors,
+  };
 }
 
 function dueStageForRow(
@@ -352,7 +376,13 @@ export async function runSurveyOutreachScheduler(
     configurationErrors.push("Supabase settings are incomplete.");
   }
 
-  let sync = { synced: 0, skippedNoEmail: 0, skippedBeforeLiveStart: 0, syncErrors: [] as { date: string; error: string }[] };
+  let sync = {
+    synced: 0,
+    skippedNoEmail: 0,
+    skippedBeforeLiveStart: 0,
+    suppressedNoLongerCheckedOut: 0,
+    syncErrors: [] as { date: string; error: string }[],
+  };
   if (sendingEnabled && liveStartAt) {
     try {
       sync = await syncCheckedOutFromCrm(now, liveStartAt);
@@ -453,6 +483,7 @@ export async function runSurveyOutreachScheduler(
     synced: sync.synced,
     skippedNoEmail: sync.skippedNoEmail,
     skippedBeforeLiveStart: sync.skippedBeforeLiveStart,
+    suppressedNoLongerCheckedOut: sync.suppressedNoLongerCheckedOut,
     syncErrors: sync.syncErrors,
     configurationErrors,
     attempted,
@@ -481,6 +512,7 @@ export async function runSurveyOutreachScheduler(
       skipped: skipped.length,
       errors: errors.length + configurationErrors.length,
       syncErrors: sync.syncErrors.length,
+      suppressedNoLongerCheckedOut: sync.suppressedNoLongerCheckedOut,
       deferredDue,
       bounces: bounceTracking.recorded,
       bounceErrors: bounceTracking.errors.length,

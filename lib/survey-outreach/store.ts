@@ -3,6 +3,7 @@ import { listInitialSurveyBouncesForReport } from "@/lib/survey-outreach/bounce-
 import type { DailyCheckoutCountRow } from "@/lib/survey-outreach/checkout-stats";
 import { summarizeUniqueInitialRecipients } from "@/lib/survey-outreach/sent-stats";
 import type { DailyOutreachGroup } from "@/lib/survey-outreach/daily-group";
+import { outreachIdsNoLongerCheckedOut } from "@/lib/survey-outreach/crm-status";
 import type { SurveyOutreachLookup, SurveyOutreachRow, SurveyOutreachStage } from "@/lib/survey-outreach/types";
 
 const STAGE_COLUMN: Record<SurveyOutreachStage, keyof SurveyOutreachRow> = {
@@ -475,12 +476,84 @@ export async function listIncompleteOutreach(limit = 500): Promise<SurveyOutreac
     .is("permanently_failed_at", null)
     .is("final_sent_at", null)
     .in("status", ["pending", "sent"])
+    .order("initial_sent_at", { ascending: true, nullsFirst: true })
     .order("next_retry_at", { ascending: true, nullsFirst: true })
     .order("appointment_at", { ascending: true })
     .limit(Math.min(Math.max(limit, 1), 2000));
 
   if (error) throw new Error(error.message);
   return (data ?? []) as SurveyOutreachRow[];
+}
+
+export async function suppressUnsentOutreachNoLongerCheckedOut(input: {
+  appointmentDates: readonly string[];
+  currentStatusByAppointmentId: ReadonlyMap<string, string>;
+  at: string;
+}): Promise<number> {
+  const appointmentDates = [...new Set(input.appointmentDates.filter(Boolean))];
+  if (appointmentDates.length === 0 || input.currentStatusByAppointmentId.size === 0) return 0;
+
+  const supabase = createServiceRoleClient();
+  const candidates: Pick<
+    SurveyOutreachRow,
+    "id" | "crm_appointment_id" | "crm_appointment_ids"
+  >[] = [];
+  const pageSize = 1_000;
+
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from("survey_outreach")
+      .select("id,crm_appointment_id,crm_appointment_ids")
+      .eq("is_test", false)
+      .in("appointment_date", appointmentDates)
+      .is("merged_into_outreach_id", null)
+      .is("initial_sent_at", null)
+      .is("completed_at", null)
+      .is("recalled_at", null)
+      .is("permanently_failed_at", null)
+      .order("id", { ascending: true })
+      .range(offset, offset + pageSize - 1);
+    if (error) throw new Error(error.message);
+
+    const page = (data ?? []) as typeof candidates;
+    candidates.push(...page);
+    if (page.length < pageSize) break;
+  }
+
+  const staleIds = outreachIdsNoLongerCheckedOut(
+    candidates,
+    input.currentStatusByAppointmentId,
+  );
+  let suppressed = 0;
+
+  for (let offset = 0; offset < staleIds.length; offset += 200) {
+    const ids = staleIds.slice(offset, offset + 200);
+    const { data, error } = await supabase
+      .from("survey_outreach")
+      .update({
+        recalled_at: input.at,
+        recall_reason: "CRM appointment is no longer checked out; survey delivery suppressed.",
+        status: "skipped",
+        send_lock_token: null,
+        send_lock_stage: null,
+        send_lock_until: null,
+        send_attempt_count: 0,
+        next_retry_at: null,
+        last_send_error: null,
+        failed_stage: null,
+        permanently_failed_at: null,
+      })
+      .in("id", ids)
+      .is("initial_sent_at", null)
+      .is("completed_at", null)
+      .is("recalled_at", null)
+      .or(`send_lock_token.is.null,send_lock_until.lt.${input.at}`)
+      .select("id");
+    if (error) throw new Error(error.message);
+    suppressed += data?.length ?? 0;
+  }
+
+  return suppressed;
 }
 
 export type SurveyOutreachListFilters = {

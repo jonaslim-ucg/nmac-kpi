@@ -31,6 +31,7 @@ export type SurveyOutreachSchedulerHealth = ReturnType<typeof schedulerConfigura
     skipped: number;
     errors: number;
     syncErrors: number;
+    suppressedNoLongerCheckedOut?: number;
     deferredDue: number;
     bounces?: number;
     bounceErrors?: number;

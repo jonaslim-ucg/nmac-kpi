@@ -241,7 +241,7 @@ export function AppointmentReviewDashboard({
           {
             label: "Check-outs",
             value: String(numberCheckouts),
-            hint: "Checked-out appointments in the selected date range",
+            hint: "Checked-out appointments since the survey launched, within the selected range",
           },
           {
             label: "Multiple same-day appointments",
@@ -249,7 +249,7 @@ export function AppointmentReviewDashboard({
               numberMultipleSameDayAppointments === null
                 ? "—"
                 : String(numberMultipleSameDayAppointments),
-            hint: "Additional check-outs when a patient had more than one appointment that day",
+            hint: "Additional check-outs since launch when a patient had multiple appointments that day",
           },
           {
             label: "Bounced emails",

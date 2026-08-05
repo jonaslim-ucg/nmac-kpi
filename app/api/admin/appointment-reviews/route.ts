@@ -265,19 +265,23 @@ export async function GET(req: Request) {
     responseOnlyProviderReport,
   );
   const dailyCheckoutRows = dailyCheckoutResult.ok ? dailyCheckoutResult.rows : [];
-  const dailyCheckouts = buildDailyCheckoutTrend(dailyCheckoutRows);
+  const surveyCheckoutRows = checkoutRowsSinceSurveyLaunch(
+    dailyCheckoutRows,
+    reportingStartResult.date,
+  );
+  const dailyCheckouts = buildDailyCheckoutTrend(surveyCheckoutRows);
   const dailySurveySends = buildDailyInitialSurveySendTrend(
     outreachResult.rows,
     initialBounceResult.rows,
   );
-  const checkoutSummary = summarizeDailyCheckouts(dailyCheckoutRows);
+  const checkoutSummary = summarizeDailyCheckouts(surveyCheckoutRows);
   const deliveryFailureStats = summarizeTrackedSurveyEmailFailures(
     deliveryBounceResult.rows,
     permanentFailureResult.rows,
   );
   const checkoutReconciliation = {
     ...reconcileSurveyCheckouts(
-      checkoutRowsSinceSurveyLaunch(dailyCheckoutRows, reportingStartResult.date),
+      surveyCheckoutRows,
       outreachStateResult.rows,
       initialBounceResult.rows,
     ),
@@ -293,7 +297,7 @@ export async function GET(req: Request) {
       dateBasis: {
         initialSurveyKpis: "appointment_date",
         providerAppointmentsAndSends: "appointment_date",
-        dailyCheckouts: "appointment_date",
+        dailyCheckouts: "appointment_date_from_first_production_send",
         dailySurveySends: "appointment_date",
         responses: "submitted_at",
         deliveryFailureEvents: "failure_event_at",

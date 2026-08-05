@@ -1,6 +1,12 @@
-import { fetchCrmAppointments, crmSyncDates, type CrmAppointmentRow } from "@/lib/crm/appointments";
+import {
+  fetchCrmAppointments,
+  crmSyncDates,
+  crmSyncLookbackDays,
+  type CrmAppointmentRow,
+} from "@/lib/crm/appointments";
 import {
   isProductionSurveyOutreachAfterLiveStart,
+  isProductionSurveyOutreachInActiveCohort,
   isScheduledTestRecipientAllowed,
   surveyOutreachLiveStartAt,
 } from "@/lib/survey-outreach/config";
@@ -143,7 +149,7 @@ export async function syncCheckedOutFromCrm(
   skippedBeforeLiveStart: number;
   syncErrors: { date: string; error: string }[];
 }> {
-  const lookbackDays = now.getUTCMinutes() % 15 === 0 ? 3 : 1;
+  const lookbackDays = crmSyncLookbackDays(now);
   const dates = crmSyncDates(now, lookbackDays);
   const settled = await Promise.allSettled(
     dates.map(async (date) => ({ date, rows: await fetchCrmAppointments(date, "CHK") })),
@@ -185,7 +191,12 @@ export async function syncCheckedOutFromCrm(
   }
 
   const dailyGroups = groupDailyOutreachAppointments(outreachRows);
-  const { synced } = await upsertCrmOutreachBatch(dailyGroups);
+  const { synced, exists } = await upsertCrmOutreachBatch(dailyGroups);
+  if (synced + exists !== dailyGroups.length) {
+    throw new Error(
+      `CRM survey sync accounted for ${synced + exists} of ${dailyGroups.length} eligible daily groups.`,
+    );
+  }
   try {
     await upsertDailyCheckoutCounts(dailyCheckoutCounts);
   } catch (error) {
@@ -375,9 +386,10 @@ export async function runSurveyOutreachScheduler(
     if (
       sendingEnabled &&
       !row.is_test &&
-      !isProductionSurveyOutreachAfterLiveStart({
+      !isProductionSurveyOutreachInActiveCohort({
         appointmentAt: row.appointment_at,
         createdAt: row.created_at,
+        initialSentAt: row.initial_sent_at,
         liveStartAt,
       })
     ) {

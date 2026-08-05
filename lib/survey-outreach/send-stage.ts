@@ -1,6 +1,6 @@
 import { buildSurveyEmail } from "@/lib/survey-outreach/emails";
 import {
-  isProductionSurveyOutreachAfterLiveStart,
+  isProductionSurveyOutreachInActiveCohort,
   surveyOutreachAppDisabledReason,
   surveyOutreachBeforeLiveStartReason,
   surveyOutreachSendingDisabledReason,
@@ -202,9 +202,10 @@ export async function sendSurveyStage(input: {
 
   if (
     !row.is_test &&
-    !isProductionSurveyOutreachAfterLiveStart({
+    !isProductionSurveyOutreachInActiveCohort({
       appointmentAt: row.appointment_at,
       createdAt: row.created_at,
+      initialSentAt: row.initial_sent_at,
       liveStartAt: sending.liveStartAt,
     })
   ) {

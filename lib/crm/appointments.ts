@@ -140,6 +140,18 @@ export async function fetchCrmAiConfirmationRate(
 
 const BERMUDA_TZ = "Atlantic/Bermuda";
 
+/**
+ * Keep the frequent sync small while periodically recovering checkout rows
+ * that appeared late in the CRM reporting endpoint.
+ */
+export function crmSyncLookbackDays(now = new Date()): number {
+  const minute = now.getUTCMinutes();
+  if (minute === 0 && now.getUTCHours() === 7) return 30;
+  if (minute === 0) return 14;
+  if (minute % 15 === 0) return 3;
+  return 1;
+}
+
 function bermudaCalendarDate(d: Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: BERMUDA_TZ }).format(d);
 }

@@ -10,7 +10,7 @@ import {
 } from "@/lib/survey-outreach/schedule-settings";
 import { listIncompleteOutreach } from "@/lib/survey-outreach/store";
 import type { SurveyOutreachRow, SurveyOutreachStage } from "@/lib/survey-outreach/types";
-import { isProductionSurveyOutreachAfterLiveStart } from "@/lib/survey-outreach/config";
+import { isProductionSurveyOutreachInActiveCohort } from "@/lib/survey-outreach/config";
 
 export type NextOutreachAction = {
   outreachId: string;
@@ -119,9 +119,10 @@ export async function getNextSurveyOutreachActions(): Promise<{
       (row) =>
         !sendingEnabled ||
         row.is_test ||
-        isProductionSurveyOutreachAfterLiveStart({
+        isProductionSurveyOutreachInActiveCohort({
           appointmentAt: row.appointment_at,
           createdAt: row.created_at,
+          initialSentAt: row.initial_sent_at,
           liveStartAt: sending.liveStartAt,
         }),
     )

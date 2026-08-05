@@ -41,6 +41,25 @@ export function isProductionSurveyOutreachAfterLiveStart(input: {
   return true;
 }
 
+/**
+ * Once an initial survey has been sent, pausing and resuming the app switch
+ * must not move that survey chain outside the live cohort. The live-start
+ * cutoff still applies to every initial survey that has not been sent yet.
+ */
+export function isProductionSurveyOutreachInActiveCohort(input: {
+  appointmentAt: string | null;
+  createdAt?: string | null;
+  initialSentAt?: string | null;
+  liveStartAt?: Date | string | null;
+}): boolean {
+  if (input.initialSentAt) {
+    const initialSentAt = new Date(input.initialSentAt);
+    if (Number.isFinite(initialSentAt.getTime())) return true;
+  }
+
+  return isProductionSurveyOutreachAfterLiveStart(input);
+}
+
 export function isScheduledTestRecipientAllowed(email: string): boolean {
   const raw = process.env.SURVEY_OUTREACH_TEST_EMAILS?.trim() || "kim.ramirez@ucg.bm";
   const allowed = raw

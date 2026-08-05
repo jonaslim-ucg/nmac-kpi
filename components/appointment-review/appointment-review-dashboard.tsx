@@ -94,6 +94,18 @@ function formatDay(iso: string): string {
   }
 }
 
+function formatCalendarDate(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(`${iso}T12:00:00`));
+  } catch {
+    return iso;
+  }
+}
+
 function formatWhen(iso: string): string {
   try {
     return new Intl.DateTimeFormat(undefined, {
@@ -209,6 +221,9 @@ function DeliveryDiscrepancies({ reconciliation }: { reconciliation: SurveyCheck
           <p className="mt-2 text-xs text-muted-foreground sm:mt-0 sm:text-right">
             {reconciliation.patientDayGroups.toLocaleString()} patient-day groups across{" "}
             {reconciliation.trackedDates.toLocaleString()} synced dates
+            {reconciliation.reportingStartDate
+              ? ` since ${formatCalendarDate(reconciliation.reportingStartDate)}`
+              : ""}
           </p>
         )}
       </div>

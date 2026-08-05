@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { reconcileSurveyCheckouts } from "../../lib/survey-outreach/checkout-reconciliation.ts";
+import {
+  checkoutRowsSinceSurveyLaunch,
+  reconcileSurveyCheckouts,
+} from "../../lib/survey-outreach/checkout-reconciliation.ts";
 import type { SurveyOutreachRow } from "../../lib/survey-outreach/types.ts";
 
 function outreach(overrides: Partial<SurveyOutreachRow>): SurveyOutreachRow {
@@ -125,4 +128,18 @@ test("marks legacy checkout snapshots as not ready while retaining delivery fail
   assert.equal(result.noEmail, 0);
   assert.equal(result.notSent, 0);
   assert.equal(result.discrepancies.bounced.groupCount, 1);
+});
+
+test("excludes checkout snapshots from before the first production survey", () => {
+  const rows = [
+    { appointment_date: "2026-07-20", checkout_count: 10 },
+    { appointment_date: "2026-07-21", checkout_count: 11 },
+    { appointment_date: "2026-07-22", checkout_count: 12 },
+  ];
+
+  assert.deepEqual(
+    checkoutRowsSinceSurveyLaunch(rows, "2026-07-21").map((row) => row.appointment_date),
+    ["2026-07-21", "2026-07-22"],
+  );
+  assert.equal(checkoutRowsSinceSurveyLaunch(rows, null).length, 3);
 });

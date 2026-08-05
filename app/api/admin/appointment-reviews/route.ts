@@ -15,6 +15,7 @@ import { isNmacNavViewAllowed, SURVEY_RESULTS_NAV_VIEW_ID } from "@/lib/auth/rol
 import { getAppDashboardSettings } from "@/lib/auth/app-settings";
 import {
   findTestSurveyOutreachTokens,
+  getSurveyOutreachReportingStartDate,
   listDailyCheckoutCountsForReport,
   listPermanentSurveyDeliveryFailuresForReport,
   listSurveyOutreachForReport,
@@ -31,7 +32,10 @@ import {
 } from "@/lib/survey-outreach/bounce-store";
 import { buildDailyCheckoutTrend } from "@/lib/survey-outreach/checkout-stats";
 import { summarizeTrackedSurveyEmailFailures } from "@/lib/survey-outreach/failure-stats";
-import { reconcileSurveyCheckouts } from "@/lib/survey-outreach/checkout-reconciliation";
+import {
+  checkoutRowsSinceSurveyLaunch,
+  reconcileSurveyCheckouts,
+} from "@/lib/survey-outreach/checkout-reconciliation";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +79,7 @@ export async function GET(req: Request) {
     permanentFailureResult,
     permanentInitialFailureResult,
     dailyCheckoutResult,
+    reportingStartResult,
   ] = await Promise.all([
     listAppointmentReviews({ createdFrom: range.startAt, createdBefore: range.endBefore }),
     listSurveyOutreachForReport({
@@ -108,6 +113,7 @@ export async function GET(req: Request) {
       dateStart: range.dateStart,
       dateEnd: range.dateEnd,
     }),
+    getSurveyOutreachReportingStartDate(),
   ]);
   if (!reviewsResult.ok) {
     if (reviewsResult.setupRequired) {
@@ -176,6 +182,9 @@ export async function GET(req: Request) {
       { status: permanentInitialFailureResult.setupRequired ? 503 : 500 },
     );
   }
+  if (!reportingStartResult.ok) {
+    return NextResponse.json({ error: reportingStartResult.error }, { status: 500 });
+  }
   const testTokenResult = await findTestSurveyOutreachTokens(
     reviewsResult.rows
       .map((row) => row.survey_token)
@@ -241,31 +250,35 @@ export async function GET(req: Request) {
     outreachProviderReport,
     responseOnlyProviderReport,
   );
-  const dailyCheckouts = buildDailyCheckoutTrend(
-    dailyCheckoutResult.ok ? dailyCheckoutResult.rows : [],
-  );
+  const dailyCheckoutRows = dailyCheckoutResult.ok ? dailyCheckoutResult.rows : [];
+  const dailyCheckouts = buildDailyCheckoutTrend(dailyCheckoutRows);
   const numberCheckouts = dailyCheckouts.reduce((total, point) => total + point.count, 0);
   const deliveryFailureStats = summarizeTrackedSurveyEmailFailures(
     deliveryBounceResult.rows,
     permanentFailureResult.rows,
   );
-  const checkoutReconciliation = reconcileSurveyCheckouts(
-    dailyCheckoutResult.ok ? dailyCheckoutResult.rows : [],
-    outreachStateResult.rows,
-    initialBounceResult.rows,
-  );
+  const checkoutReconciliation = {
+    ...reconcileSurveyCheckouts(
+      checkoutRowsSinceSurveyLaunch(dailyCheckoutRows, reportingStartResult.date),
+      outreachStateResult.rows,
+      initialBounceResult.rows,
+    ),
+    reportingStartDate: reportingStartResult.date,
+  };
 
   return NextResponse.json(
     {
       dateStart: range.dateStart,
       dateEnd: range.dateEnd,
       includeTests,
+      surveyReportingStartDate: reportingStartResult.date,
       dateBasis: {
         initialSurveyKpis: "appointment_date",
         providerAppointmentsAndSends: "appointment_date",
         dailyCheckouts: "appointment_date",
         responses: "submitted_at",
         deliveryFailureEvents: "failure_event_at",
+        checkoutReconciliation: "appointment_date_from_first_production_send",
       },
       kpis: {
         appointmentCheckouts: numberCheckouts,

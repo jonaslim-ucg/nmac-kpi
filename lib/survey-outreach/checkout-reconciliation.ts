@@ -21,6 +21,7 @@ export type SurveyCheckoutDiscrepancies = {
 
 export type SurveyCheckoutReconciliation = {
   ready: boolean;
+  reportingStartDate?: string | null;
   trackedDates: number;
   snapshotDates: number;
   patientDayGroups: number;
@@ -28,6 +29,15 @@ export type SurveyCheckoutReconciliation = {
   notSent: number;
   discrepancies: SurveyCheckoutDiscrepancies;
 };
+
+/** Exclude checkout snapshots from before the first production survey was sent. */
+export function checkoutRowsSinceSurveyLaunch(
+  dailyRows: readonly DailyCheckoutCountRow[],
+  reportingStartDate: string | null,
+): DailyCheckoutCountRow[] {
+  if (!reportingStartDate) return [...dailyRows];
+  return dailyRows.filter((row) => row.appointment_date >= reportingStartDate);
+}
 
 type ReconciliationOutreachRow = Pick<
   SurveyOutreachRow,

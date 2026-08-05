@@ -582,6 +582,36 @@ export type SurveyOutreachReportFilters = {
   includeTests?: boolean;
 };
 
+export type SurveyOutreachReportingStartResult =
+  | { ok: true; date: string | null }
+  | { ok: false; error: string };
+
+/** Appointment date attached to the first production initial-survey send. */
+export async function getSurveyOutreachReportingStartDate(): Promise<SurveyOutreachReportingStartResult> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return { ok: false, error: "Survey outreach storage is not available." };
+  }
+
+  try {
+    const supabase = createServiceRoleClient();
+    const { data, error } = await supabase
+      .from("survey_outreach")
+      .select("appointment_date")
+      .eq("is_test", false)
+      .is("merged_into_outreach_id", null)
+      .not("initial_sent_at", "is", null)
+      .order("initial_sent_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      return { ok: false, error: "Could not determine the survey reporting start date." };
+    }
+    return { ok: true, date: data?.appointment_date ?? null };
+  } catch {
+    return { ok: false, error: "Could not determine the survey reporting start date." };
+  }
+}
+
 export type PermanentSurveyDeliveryFailureRow = Pick<
   SurveyOutreachRow,
   | "id"

@@ -13,7 +13,6 @@ import type { AppointmentReviewStats } from "@/lib/appointment-review/analytics"
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
 import type { AppointmentReviewQuarter } from "@/lib/appointment-review/report";
 import type { DailyCheckoutPoint } from "@/lib/survey-outreach/checkout-stats";
-import type { SurveyCheckoutReconciliation } from "@/lib/survey-outreach/checkout-reconciliation";
 import { APPOINTMENT_REVIEWS_SETUP_SQL } from "@/lib/appointment-review/store";
 import { isNmacNavHrefAllowed } from "@/lib/auth/role-nmac-nav";
 
@@ -37,7 +36,6 @@ type ApiResponse = {
   numberNotSent?: number | null;
   numberFailedEmails?: number;
   dailyCheckouts?: DailyCheckoutPoint[];
-  checkoutReconciliation?: SurveyCheckoutReconciliation;
   quarter?: AppointmentReviewQuarter | null;
   currentQuarter?: AppointmentReviewQuarter;
   eligibleEntries?: number | null;
@@ -96,8 +94,6 @@ export default function AdminAppointmentReviewsPage() {
   const [numberPermanentInitialFailures, setNumberPermanentInitialFailures] = useState(0);
   const [numberNoEmail, setNumberNoEmail] = useState<number | null>(null);
   const [numberNotSent, setNumberNotSent] = useState<number | null>(null);
-  const [checkoutReconciliation, setCheckoutReconciliation] =
-    useState<SurveyCheckoutReconciliation | null>(null);
   const [dailyCheckouts, setDailyCheckouts] = useState<DailyCheckoutPoint[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -216,7 +212,6 @@ export default function AdminAppointmentReviewsPage() {
         setNumberPermanentInitialFailures(0);
         setNumberNoEmail(null);
         setNumberNotSent(null);
-        setCheckoutReconciliation(null);
         setDailyCheckouts([]);
         setAppliedDateRange(null);
         setQuarter(null);
@@ -254,7 +249,6 @@ export default function AdminAppointmentReviewsPage() {
       setNumberNotSent(
         typeof liveData.numberNotSent === "number" ? liveData.numberNotSent : null,
       );
-      setCheckoutReconciliation(liveData.checkoutReconciliation ?? null);
       setDailyCheckouts(liveData.dailyCheckouts ?? []);
       setAppliedDateRange(
         liveData.dateStart || liveData.dateEnd
@@ -276,7 +270,6 @@ export default function AdminAppointmentReviewsPage() {
       setNumberPermanentInitialFailures(0);
       setNumberNoEmail(null);
       setNumberNotSent(null);
-      setCheckoutReconciliation(null);
       setDailyCheckouts([]);
       setAppliedDateRange(null);
       setQuarter(null);
@@ -553,7 +546,6 @@ export default function AdminAppointmentReviewsPage() {
           numberPermanentInitialFailures={numberPermanentInitialFailures}
           numberNoEmail={numberNoEmail}
           numberNotSent={numberNotSent}
-          checkoutReconciliation={checkoutReconciliation}
           periodLabel={appliedPeriodLabel}
           refreshing={refreshing}
           dailyCheckouts={dailyCheckouts}

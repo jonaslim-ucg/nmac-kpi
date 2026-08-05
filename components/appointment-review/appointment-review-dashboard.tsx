@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -20,10 +20,6 @@ import {
 import type { AppointmentReviewStats } from "@/lib/appointment-review/analytics";
 import { APPOINTMENT_REVIEW_MAX_SCORE } from "@/lib/appointment-review/types";
 import type { DailyCheckoutPoint } from "@/lib/survey-outreach/checkout-stats";
-import type {
-  SurveyCheckoutDiscrepancies,
-  SurveyCheckoutReconciliation,
-} from "@/lib/survey-outreach/checkout-reconciliation";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 
 const CHART_COLORS = [
@@ -94,18 +90,6 @@ function formatDay(iso: string): string {
   }
 }
 
-function formatCalendarDate(iso: string): string {
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(new Date(`${iso}T12:00:00`));
-  } catch {
-    return iso;
-  }
-}
-
 function formatWhen(iso: string): string {
   try {
     return new Intl.DateTimeFormat(undefined, {
@@ -149,127 +133,6 @@ function YesNoPie({ title, data }: { title: string; data: AppointmentReviewStats
   );
 }
 
-const DISCREPANCY_ROWS: Array<{
-  key: keyof SurveyCheckoutDiscrepancies;
-  label: string;
-  description: string;
-  requiresCheckoutSnapshot?: boolean;
-}> = [
-  {
-    key: "bounced",
-    label: "Bounced emails",
-    description: "Initial messages that Outlook later reported as undeliverable.",
-  },
-  {
-    key: "failedBeforeSend",
-    label: "Failed before send",
-    description: "Initial messages rejected before the mail provider accepted them.",
-  },
-  {
-    key: "pendingNotSent",
-    label: "Pending, not sent",
-    description: "Outreach records exist, but the initial survey has not been sent.",
-    requiresCheckoutSnapshot: true,
-  },
-  {
-    key: "emailWithoutOutreach",
-    label: "Email exists but no outreach record",
-    description: "The CRM has an email, but no matching survey schedule was created.",
-    requiresCheckoutSnapshot: true,
-  },
-  {
-    key: "noEmail",
-    label: "No email available",
-    description: "Checked-out patient-day groups with no email in the CRM.",
-    requiresCheckoutSnapshot: true,
-  },
-  {
-    key: "sentThroughSameDayGroup",
-    label: "Sent through a same-day grouped survey",
-    description: "Appointments covered by another survey sent to the same patient that day.",
-    requiresCheckoutSnapshot: true,
-  },
-  {
-    key: "suppressedBeforeSend",
-    label: "Suppressed before send",
-    description: "Survey delivery was intentionally stopped before the initial message.",
-    requiresCheckoutSnapshot: true,
-  },
-];
-
-function DeliveryDiscrepancies({ reconciliation }: { reconciliation: SurveyCheckoutReconciliation }) {
-  const rows = DISCREPANCY_ROWS.filter(
-    (row) => reconciliation.ready || !row.requiresCheckoutSnapshot,
-  );
-
-  return (
-    <section className="border-y border-border" aria-labelledby="delivery-discrepancies-heading">
-      <div className="py-4 sm:flex sm:items-start sm:justify-between sm:gap-6">
-        <div>
-          <h2 id="delivery-discrepancies-heading" className="text-sm font-semibold text-foreground">
-            Delivery discrepancies
-          </h2>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            CRM appointment IDs grouped by checkout date and delivery outcome.
-          </p>
-        </div>
-        {!reconciliation.ready ? (
-          <p className="mt-2 max-w-xl text-xs text-amber-600 dark:text-amber-400 sm:mt-0 sm:text-right">
-            No-email and not-sent reconciliation will appear after the next CRM sync.
-          </p>
-        ) : (
-          <p className="mt-2 text-xs text-muted-foreground sm:mt-0 sm:text-right">
-            {reconciliation.patientDayGroups.toLocaleString()} patient-day groups across{" "}
-            {reconciliation.trackedDates.toLocaleString()} synced dates
-            {reconciliation.reportingStartDate
-              ? ` since ${formatCalendarDate(reconciliation.reportingStartDate)}`
-              : ""}
-          </p>
-        )}
-      </div>
-      <div className="divide-y divide-border">
-        {rows.map((row) => {
-          const bucket = reconciliation.discrepancies[row.key];
-          return (
-            <details key={row.key} className="group py-3">
-              <summary className="flex cursor-pointer list-none items-start justify-between gap-4 rounded-md px-1 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium text-foreground">{row.label}</span>
-                  <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-                    {row.description}
-                  </span>
-                </span>
-                <span className="flex shrink-0 items-center gap-3">
-                  <span className="font-mono text-sm font-semibold text-foreground">
-                    {bucket.groupCount.toLocaleString()}
-                  </span>
-                  <ChevronDown
-                    className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180"
-                    aria-hidden
-                  />
-                </span>
-              </summary>
-              <div className="px-1 pb-1 pt-3">
-                <p className="text-xs text-muted-foreground">
-                  {bucket.appointmentCount.toLocaleString()} appointment ID
-                  {bucket.appointmentCount === 1 ? "" : "s"}
-                </p>
-                {bucket.appointmentIds.length > 0 ? (
-                  <p className="mt-2 break-words font-mono text-xs leading-6 text-foreground">
-                    {bucket.appointmentIds.join(", ")}
-                  </p>
-                ) : (
-                  <p className="mt-2 text-xs text-muted-foreground">No appointment IDs in this category.</p>
-                )}
-              </div>
-            </details>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
 type Props = {
   stats: AppointmentReviewStats;
   numberSent: number;
@@ -277,7 +140,6 @@ type Props = {
   numberPermanentInitialFailures: number;
   numberNoEmail: number | null;
   numberNotSent: number | null;
-  checkoutReconciliation: SurveyCheckoutReconciliation | null;
   periodLabel: string;
   refreshing: boolean;
   dailyCheckouts: DailyCheckoutPoint[];
@@ -291,7 +153,6 @@ export function AppointmentReviewDashboard({
   numberPermanentInitialFailures,
   numberNoEmail,
   numberNotSent,
-  checkoutReconciliation,
   periodLabel,
   refreshing,
   dailyCheckouts,
@@ -374,10 +235,6 @@ export function AppointmentReviewDashboard({
           ]}
         />
       </div>
-
-      {checkoutReconciliation ? (
-        <DeliveryDiscrepancies reconciliation={checkoutReconciliation} />
-      ) : null}
 
       <ChartCard title="Patient check-outs per day" subtitle="Daily checked-out appointments from the CRM" tall>
         {dailyCheckouts.length === 0 ? (

@@ -14,7 +14,7 @@ import { getSessionFromCookies } from "@/lib/auth/session";
 import { isNmacNavViewAllowed, SURVEY_RESULTS_NAV_VIEW_ID } from "@/lib/auth/role-nmac-nav";
 import { getAppDashboardSettings } from "@/lib/auth/app-settings";
 import {
-  findTestSurveyOutreachTokens,
+  findSurveyOutreachReviewMetadata,
   getSurveyOutreachReportingStartDate,
   listDailyCheckoutCountsForReport,
   listPermanentSurveyDeliveryFailuresForReport,
@@ -186,24 +186,34 @@ export async function GET(req: Request) {
   if (!reportingStartResult.ok) {
     return NextResponse.json({ error: reportingStartResult.error }, { status: 500 });
   }
-  const testTokenResult = await findTestSurveyOutreachTokens(
+  const reviewMetadataResult = await findSurveyOutreachReviewMetadata(
     reviewsResult.rows
       .map((row) => row.survey_token)
       .filter((token): token is string => Boolean(token)),
   );
-  if (!testTokenResult.ok) {
-    return NextResponse.json({ error: testTokenResult.error }, { status: 500 });
+  if (!reviewMetadataResult.ok) {
+    return NextResponse.json({ error: reviewMetadataResult.error }, { status: 500 });
   }
-  const testTokens = new Set(testTokenResult.tokens);
+  const reviewMetadataByToken = new Map(
+    reviewMetadataResult.rows.map((metadata) => [metadata.surveyToken, metadata]),
+  );
   const isTestReview = (row: (typeof reviewsResult.rows)[number]) =>
     row.survey_token
-      ? testTokens.has(row.survey_token)
+      ? reviewMetadataByToken.get(row.survey_token)?.isTest ?? false
       : isScheduledTestRecipientAllowed(row.email);
 
   let rows = reviewsResult.rows;
   if (!includeTests) rows = rows.filter((row) => !isTestReview(row));
 
-  const reviews = rows.map((row) => toAppointmentReviewDetail(row, isTestReview(row)));
+  const reviews = rows.map((row) =>
+    toAppointmentReviewDetail(
+      row,
+      isTestReview(row),
+      row.survey_token
+        ? reviewMetadataByToken.get(row.survey_token)?.appointmentDate ?? null
+        : null,
+    ),
+  );
   const responseAtBySurveyToken = new Map(
     rows.flatMap((row) => row.survey_token ? [[row.survey_token, row.created_at] as const] : []),
   );

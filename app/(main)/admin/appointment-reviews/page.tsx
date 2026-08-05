@@ -562,6 +562,7 @@ export default function AdminAppointmentReviewsPage() {
 
       {tab === "reviews" ? (
         <AppointmentReviewList
+          key={`${period}:${selectedQuarter ?? ""}:${customRange?.start ?? ""}:${customRange?.end ?? ""}:${showTestResponses}`}
           reviews={reviews}
           onViewReview={viewReview}
           periodLabel={periodLabel}

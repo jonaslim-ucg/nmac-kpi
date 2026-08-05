@@ -1,9 +1,13 @@
 "use client";
 
-import { Loader2, MessageSquareText } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, MessageSquareText } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
-import { formatRating, formatReviewWhen } from "@/lib/appointment-review/display";
+import {
+  formatAppointmentDate,
+  formatRating,
+  formatReviewWhen,
+} from "@/lib/appointment-review/display";
 
 type Props = {
   reviews: AppointmentReviewDetail[];
@@ -15,6 +19,7 @@ type Props = {
 };
 
 type CommentFilter = "all" | "with-comments";
+const PAGE_SIZE = 10;
 
 export function AppointmentReviewList({
   reviews,
@@ -25,6 +30,7 @@ export function AppointmentReviewList({
   onShowTestResponsesChange,
 }: Props) {
   const [commentFilter, setCommentFilter] = useState<CommentFilter>("all");
+  const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
     if (commentFilter === "with-comments") {
@@ -32,6 +38,10 @@ export function AppointmentReviewList({
     }
     return reviews;
   }, [commentFilter, reviews]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pageReviews = filtered.slice(pageStart, pageStart + PAGE_SIZE);
   const liveCount = filtered.filter((review) => !review.isTest).length;
   const testCount = filtered.length - liveCount;
 
@@ -93,7 +103,10 @@ export function AppointmentReviewList({
             <button
               key={id}
               type="button"
-              onClick={() => setCommentFilter(id)}
+              onClick={() => {
+                setCommentFilter(id);
+                setPage(1);
+              }}
               className={
                 "rounded-lg border px-3 py-1.5 text-sm font-medium transition " +
                 (commentFilter === id
@@ -114,76 +127,109 @@ export function AppointmentReviewList({
             : "No reviews in this period."}
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-border bg-surface-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <th className="px-5 py-3 font-semibold">Submitted</th>
-                <th className="px-3 py-3 font-semibold">Patient</th>
-                <th className="px-3 py-3 font-semibold">Scheduling</th>
-                <th className="px-3 py-3 font-semibold">Visit</th>
-                <th className="px-3 py-3 font-semibold">Wait time</th>
-                <th className="px-3 py-3 font-semibold">Provider(s)</th>
-                <th className="px-3 py-3 font-semibold">Recommend</th>
-                <th className="px-3 py-3 font-semibold">Comments</th>
-                <th className="px-5 py-3 font-semibold" />
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((review) => (
-                <tr
-                  key={review.id}
-                  className="cursor-pointer border-b border-border/70 transition hover:bg-surface-muted/30"
-                  onClick={() => onViewReview(review.id)}
-                >
-                  <td className="px-5 py-3 text-foreground">{formatReviewWhen(review.createdAt)}</td>
-                  <td className="max-w-[160px] px-3 py-3">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <p className="font-medium text-foreground">{review.patientName}</p>
-                      {review.isTest ? (
-                        <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-700 dark:text-amber-300">
-                          Test
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{review.email}</p>
-                  </td>
-                  <td className="px-3 py-3 font-mono text-foreground">{formatRating(review.appointmentEase)}</td>
-                  <td className="px-3 py-3 font-mono text-foreground">{formatRating(review.visitRating)}</td>
-                  <td className="px-3 py-3 text-muted-foreground">{review.waitTimeLabel}</td>
-                  <td className="max-w-[220px] px-3 py-3">
-                    <p className="line-clamp-2 text-foreground">{review.serviceTypeLabel || "—"}</p>
-                  </td>
-                  <td className="px-3 py-3 font-mono text-foreground">
-                    {formatRating(review.recommendationRating)}
-                  </td>
-                  <td className="max-w-[220px] px-3 py-3">
-                    {review.commentPreview ? (
-                      <div className="flex items-start gap-2">
-                        <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
-                        <p className="line-clamp-2 text-foreground">{review.commentPreview}</p>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onViewReview(review.id);
-                      }}
-                      className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-surface-muted/80"
-                    >
-                      View
-                    </button>
-                  </td>
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-border bg-surface-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <th className="px-5 py-3 font-semibold">Submitted</th>
+                  <th className="px-3 py-3 font-semibold">Appointment</th>
+                  <th className="px-3 py-3 font-semibold">Patient</th>
+                  <th className="px-3 py-3 font-semibold">Scheduling</th>
+                  <th className="px-3 py-3 font-semibold">Visit</th>
+                  <th className="px-3 py-3 font-semibold">Wait time</th>
+                  <th className="px-3 py-3 font-semibold">Provider(s)</th>
+                  <th className="px-3 py-3 font-semibold">Recommend</th>
+                  <th className="px-3 py-3 font-semibold">Comments</th>
+                  <th className="px-5 py-3 font-semibold" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {pageReviews.map((review) => (
+                  <tr
+                    key={review.id}
+                    className="cursor-pointer border-b border-border/70 transition hover:bg-surface-muted/30"
+                    onClick={() => onViewReview(review.id)}
+                  >
+                    <td className="px-5 py-3 text-foreground">{formatReviewWhen(review.createdAt)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-foreground">
+                      {formatAppointmentDate(review.appointmentDate)}
+                    </td>
+                    <td className="max-w-[160px] px-3 py-3">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <p className="font-medium text-foreground">{review.patientName}</p>
+                        {review.isTest ? (
+                          <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-700 dark:text-amber-300">
+                            Test
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{review.email}</p>
+                    </td>
+                    <td className="px-3 py-3 font-mono text-foreground">{formatRating(review.appointmentEase)}</td>
+                    <td className="px-3 py-3 font-mono text-foreground">{formatRating(review.visitRating)}</td>
+                    <td className="px-3 py-3 text-muted-foreground">{review.waitTimeLabel}</td>
+                    <td className="max-w-[220px] px-3 py-3">
+                      <p className="line-clamp-2 text-foreground">{review.serviceTypeLabel || "—"}</p>
+                    </td>
+                    <td className="px-3 py-3 font-mono text-foreground">
+                      {formatRating(review.recommendationRating)}
+                    </td>
+                    <td className="max-w-[220px] px-3 py-3">
+                      {review.commentPreview ? (
+                        <div className="flex items-start gap-2">
+                          <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
+                          <p className="line-clamp-2 text-foreground">{review.commentPreview}</p>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewReview(review.id);
+                        }}
+                        className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-surface-muted/80"
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex flex-col gap-3 border-t border-border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <p className="text-muted-foreground">
+              Showing {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, filtered.length)} of{" "}
+              {filtered.length} result{filtered.length === 1 ? "" : "s"} · Page {currentPage} of{" "}
+              {pageCount}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={currentPage === 1}
+                onClick={() => setPage((value) => Math.max(1, value - 1))}
+                className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 font-medium text-foreground transition hover:bg-surface-muted/80 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden />
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={currentPage === pageCount}
+                onClick={() => setPage((value) => Math.min(pageCount, value + 1))}
+                className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 font-medium text-foreground transition hover:bg-surface-muted/80 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+                <ChevronRight className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

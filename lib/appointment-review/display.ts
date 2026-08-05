@@ -17,6 +17,7 @@ export type AppointmentReviewDetail = {
   id: string;
   isTest: boolean;
   createdAt: string;
+  appointmentDate: string | null;
   email: string;
   patientName: string;
   appointmentEase: number | null;
@@ -120,12 +121,14 @@ function reviewComments(row: AppointmentReviewRow): string[] {
 export function toAppointmentReviewDetail(
   row: AppointmentReviewRow,
   isTest = false,
+  appointmentDate: string | null = null,
 ): AppointmentReviewDetail {
   const comments = reviewComments(row);
   return {
     id: row.id,
     isTest,
     createdAt: row.created_at,
+    appointmentDate,
     email: text(row.email) || "—",
     patientName: text(row.patient_name) || "—",
     appointmentEase: rating(row.appointment_ease),
@@ -170,6 +173,19 @@ export function formatReviewWhen(iso: string): string {
     }).format(new Date(iso));
   } catch {
     return iso;
+  }
+}
+
+export function formatAppointmentDate(date: string | null | undefined): string {
+  if (!date) return "—";
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(`${date.slice(0, 10)}T12:00:00`));
+  } catch {
+    return date;
   }
 }
 

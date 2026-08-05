@@ -877,37 +877,49 @@ export async function listDailyCheckoutCountsForReport(filters: {
   }
 }
 
-type SurveyOutreachTestTokenResult =
-  | { ok: true; tokens: string[] }
+export type SurveyOutreachReviewMetadata = {
+  surveyToken: string;
+  appointmentDate: string | null;
+  isTest: boolean;
+};
+
+type SurveyOutreachReviewMetadataResult =
+  | { ok: true; rows: SurveyOutreachReviewMetadata[] }
   | { ok: false; error: string };
 
-/** Resolve which linked review tokens belong to test outreach rows. */
-export async function findTestSurveyOutreachTokens(
+/** Resolve appointment dates and test status for linked survey responses. */
+export async function findSurveyOutreachReviewMetadata(
   surveyTokens: readonly string[],
-): Promise<SurveyOutreachTestTokenResult> {
+): Promise<SurveyOutreachReviewMetadataResult> {
   const tokens = [...new Set(surveyTokens.map((token) => token.trim()).filter(Boolean))];
-  if (tokens.length === 0) return { ok: true, tokens: [] };
+  if (tokens.length === 0) return { ok: true, rows: [] };
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return { ok: false, error: "Survey outreach storage is not available." };
   }
 
   try {
     const supabase = createServiceRoleClient();
-    const testTokens: string[] = [];
+    const rows: SurveyOutreachReviewMetadata[] = [];
     const batchSize = 100;
     for (let offset = 0; offset < tokens.length; offset += batchSize) {
       const batch = tokens.slice(offset, offset + batchSize);
       const { data, error } = await supabase
         .from("survey_outreach")
-        .select("survey_token")
-        .eq("is_test", true)
+        .select("survey_token,appointment_date,is_test")
         .in("survey_token", batch);
-      if (error) return { ok: false, error: "Could not classify test survey responses." };
-      testTokens.push(...(data ?? []).map((row) => String(row.survey_token)));
+      if (error) return { ok: false, error: "Could not load linked survey appointment dates." };
+      rows.push(
+        ...(data ?? []).map((row) => ({
+          surveyToken: String(row.survey_token),
+          appointmentDate:
+            typeof row.appointment_date === "string" ? row.appointment_date : null,
+          isTest: Boolean(row.is_test),
+        })),
+      );
     }
-    return { ok: true, tokens: testTokens };
+    return { ok: true, rows };
   } catch {
-    return { ok: false, error: "Could not classify test survey responses." };
+    return { ok: false, error: "Could not load linked survey appointment dates." };
   }
 }
 

@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, MessageSquareText, X } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
 import {
+  formatAppointmentDate,
   formatRating,
   formatRatingOrDash,
   formatReviewWhen,
@@ -98,6 +99,7 @@ export function AppointmentReviewDetailModal({
           <div className="divide-y divide-border">
             <Answer label="Email" value={review.email} />
             <Answer label="Name" value={review.patientName} />
+            <Answer label="Appointment date" value={formatAppointmentDate(review.appointmentDate)} />
             <Answer
               label="1. Ease of scheduling an appointment"
               value={formatRating(review.appointmentEase)}

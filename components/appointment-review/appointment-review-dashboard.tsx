@@ -179,7 +179,7 @@ export function AppointmentReviewDashboard({
           {
             label: "Initial surveys sent",
             value: String(numberSent),
-            hint: "Includes repeat visits; delivery failures and reminders excluded",
+            hint: "Counted by checkout date; repeat visits included, failures and reminders excluded",
           },
           {
             label: "Repeat initial sends",

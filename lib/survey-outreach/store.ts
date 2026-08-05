@@ -504,8 +504,8 @@ export type SurveyOutreachListResult = {
 };
 
 export type SurveyOutreachReportFilters = {
-  sentFrom?: string;
-  sentBefore?: string;
+  appointmentDateStart?: string;
+  appointmentDateEnd?: string;
   includeTests?: boolean;
 };
 
@@ -522,7 +522,7 @@ type SurveyOutreachReportResult =
   | { ok: true; rows: SurveyOutreachRow[] }
   | { ok: false; error: string; setupRequired?: boolean };
 
-/** All production survey invitations sent in the requested interval. */
+/** Sent survey invitations attributed to their appointment date. */
 export async function listSurveyOutreachForReport(
   filters: SurveyOutreachReportFilters = {},
 ): Promise<SurveyOutreachReportResult> {
@@ -547,8 +547,12 @@ export async function listSurveyOutreachForReport(
         .order("id", { ascending: false });
 
       if (!filters.includeTests) query = query.eq("is_test", false);
-      if (filters.sentFrom) query = query.gte("initial_sent_at", filters.sentFrom);
-      if (filters.sentBefore) query = query.lt("initial_sent_at", filters.sentBefore);
+      if (filters.appointmentDateStart) {
+        query = query.gte("appointment_date", filters.appointmentDateStart);
+      }
+      if (filters.appointmentDateEnd) {
+        query = query.lte("appointment_date", filters.appointmentDateEnd);
+      }
 
       const { data, error, count } = await query.range(offset, offset + pageSize - 1);
       if (error) {

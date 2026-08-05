@@ -71,8 +71,8 @@ export async function GET(req: Request) {
   ] = await Promise.all([
     listAppointmentReviews({ createdFrom: range.startAt, createdBefore: range.endBefore }),
     listSurveyOutreachForReport({
-      sentFrom: range.startAt,
-      sentBefore: range.endBefore,
+      appointmentDateStart: range.dateStart ?? undefined,
+      appointmentDateEnd: range.dateEnd ?? undefined,
       includeTests,
     }),
     listInitialSurveyBouncesForReport(),

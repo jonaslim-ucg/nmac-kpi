@@ -19,6 +19,11 @@ export type DailyCheckoutPoint = {
   count: number;
 };
 
+export type CheckoutSummary = {
+  checkouts: number;
+  multipleSameDayAppointments: number | null;
+};
+
 const CALENDAR_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function isCalendarDate(value: string): boolean {
@@ -104,4 +109,49 @@ export function buildDailyCheckoutTrend(
   return [...countsByDate.entries()]
     .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
     .map(([date, count]) => ({ date, count }));
+}
+
+/** Summarize check-outs and extra same-day appointments for the selected dates. */
+export function summarizeDailyCheckouts(
+  rows: readonly DailyCheckoutCountRow[],
+): CheckoutSummary {
+  const snapshotsByDate = new Map<
+    string,
+    { checkouts: number; distinctPatients: number | null }
+  >();
+
+  for (const row of rows) {
+    if (!isCalendarDate(row.appointment_date)) continue;
+    if (!Number.isFinite(row.checkout_count) || row.checkout_count < 0) continue;
+
+    const checkouts = Math.trunc(row.checkout_count);
+    const distinctPatients =
+      typeof row.distinct_patient_count === "number"
+      && Number.isFinite(row.distinct_patient_count)
+      && row.distinct_patient_count >= 0
+        ? Math.min(checkouts, Math.trunc(row.distinct_patient_count))
+        : null;
+
+    snapshotsByDate.set(row.appointment_date, { checkouts, distinctPatients });
+  }
+
+  let checkouts = 0;
+  let multipleSameDayAppointments = 0;
+  let hasCompletePatientCounts = true;
+
+  for (const snapshot of snapshotsByDate.values()) {
+    checkouts += snapshot.checkouts;
+    if (snapshot.distinctPatients === null) {
+      hasCompletePatientCounts = false;
+      continue;
+    }
+    multipleSameDayAppointments += snapshot.checkouts - snapshot.distinctPatients;
+  }
+
+  return {
+    checkouts,
+    multipleSameDayAppointments: hasCompletePatientCounts
+      ? multipleSameDayAppointments
+      : null,
+  };
 }

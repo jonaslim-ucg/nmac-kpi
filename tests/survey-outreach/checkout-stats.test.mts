@@ -5,6 +5,7 @@ import type { CrmAppointmentRow } from "../../lib/crm/appointments.ts";
 import {
   buildDailyCheckoutSnapshot,
   buildDailyCheckoutTrend,
+  summarizeDailyCheckouts,
 } from "../../lib/survey-outreach/checkout-stats.ts";
 
 function crmAppointment(overrides: Partial<CrmAppointmentRow>): CrmAppointmentRow {
@@ -97,5 +98,38 @@ test("ignores invalid checkout snapshots", () => {
       { appointment_date: "2026-08-01", checkout_count: -1 },
     ]),
     [],
+  );
+});
+
+test("summarizes check-outs and extra same-day appointments", () => {
+  assert.deepEqual(
+    summarizeDailyCheckouts([
+      {
+        appointment_date: "2026-08-01",
+        checkout_count: 10,
+        distinct_patient_count: 7,
+      },
+      {
+        appointment_date: "2026-08-02",
+        checkout_count: 5,
+        distinct_patient_count: 4,
+      },
+    ]),
+    {
+      checkouts: 15,
+      multipleSameDayAppointments: 4,
+    },
+  );
+});
+
+test("marks same-day appointment totals unavailable when patient counts are missing", () => {
+  assert.deepEqual(
+    summarizeDailyCheckouts([
+      { appointment_date: "2026-08-01", checkout_count: 10 },
+    ]),
+    {
+      checkouts: 10,
+      multipleSameDayAppointments: null,
+    },
   );
 });

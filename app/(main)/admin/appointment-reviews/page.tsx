@@ -30,6 +30,8 @@ type ApiResponse = {
   dateEnd?: string | null;
   stats?: AppointmentReviewStats;
   reviews?: AppointmentReviewDetail[];
+  numberCheckouts?: number;
+  numberMultipleSameDayAppointments?: number | null;
   numberSent?: number;
   numberBouncedInitialSends?: number;
   numberPermanentInitialFailures?: number;
@@ -90,6 +92,10 @@ export default function AdminAppointmentReviewsPage() {
   const { ready: prefsReady, roleNmacNav } = useDashboardPreferences();
   const [stats, setStats] = useState<AppointmentReviewStats | null>(null);
   const [reviews, setReviews] = useState<AppointmentReviewDetail[]>([]);
+  const [numberCheckouts, setNumberCheckouts] = useState(0);
+  const [numberMultipleSameDayAppointments, setNumberMultipleSameDayAppointments] = useState<
+    number | null
+  >(null);
   const [numberSent, setNumberSent] = useState(0);
   const [numberBouncedInitialSends, setNumberBouncedInitialSends] = useState(0);
   const [numberPermanentInitialFailures, setNumberPermanentInitialFailures] = useState(0);
@@ -208,6 +214,8 @@ export default function AdminAppointmentReviewsPage() {
         }
         setStats(null);
         setReviews([]);
+        setNumberCheckouts(0);
+        setNumberMultipleSameDayAppointments(null);
         setNumberSent(0);
         setNumberBouncedInitialSends(0);
         setNumberPermanentInitialFailures(0);
@@ -233,6 +241,14 @@ export default function AdminAppointmentReviewsPage() {
 
       setStats(liveData.stats ?? null);
       setReviews(displayedReviews);
+      setNumberCheckouts(
+        typeof liveData.numberCheckouts === "number" ? liveData.numberCheckouts : 0,
+      );
+      setNumberMultipleSameDayAppointments(
+        typeof liveData.numberMultipleSameDayAppointments === "number"
+          ? liveData.numberMultipleSameDayAppointments
+          : null,
+      );
       setNumberSent(typeof liveData.numberSent === "number" ? liveData.numberSent : 0);
       setNumberBouncedInitialSends(
         typeof liveData.numberBouncedInitialSends === "number"
@@ -264,6 +280,8 @@ export default function AdminAppointmentReviewsPage() {
       setLoadError("Could not load results.");
       setStats(null);
       setReviews([]);
+      setNumberCheckouts(0);
+      setNumberMultipleSameDayAppointments(null);
       setNumberSent(0);
       setNumberBouncedInitialSends(0);
       setNumberPermanentInitialFailures(0);
@@ -541,6 +559,8 @@ export default function AdminAppointmentReviewsPage() {
         <AppointmentReviewDashboard
           key={appliedPeriodLabel}
           stats={stats}
+          numberCheckouts={numberCheckouts}
+          numberMultipleSameDayAppointments={numberMultipleSameDayAppointments}
           numberSent={numberSent}
           numberBouncedInitialSends={numberBouncedInitialSends}
           numberPermanentInitialFailures={numberPermanentInitialFailures}

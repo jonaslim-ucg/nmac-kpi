@@ -163,6 +163,8 @@ function YesNoPie({ title, data }: { title: string; data: AppointmentReviewStats
 
 type Props = {
   stats: AppointmentReviewStats;
+  numberCheckouts: number;
+  numberMultipleSameDayAppointments: number | null;
   numberSent: number;
   numberBouncedInitialSends: number;
   numberPermanentInitialFailures: number;
@@ -176,6 +178,8 @@ type Props = {
 
 export function AppointmentReviewDashboard({
   stats,
+  numberCheckouts,
+  numberMultipleSameDayAppointments,
   numberSent,
   numberBouncedInitialSends,
   numberPermanentInitialFailures,
@@ -233,6 +237,19 @@ export function AppointmentReviewDashboard({
             label: "Total responses",
             value: String(stats.total),
             hint: "Provider experience survey submissions",
+          },
+          {
+            label: "Check-outs",
+            value: String(numberCheckouts),
+            hint: "Checked-out appointments in the selected date range",
+          },
+          {
+            label: "Multiple same-day appointments",
+            value:
+              numberMultipleSameDayAppointments === null
+                ? "—"
+                : String(numberMultipleSameDayAppointments),
+            hint: "Additional check-outs when a patient had more than one appointment that day",
           },
           {
             label: "Bounced emails",

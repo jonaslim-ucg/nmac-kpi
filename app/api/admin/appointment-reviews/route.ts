@@ -31,7 +31,10 @@ import {
   listInitialSurveyBouncesForReport,
   listSurveyOutreachBouncesForReport,
 } from "@/lib/survey-outreach/bounce-store";
-import { buildDailyCheckoutTrend } from "@/lib/survey-outreach/checkout-stats";
+import {
+  buildDailyCheckoutTrend,
+  summarizeDailyCheckouts,
+} from "@/lib/survey-outreach/checkout-stats";
 import { summarizeTrackedSurveyEmailFailures } from "@/lib/survey-outreach/failure-stats";
 import {
   checkoutRowsSinceSurveyLaunch,
@@ -267,7 +270,7 @@ export async function GET(req: Request) {
     outreachResult.rows,
     initialBounceResult.rows,
   );
-  const numberCheckouts = dailyCheckouts.reduce((total, point) => total + point.count, 0);
+  const checkoutSummary = summarizeDailyCheckouts(dailyCheckoutRows);
   const deliveryFailureStats = summarizeTrackedSurveyEmailFailures(
     deliveryBounceResult.rows,
     permanentFailureResult.rows,
@@ -297,7 +300,8 @@ export async function GET(req: Request) {
         checkoutReconciliation: "appointment_date_from_first_production_send",
       },
       kpis: {
-        appointmentCheckouts: numberCheckouts,
+        appointmentCheckouts: checkoutSummary.checkouts,
+        multipleSameDayAppointments: checkoutSummary.multipleSameDayAppointments,
         initialSurveyAttempts: initialSurveyKpis.attempted,
         initialSurveysSent: initialSurveyKpis.successful,
         uniqueInitialRecipients: initialSurveyKpis.uniqueSuccessfulRecipients,
@@ -309,7 +313,8 @@ export async function GET(req: Request) {
         notSent: checkoutReconciliation.ready ? checkoutReconciliation.notSent : null,
         totalResponses: rows.length,
       },
-      numberCheckouts,
+      numberCheckouts: checkoutSummary.checkouts,
+      numberMultipleSameDayAppointments: checkoutSummary.multipleSameDayAppointments,
       numberInitialSurveyAttempts: initialSurveyKpis.attempted,
       numberSent: initialSurveyKpis.successful,
       numberUniqueInitialRecipients: initialSurveyKpis.uniqueSuccessfulRecipients,

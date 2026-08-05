@@ -601,9 +601,9 @@ type SurveyOutreachReportResult =
   | { ok: true; rows: SurveyOutreachRow[] }
   | { ok: false; error: string; setupRequired?: boolean };
 
-/** Sent survey invitations attributed to their appointment date. */
-export async function listSurveyOutreachForReport(
+async function querySurveyOutreachForReport(
   filters: SurveyOutreachReportFilters = {},
+  sentOnly: boolean,
 ): Promise<SurveyOutreachReportResult> {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return { ok: false, error: "Survey outreach storage is not available." };
@@ -621,10 +621,13 @@ export async function listSurveyOutreachForReport(
         .from("survey_outreach")
         .select("*", { count: "exact" })
         .is("merged_into_outreach_id", null)
-        .not("initial_sent_at", "is", null)
-        .order("initial_sent_at", { ascending: false })
+        .order(sentOnly ? "initial_sent_at" : "appointment_date", {
+          ascending: false,
+          nullsFirst: false,
+        })
         .order("id", { ascending: false });
 
+      if (sentOnly) query = query.not("initial_sent_at", "is", null);
       if (!filters.includeTests) query = query.eq("is_test", false);
       if (filters.appointmentDateStart) {
         query = query.gte("appointment_date", filters.appointmentDateStart);
@@ -638,7 +641,12 @@ export async function listSurveyOutreachForReport(
         if (/survey_outreach|merged_into_outreach_id/i.test(error.message) && /does not exist|schema cache/i.test(error.message)) {
           return { ok: false, error: "Survey outreach storage is not configured.", setupRequired: true };
         }
-        return { ok: false, error: "Could not load sent survey data." };
+        return {
+          ok: false,
+          error: sentOnly
+            ? "Could not load sent survey data."
+            : "Could not load survey delivery states.",
+        };
       }
 
       const page = (data ?? []) as SurveyOutreachRow[];
@@ -651,8 +659,22 @@ export async function listSurveyOutreachForReport(
 
     return { ok: true, rows };
   } catch {
-    return { ok: false, error: "Could not load sent survey data." };
+    return { ok: false, error: "Could not load survey outreach data." };
   }
+}
+
+/** Sent survey invitations attributed to their appointment date. */
+export async function listSurveyOutreachForReport(
+  filters: SurveyOutreachReportFilters = {},
+): Promise<SurveyOutreachReportResult> {
+  return querySurveyOutreachForReport(filters, true);
+}
+
+/** Every canonical outreach state attributed to its appointment date. */
+export async function listSurveyOutreachStatesForReport(
+  filters: SurveyOutreachReportFilters = {},
+): Promise<SurveyOutreachReportResult> {
+  return querySurveyOutreachForReport(filters, false);
 }
 
 /** Permanent pre-send or immediate provider failures for the requested report filters. */
@@ -725,17 +747,45 @@ export async function upsertDailyCheckoutCounts(
   if (rows.length === 0) return;
   const syncedAt = new Date().toISOString();
   const supabase = createServiceRoleClient();
+  const payload = rows.map((row) => ({
+    appointment_date: row.appointment_date,
+    checkout_count: Math.max(0, Math.trunc(row.checkout_count)),
+    distinct_patient_count:
+      typeof row.distinct_patient_count === "number"
+        ? Math.max(0, Math.trunc(row.distinct_patient_count))
+        : null,
+    eligible_survey_count:
+      typeof row.eligible_survey_count === "number"
+        ? Math.max(0, Math.trunc(row.eligible_survey_count))
+        : null,
+    no_email_count:
+      typeof row.no_email_count === "number"
+        ? Math.max(0, Math.trunc(row.no_email_count))
+        : null,
+    survey_groups: Array.isArray(row.survey_groups) ? row.survey_groups : null,
+    synced_at: syncedAt,
+  }));
   const { error } = await supabase
     .from("survey_outreach_daily_checkouts")
+    .upsert(payload, { onConflict: "appointment_date" });
+  if (!error) return;
+
+  const reconciliationSchemaMissing =
+    /distinct_patient_count|eligible_survey_count|no_email_count|survey_groups/i.test(error.message)
+    && /does not exist|schema cache|could not find/i.test(error.message);
+  if (!reconciliationSchemaMissing) throw new Error(error.message);
+
+  const { error: fallbackError } = await supabase
+    .from("survey_outreach_daily_checkouts")
     .upsert(
-      rows.map((row) => ({
-        appointment_date: row.appointment_date,
-        checkout_count: Math.max(0, Math.trunc(row.checkout_count)),
-        synced_at: syncedAt,
+      payload.map(({ appointment_date, checkout_count, synced_at }) => ({
+        appointment_date,
+        checkout_count,
+        synced_at,
       })),
       { onConflict: "appointment_date" },
     );
-  if (error) throw new Error(error.message);
+  if (fallbackError) throw new Error(fallbackError.message);
 }
 
 export type DailyCheckoutCountReportResult =
@@ -752,14 +802,28 @@ export async function listDailyCheckoutCountsForReport(filters: {
 
   try {
     const supabase = createServiceRoleClient();
-    let query = supabase
-      .from("survey_outreach_daily_checkouts")
-      .select("appointment_date,checkout_count")
-      .order("appointment_date", { ascending: true });
-    if (filters.dateStart) query = query.gte("appointment_date", filters.dateStart);
-    if (filters.dateEnd) query = query.lte("appointment_date", filters.dateEnd);
-
-    const { data, error } = await query;
+    const loadRows = async (columns: string) => {
+      let query = supabase
+        .from("survey_outreach_daily_checkouts")
+        .select(columns)
+        .order("appointment_date", { ascending: true });
+      if (filters.dateStart) query = query.gte("appointment_date", filters.dateStart);
+      if (filters.dateEnd) query = query.lte("appointment_date", filters.dateEnd);
+      return query;
+    };
+    let { data, error } = await loadRows(
+      "appointment_date,checkout_count,distinct_patient_count,eligible_survey_count,no_email_count,survey_groups",
+    );
+    const reconciliationSchemaMissing = Boolean(
+      error
+      && /distinct_patient_count|eligible_survey_count|no_email_count|survey_groups/i.test(error.message)
+      && /does not exist|schema cache|could not find/i.test(error.message),
+    );
+    if (reconciliationSchemaMissing) {
+      const fallback = await loadRows("appointment_date,checkout_count");
+      data = fallback.data;
+      error = fallback.error;
+    }
     if (error) {
       const setupRequired = /survey_outreach_daily_checkouts/i.test(error.message)
         && /does not exist|schema cache|could not find/i.test(error.message);
@@ -771,7 +835,13 @@ export async function listDailyCheckoutCountsForReport(filters: {
         setupRequired,
       };
     }
-    return { ok: true, rows: (data ?? []) as DailyCheckoutCountRow[] };
+    const rows = (data ?? []) as unknown as DailyCheckoutCountRow[];
+    return {
+      ok: true,
+      rows: reconciliationSchemaMissing
+        ? rows.map((row) => ({ ...row, survey_groups: null }))
+        : rows,
+    };
   } catch {
     return { ok: false, error: "Could not load daily checkout totals." };
   }

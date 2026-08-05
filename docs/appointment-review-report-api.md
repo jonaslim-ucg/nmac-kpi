@@ -70,6 +70,8 @@ This means an initial survey sent on July 25 for a July 24 checkout is counted u
     "failedInitialSends": 6,
     "bouncedInitialSends": 5,
     "permanentInitialFailures": 1,
+    "noEmail": 8,
+    "notSent": 3,
     "totalResponses": 54
   },
   "numberCheckouts": 142,
@@ -80,11 +82,58 @@ This means an initial survey sent on July 25 for a July 24 checkout is counted u
   "numberFailedInitialSends": 6,
   "numberBouncedInitialSends": 5,
   "numberPermanentInitialFailures": 1,
+  "numberNoEmail": 8,
+  "numberNotSent": 3,
   "numberResponses": 54,
   "dailyCheckouts": [
     { "date": "2026-07-21", "count": 49 },
     { "date": "2026-07-22", "count": 93 }
   ],
+  "checkoutReconciliation": {
+    "ready": true,
+    "trackedDates": 2,
+    "snapshotDates": 2,
+    "patientDayGroups": 131,
+    "noEmail": 8,
+    "notSent": 3,
+    "discrepancies": {
+      "sentThroughSameDayGroup": {
+        "groupCount": 2,
+        "appointmentCount": 2,
+        "appointmentIds": ["149558", "149570"]
+      },
+      "pendingNotSent": {
+        "groupCount": 1,
+        "appointmentCount": 1,
+        "appointmentIds": ["39460"]
+      },
+      "emailWithoutOutreach": {
+        "groupCount": 1,
+        "appointmentCount": 1,
+        "appointmentIds": ["147330"]
+      },
+      "noEmail": {
+        "groupCount": 1,
+        "appointmentCount": 1,
+        "appointmentIds": ["39492"]
+      },
+      "bounced": {
+        "groupCount": 1,
+        "appointmentCount": 1,
+        "appointmentIds": ["151111"]
+      },
+      "failedBeforeSend": {
+        "groupCount": 0,
+        "appointmentCount": 0,
+        "appointmentIds": []
+      },
+      "suppressedBeforeSend": {
+        "groupCount": 0,
+        "appointmentCount": 0,
+        "appointmentIds": []
+      }
+    }
+  },
   "stats": {},
   "providers": [
     {
@@ -107,6 +156,12 @@ This means an initial survey sent on July 25 for a July 24 checkout is counted u
 - `uniqueInitialRecipients` counts normalized recipient addresses after failed messages are excluded.
 - `repeatInitialSends` counts additional successful initial sends to an address already represented in the selected appointment-date period.
 - `failedInitialSends` includes both known initial-message bounces and permanent initial failures rejected before delivery.
+- `bouncedInitialSends` counts initial messages accepted by the mail provider and later reported as undeliverable.
+- `permanentInitialFailures` counts initial messages rejected before the mail provider accepted them.
+- `noEmail` counts checked-out patient-day groups that have no email in the CRM.
+- `notSent` counts email-eligible patient-day groups that are pending, missing an outreach record, or suppressed before sending. Bounces and permanent failures are excluded so the categories do not overlap.
+- `checkoutReconciliation.ready` becomes `true` after every cached checkout date in the selected period has the detailed CRM snapshot. Until then, `numberNoEmail` and `numberNotSent` are `null`.
+- `checkoutReconciliation.discrepancies` provides grouped counts and CRM appointment IDs for bounced, failed-before-send, pending, missing-outreach, no-email, suppressed, and same-day grouped-survey cases.
 - `dailyCheckouts` contains the CRM checked-out appointment count for each appointment date; `appointmentCheckouts` is its total.
 - `numberFailedEmails`, `numberBounceReports`, and `numberPermanentSendFailures` remain available for all-stage delivery monitoring and use failure-event dates rather than appointment dates.
 - `reviews` contains all matching survey submissions, not only the first 500.

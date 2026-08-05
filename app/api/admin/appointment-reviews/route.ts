@@ -18,6 +18,7 @@ import {
   listDailyCheckoutCountsForReport,
   listPermanentSurveyDeliveryFailuresForReport,
   listSurveyOutreachForReport,
+  listSurveyOutreachStatesForReport,
 } from "@/lib/survey-outreach/store";
 import { isScheduledTestRecipientAllowed } from "@/lib/survey-outreach/config";
 import {
@@ -30,6 +31,7 @@ import {
 } from "@/lib/survey-outreach/bounce-store";
 import { buildDailyCheckoutTrend } from "@/lib/survey-outreach/checkout-stats";
 import { summarizeTrackedSurveyEmailFailures } from "@/lib/survey-outreach/failure-stats";
+import { reconcileSurveyCheckouts } from "@/lib/survey-outreach/checkout-reconciliation";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +69,7 @@ export async function GET(req: Request) {
   const [
     reviewsResult,
     outreachResult,
+    outreachStateResult,
     initialBounceResult,
     deliveryBounceResult,
     permanentFailureResult,
@@ -75,6 +78,11 @@ export async function GET(req: Request) {
   ] = await Promise.all([
     listAppointmentReviews({ createdFrom: range.startAt, createdBefore: range.endBefore }),
     listSurveyOutreachForReport({
+      appointmentDateStart: range.dateStart ?? undefined,
+      appointmentDateEnd: range.dateEnd ?? undefined,
+      includeTests,
+    }),
+    listSurveyOutreachStatesForReport({
       appointmentDateStart: range.dateStart ?? undefined,
       appointmentDateEnd: range.dateEnd ?? undefined,
       includeTests,
@@ -121,6 +129,15 @@ export async function GET(req: Request) {
         error: outreachResult.error ?? "Could not load sent survey data.",
       },
       { status: outreachResult.setupRequired ? 503 : 500 },
+    );
+  }
+  if (!outreachStateResult.ok) {
+    return NextResponse.json(
+      {
+        setupRequired: outreachStateResult.setupRequired ?? false,
+        error: outreachStateResult.error ?? "Could not load survey delivery states.",
+      },
+      { status: outreachStateResult.setupRequired ? 503 : 500 },
     );
   }
   if (!initialBounceResult.ok) {
@@ -232,6 +249,11 @@ export async function GET(req: Request) {
     deliveryBounceResult.rows,
     permanentFailureResult.rows,
   );
+  const checkoutReconciliation = reconcileSurveyCheckouts(
+    dailyCheckoutResult.ok ? dailyCheckoutResult.rows : [],
+    outreachStateResult.rows,
+    initialBounceResult.rows,
+  );
 
   return NextResponse.json(
     {
@@ -254,6 +276,8 @@ export async function GET(req: Request) {
         failedInitialSends: initialSurveyKpis.failed,
         bouncedInitialSends: initialSurveyKpis.bounced,
         permanentInitialFailures: initialSurveyKpis.permanentPreSendFailures,
+        noEmail: checkoutReconciliation.ready ? checkoutReconciliation.noEmail : null,
+        notSent: checkoutReconciliation.ready ? checkoutReconciliation.notSent : null,
         totalResponses: rows.length,
       },
       numberCheckouts,
@@ -264,10 +288,14 @@ export async function GET(req: Request) {
       numberFailedInitialSends: initialSurveyKpis.failed,
       numberBouncedInitialSends: initialSurveyKpis.bounced,
       numberPermanentInitialFailures: initialSurveyKpis.permanentPreSendFailures,
+      numberNoEmail: checkoutReconciliation.ready ? checkoutReconciliation.noEmail : null,
+      numberNotSent: checkoutReconciliation.ready ? checkoutReconciliation.notSent : null,
       numberFailedEmails: deliveryFailureStats.total,
       numberBounceReports: deliveryFailureStats.bounceReports,
       numberPermanentSendFailures: deliveryFailureStats.permanentSendFailures,
       dailyCheckouts,
+      checkoutReconciliation,
+      discrepancies: checkoutReconciliation.discrepancies,
       numberResponses: rows.length,
       quarter: range.quarter ?? null,
       currentQuarter: currentAppointmentReviewQuarter(now),

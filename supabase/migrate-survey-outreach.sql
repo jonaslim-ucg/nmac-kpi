@@ -119,8 +119,18 @@ alter table public.survey_outreach_bounces enable row level security;
 create table if not exists public.survey_outreach_daily_checkouts (
   appointment_date date primary key,
   checkout_count integer not null check (checkout_count >= 0),
+  distinct_patient_count integer check (distinct_patient_count >= 0),
+  eligible_survey_count integer check (eligible_survey_count >= 0),
+  no_email_count integer check (no_email_count >= 0),
+  survey_groups jsonb,
   synced_at timestamptz not null default now()
 );
+
+alter table public.survey_outreach_daily_checkouts
+  add column if not exists distinct_patient_count integer check (distinct_patient_count >= 0),
+  add column if not exists eligible_survey_count integer check (eligible_survey_count >= 0),
+  add column if not exists no_email_count integer check (no_email_count >= 0),
+  add column if not exists survey_groups jsonb;
 
 alter table public.survey_outreach_daily_checkouts enable row level security;
 

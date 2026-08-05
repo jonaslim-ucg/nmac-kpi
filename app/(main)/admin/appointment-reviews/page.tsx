@@ -13,6 +13,7 @@ import type { AppointmentReviewStats } from "@/lib/appointment-review/analytics"
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
 import type { AppointmentReviewQuarter } from "@/lib/appointment-review/report";
 import type { DailyCheckoutPoint } from "@/lib/survey-outreach/checkout-stats";
+import type { SurveyCheckoutReconciliation } from "@/lib/survey-outreach/checkout-reconciliation";
 import { APPOINTMENT_REVIEWS_SETUP_SQL } from "@/lib/appointment-review/store";
 import { isNmacNavHrefAllowed } from "@/lib/auth/role-nmac-nav";
 
@@ -31,9 +32,13 @@ type ApiResponse = {
   reviews?: AppointmentReviewDetail[];
   numberSent?: number;
   numberRepeatInitialSends?: number;
-  numberFailedInitialSends?: number;
+  numberBouncedInitialSends?: number;
+  numberPermanentInitialFailures?: number;
+  numberNoEmail?: number | null;
+  numberNotSent?: number | null;
   numberFailedEmails?: number;
   dailyCheckouts?: DailyCheckoutPoint[];
+  checkoutReconciliation?: SurveyCheckoutReconciliation;
   quarter?: AppointmentReviewQuarter | null;
   currentQuarter?: AppointmentReviewQuarter;
   eligibleEntries?: number | null;
@@ -89,7 +94,12 @@ export default function AdminAppointmentReviewsPage() {
   const [reviews, setReviews] = useState<AppointmentReviewDetail[]>([]);
   const [numberSent, setNumberSent] = useState(0);
   const [numberRepeatInitialSends, setNumberRepeatInitialSends] = useState(0);
-  const [numberFailedInitialSends, setNumberFailedInitialSends] = useState(0);
+  const [numberBouncedInitialSends, setNumberBouncedInitialSends] = useState(0);
+  const [numberPermanentInitialFailures, setNumberPermanentInitialFailures] = useState(0);
+  const [numberNoEmail, setNumberNoEmail] = useState<number | null>(null);
+  const [numberNotSent, setNumberNotSent] = useState<number | null>(null);
+  const [checkoutReconciliation, setCheckoutReconciliation] =
+    useState<SurveyCheckoutReconciliation | null>(null);
   const [dailyCheckouts, setDailyCheckouts] = useState<DailyCheckoutPoint[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -205,7 +215,11 @@ export default function AdminAppointmentReviewsPage() {
         setReviews([]);
         setNumberSent(0);
         setNumberRepeatInitialSends(0);
-        setNumberFailedInitialSends(0);
+        setNumberBouncedInitialSends(0);
+        setNumberPermanentInitialFailures(0);
+        setNumberNoEmail(null);
+        setNumberNotSent(null);
+        setCheckoutReconciliation(null);
         setDailyCheckouts([]);
         setAppliedDateRange(null);
         setQuarter(null);
@@ -232,11 +246,23 @@ export default function AdminAppointmentReviewsPage() {
           ? liveData.numberRepeatInitialSends
           : 0,
       );
-      setNumberFailedInitialSends(
-        typeof liveData.numberFailedInitialSends === "number"
-          ? liveData.numberFailedInitialSends
+      setNumberBouncedInitialSends(
+        typeof liveData.numberBouncedInitialSends === "number"
+          ? liveData.numberBouncedInitialSends
           : 0,
       );
+      setNumberPermanentInitialFailures(
+        typeof liveData.numberPermanentInitialFailures === "number"
+          ? liveData.numberPermanentInitialFailures
+          : 0,
+      );
+      setNumberNoEmail(
+        typeof liveData.numberNoEmail === "number" ? liveData.numberNoEmail : null,
+      );
+      setNumberNotSent(
+        typeof liveData.numberNotSent === "number" ? liveData.numberNotSent : null,
+      );
+      setCheckoutReconciliation(liveData.checkoutReconciliation ?? null);
       setDailyCheckouts(liveData.dailyCheckouts ?? []);
       setAppliedDateRange(
         liveData.dateStart || liveData.dateEnd
@@ -255,7 +281,11 @@ export default function AdminAppointmentReviewsPage() {
       setReviews([]);
       setNumberSent(0);
       setNumberRepeatInitialSends(0);
-      setNumberFailedInitialSends(0);
+      setNumberBouncedInitialSends(0);
+      setNumberPermanentInitialFailures(0);
+      setNumberNoEmail(null);
+      setNumberNotSent(null);
+      setCheckoutReconciliation(null);
       setDailyCheckouts([]);
       setAppliedDateRange(null);
       setQuarter(null);
@@ -529,7 +559,11 @@ export default function AdminAppointmentReviewsPage() {
           stats={stats}
           numberSent={numberSent}
           numberRepeatInitialSends={numberRepeatInitialSends}
-          numberFailedInitialSends={numberFailedInitialSends}
+          numberBouncedInitialSends={numberBouncedInitialSends}
+          numberPermanentInitialFailures={numberPermanentInitialFailures}
+          numberNoEmail={numberNoEmail}
+          numberNotSent={numberNotSent}
+          checkoutReconciliation={checkoutReconciliation}
           periodLabel={appliedPeriodLabel}
           refreshing={refreshing}
           dailyCheckouts={dailyCheckouts}

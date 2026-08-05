@@ -17,6 +17,10 @@ import {
 } from "@/lib/survey-outreach/daily-group";
 import { isCheckedOutCrmAppointment } from "@/lib/survey-outreach/crm-status";
 import {
+  buildDailyCheckoutSnapshot,
+  type DailyCheckoutCountRow,
+} from "@/lib/survey-outreach/checkout-stats";
+import {
   getSurveyOutreachSchedule,
   getSurveyOutreachSendingState,
   recordSurveyOutreachSchedulerRun,
@@ -161,7 +165,7 @@ export async function syncCheckedOutFromCrm(
     dates.map(async (date) => ({ date, rows: await fetchCrmAppointments(date, "all") })),
   );
   const crmRows: CrmAppointmentRow[] = [];
-  const dailyCheckoutCounts: { appointment_date: string; checkout_count: number }[] = [];
+  const dailyCheckoutCounts: DailyCheckoutCountRow[] = [];
   const syncErrors: { date: string; error: string }[] = [];
   const currentStatusByAppointmentId = new Map<string, string>();
   const successfullyFetchedDates: string[] = [];
@@ -174,10 +178,7 @@ export async function syncCheckedOutFromCrm(
       for (const row of result.value.rows) {
         if (row.id) currentStatusByAppointmentId.set(String(row.id), row.visit_status);
       }
-      dailyCheckoutCounts.push({
-        appointment_date: result.value.date,
-        checkout_count: checkedOutRows.length,
-      });
+      dailyCheckoutCounts.push(buildDailyCheckoutSnapshot(result.value.date, checkedOutRows));
       return;
     }
     syncErrors.push({

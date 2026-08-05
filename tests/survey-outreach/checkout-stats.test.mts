@@ -1,7 +1,68 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildDailyCheckoutTrend } from "../../lib/survey-outreach/checkout-stats.ts";
+import type { CrmAppointmentRow } from "../../lib/crm/appointments.ts";
+import {
+  buildDailyCheckoutSnapshot,
+  buildDailyCheckoutTrend,
+} from "../../lib/survey-outreach/checkout-stats.ts";
+
+function crmAppointment(overrides: Partial<CrmAppointmentRow>): CrmAppointmentRow {
+  return {
+    id: 101,
+    appointment_date: "2026-08-01",
+    appointment_time: "09:00:00",
+    visit_status: "CHK",
+    visit_status_label: "Check Out",
+    visit_type: "Follow up",
+    patient_name: "Doe, Jane",
+    patient_acc_number: "10001",
+    patient_email: "jane@example.com",
+    appointment_provider_name: "Brown, Kyjuan",
+    resource_provider_name: null,
+    ...overrides,
+  };
+}
+
+test("builds privacy-light patient-day checkout groups", () => {
+  assert.deepEqual(
+    buildDailyCheckoutSnapshot("2026-08-01", [
+      crmAppointment({ id: 101 }),
+      crmAppointment({ id: 102, patient_email: null }),
+      crmAppointment({
+        id: 201,
+        patient_acc_number: "10002",
+        patient_name: "Smith, John",
+        patient_email: null,
+      }),
+      crmAppointment({
+        id: 301,
+        patient_acc_number: null,
+        patient_name: "Flood, Amani",
+        patient_email: "amani@example.com",
+      }),
+      crmAppointment({
+        id: 302,
+        patient_acc_number: null,
+        patient_name: "Flood, Another",
+        patient_email: "amani@example.com",
+      }),
+    ]),
+    {
+      appointment_date: "2026-08-01",
+      checkout_count: 5,
+      distinct_patient_count: 4,
+      eligible_survey_count: 3,
+      no_email_count: 1,
+      survey_groups: [
+        { appointmentIds: ["101", "102"], hasEmail: true },
+        { appointmentIds: ["201"], hasEmail: false },
+        { appointmentIds: ["301"], hasEmail: true },
+        { appointmentIds: ["302"], hasEmail: true },
+      ],
+    },
+  );
+});
 
 test("builds a chronological daily checkout trend", () => {
   assert.deepEqual(

@@ -1,6 +1,7 @@
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { listInitialSurveyBouncesForReport } from "@/lib/survey-outreach/bounce-store";
 import type { DailyCheckoutCountRow } from "@/lib/survey-outreach/checkout-stats";
+import { surveyReportingStartDateFromTimestamp } from "@/lib/survey-outreach/reporting-date";
 import { summarizeUniqueInitialRecipients } from "@/lib/survey-outreach/sent-stats";
 import type { DailyOutreachGroup } from "@/lib/survey-outreach/daily-group";
 import { outreachIdsNoLongerCheckedOut } from "@/lib/survey-outreach/crm-status";
@@ -586,7 +587,7 @@ export type SurveyOutreachReportingStartResult =
   | { ok: true; date: string | null }
   | { ok: false; error: string };
 
-/** Appointment date attached to the first production initial-survey send. */
+/** Bermuda calendar date of the first production initial-survey send. */
 export async function getSurveyOutreachReportingStartDate(): Promise<SurveyOutreachReportingStartResult> {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return { ok: false, error: "Survey outreach storage is not available." };
@@ -596,7 +597,7 @@ export async function getSurveyOutreachReportingStartDate(): Promise<SurveyOutre
     const supabase = createServiceRoleClient();
     const { data, error } = await supabase
       .from("survey_outreach")
-      .select("appointment_date")
+      .select("initial_sent_at")
       .eq("is_test", false)
       .is("merged_into_outreach_id", null)
       .not("initial_sent_at", "is", null)
@@ -606,7 +607,10 @@ export async function getSurveyOutreachReportingStartDate(): Promise<SurveyOutre
     if (error) {
       return { ok: false, error: "Could not determine the survey reporting start date." };
     }
-    return { ok: true, date: data?.appointment_date ?? null };
+    return {
+      ok: true,
+      date: surveyReportingStartDateFromTimestamp(data?.initial_sent_at),
+    };
   } catch {
     return { ok: false, error: "Could not determine the survey reporting start date." };
   }

@@ -21,11 +21,19 @@ type Props = {
   hasNext?: boolean;
 };
 
-function Answer({ label, value }: { label: string; value: React.ReactNode }) {
+function Answer({
+  label,
+  value,
+  className = "",
+}: {
+  label: string;
+  value: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="py-3">
+    <div className={`min-w-0 border-b border-border/70 py-3 ${className}`}>
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className="mt-1 text-sm text-foreground">{value}</p>
+      <div className="mt-1 break-words text-sm leading-relaxed text-foreground">{value}</div>
     </div>
   );
 }
@@ -33,7 +41,7 @@ function Answer({ label, value }: { label: string; value: React.ReactNode }) {
 function CommentBlock({ label, text }: { label: string; text: string }) {
   if (!text) return null;
   return (
-    <div className="rounded-lg border border-border bg-surface-muted/40 px-4 py-3">
+    <div className="border-l-2 border-accent/70 py-1 pl-3">
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
       <p className="mt-2 text-sm leading-relaxed text-foreground">{text}</p>
     </div>
@@ -69,7 +77,7 @@ export function AppointmentReviewDetailModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="review-detail-title"
-        className="relative z-10 flex max-h-[min(92dvh,44rem)] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-card text-foreground shadow-xl"
+        className="relative z-10 flex max-h-[min(92dvh,52rem)] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-border bg-card text-foreground shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
@@ -96,91 +104,113 @@ export function AppointmentReviewDetailModal({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-2">
-          <div className="divide-y divide-border">
-            <Answer label="Email" value={review.email} />
-            <Answer label="Name" value={review.patientName} />
-            <Answer label="Appointment date" value={formatAppointmentDate(review.appointmentDate)} />
-            <Answer label="Appointment time" value={formatAppointmentTime(review.appointmentAt)} />
-            <Answer
-              label="Provider(s)"
-              value={review.appointmentProviderNames.length > 0
-                ? review.appointmentProviderNames.join(", ")
-                : "—"}
-            />
-            <Answer
-              label="Visit type"
-              value={review.appointmentVisitTypes.length > 0
-                ? review.appointmentVisitTypes.join(", ")
-                : "—"}
-            />
-            <Answer
-              label="1. Ease of scheduling an appointment"
-              value={formatRating(review.appointmentEase)}
-            />
-            <Answer
-              label="2. Overall visit with our practice"
-              value={formatRating(review.visitRating)}
-            />
-            <Answer label="3. Which provider(s) did they see?" value={review.serviceTypeLabel} />
-            <Answer
-              label="4. Provider ratings"
-              value={
-                review.providerRatings.length > 0 ? (
-                  <span className="block space-y-1">
-                    {review.providerRatings.map(({ providerLabel, rating }) => (
-                      <span key={providerLabel} className="flex items-center justify-between gap-4">
-                        <span>{providerLabel}</span>
-                        <span className="shrink-0 font-medium tabular-nums">{formatRating(rating)}</span>
-                      </span>
-                    ))}
-                  </span>
-                ) : (
-                  formatRatingOrDash(review.providerRating)
-                )
-              }
-            />
-            <Answer
-              label="5. Overall health improvement since receiving care at NMAC"
-              value={formatRatingOrDash(review.healthRating)}
-            />
-            <Answer
-              label="6. Likelihood to recommend NMAC"
-              value={formatRatingOrDash(review.recommendationRating)}
-            />
-            <Answer
-              label="7. Testimonial permission"
-              value={review.testimonialPermissionLabel}
-            />
-            <Answer label="8. Wait time before exam room" value={review.waitTimeLabel} />
-            <Answer
-              label="9. Provider(s) spent enough time and answered questions"
-              value={formatYesNoOrDash(review.providerTimeAdequate)}
-            />
-            <Answer
-              label="10. Front desk staff were friendly and courteous"
-              value={formatRating(review.frontDeskRating)}
-            />
-            <Answer label="11. How long they have been a patient at NMAC" value={review.patientDurationLabel} />
-            {review.referralSourcesLabel ? (
-              <Answer label="12. How did you hear about NMAC" value={review.referralSourcesLabel} />
-            ) : null}
-          </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+          <section aria-labelledby="review-visit-heading">
+            <h3 id="review-visit-heading" className="text-sm font-semibold text-foreground">
+              Patient and visit
+            </h3>
+            <div className="mt-1 grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+              <Answer label="Name" value={review.patientName} />
+              <Answer label="Email" value={review.email} />
+              <Answer label="Appointment date" value={formatAppointmentDate(review.appointmentDate)} />
+              <Answer label="Appointment time" value={formatAppointmentTime(review.appointmentAt)} />
+              <Answer
+                label="Appointment provider(s)"
+                value={review.appointmentProviderNames.length > 0
+                  ? review.appointmentProviderNames.join(", ")
+                  : "—"}
+              />
+              <Answer
+                label="Visit type"
+                value={review.appointmentVisitTypes.length > 0
+                  ? review.appointmentVisitTypes.join(", ")
+                  : "—"}
+              />
+            </div>
+          </section>
 
-          <div className="mt-4 space-y-3 border-t border-border pt-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <section className="mt-6" aria-labelledby="review-answers-heading">
+            <h3 id="review-answers-heading" className="text-sm font-semibold text-foreground">
+              Survey responses
+            </h3>
+            <div className="mt-1 grid grid-cols-1 gap-x-8 lg:grid-cols-2">
+              <Answer
+                label="1. Ease of scheduling an appointment"
+                value={formatRating(review.appointmentEase)}
+              />
+              <Answer
+                label="2. Overall visit with our practice"
+                value={formatRating(review.visitRating)}
+              />
+              <Answer label="3. Which provider(s) did they see?" value={review.serviceTypeLabel} />
+              <Answer
+                className="lg:row-span-2"
+                label="4. Provider ratings"
+                value={
+                  review.providerRatings.length > 0 ? (
+                    <span className="block space-y-1">
+                      {review.providerRatings.map(({ providerLabel, rating }) => (
+                        <span key={providerLabel} className="flex items-start justify-between gap-4">
+                          <span>{providerLabel}</span>
+                          <span className="shrink-0 font-medium tabular-nums">{formatRating(rating)}</span>
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    formatRatingOrDash(review.providerRating)
+                  )
+                }
+              />
+              <Answer
+                label="5. Overall health improvement since receiving care at NMAC"
+                value={formatRatingOrDash(review.healthRating)}
+              />
+              <Answer
+                label="6. Likelihood to recommend NMAC"
+                value={formatRatingOrDash(review.recommendationRating)}
+              />
+              <Answer
+                label="7. Testimonial permission"
+                value={review.testimonialPermissionLabel}
+              />
+              <Answer label="8. Wait time before exam room" value={review.waitTimeLabel} />
+              <Answer
+                label="9. Provider(s) spent enough time and answered questions"
+                value={formatYesNoOrDash(review.providerTimeAdequate)}
+              />
+              <Answer
+                label="10. Front desk staff were friendly and courteous"
+                value={formatRating(review.frontDeskRating)}
+              />
+              <Answer
+                label="11. How long they have been a patient at NMAC"
+                value={review.patientDurationLabel}
+              />
+              {review.referralSourcesLabel ? (
+                <Answer label="12. How did you hear about NMAC" value={review.referralSourcesLabel} />
+              ) : null}
+            </div>
+          </section>
+
+          <section className="mt-6 border-t border-border pt-4" aria-labelledby="review-comments-heading">
+            <div
+              id="review-comments-heading"
+              className="flex items-center gap-2 text-sm font-semibold text-foreground"
+            >
               <MessageSquareText className="h-4 w-4 text-accent" aria-hidden />
               Optional written responses
             </div>
-            <CommentBlock label="7. Testimonial" text={review.testimonialText} />
-            <CommentBlock
-              label={review.referralSourcesLabel ? "13. Exceptional staff" : "12. Exceptional staff"}
-              text={review.exceptionalStaffComment}
-            />
-            {!review.hasComments ? (
-              <p className="text-sm text-muted-foreground">No optional written responses.</p>
-            ) : null}
-          </div>
+            <div className="mt-4 space-y-4">
+              <CommentBlock label="7. Testimonial" text={review.testimonialText} />
+              <CommentBlock
+                label={review.referralSourcesLabel ? "13. Exceptional staff" : "12. Exceptional staff"}
+                text={review.exceptionalStaffComment}
+              />
+              {!review.hasComments ? (
+                <p className="text-sm text-muted-foreground">No optional written responses.</p>
+              ) : null}
+            </div>
+          </section>
         </div>
 
         <div className="flex flex-col gap-3 border-t border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">

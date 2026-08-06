@@ -5,6 +5,7 @@ import { useCallback, useEffect } from "react";
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
 import {
   formatAppointmentDate,
+  formatAppointmentTime,
   formatRating,
   formatRatingOrDash,
   formatReviewWhen,
@@ -100,6 +101,19 @@ export function AppointmentReviewDetailModal({
             <Answer label="Email" value={review.email} />
             <Answer label="Name" value={review.patientName} />
             <Answer label="Appointment date" value={formatAppointmentDate(review.appointmentDate)} />
+            <Answer label="Appointment time" value={formatAppointmentTime(review.appointmentAt)} />
+            <Answer
+              label="Provider(s)"
+              value={review.appointmentProviderNames.length > 0
+                ? review.appointmentProviderNames.join(", ")
+                : "—"}
+            />
+            <Answer
+              label="Visit type"
+              value={review.appointmentVisitTypes.length > 0
+                ? review.appointmentVisitTypes.join(", ")
+                : "—"}
+            />
             <Answer
               label="1. Ease of scheduling an appointment"
               value={formatRating(review.appointmentEase)}

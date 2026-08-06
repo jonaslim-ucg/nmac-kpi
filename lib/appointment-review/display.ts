@@ -18,6 +18,9 @@ export type AppointmentReviewDetail = {
   isTest: boolean;
   createdAt: string;
   appointmentDate: string | null;
+  appointmentAt: string | null;
+  appointmentProviderNames: string[];
+  appointmentVisitTypes: string[];
   email: string;
   patientName: string;
   appointmentEase: number | null;
@@ -47,6 +50,14 @@ export type AppointmentReviewDetail = {
   exceptionalStaffComment: string;
   hasComments: boolean;
   commentPreview: string | null;
+};
+
+type AppointmentReviewVisitMetadata = {
+  isTest?: boolean;
+  appointmentDate?: string | null;
+  appointmentAt?: string | null;
+  providerNames?: string[];
+  visitTypes?: string[];
 };
 
 function optionLabel(
@@ -120,15 +131,17 @@ function reviewComments(row: AppointmentReviewRow): string[] {
 
 export function toAppointmentReviewDetail(
   row: AppointmentReviewRow,
-  isTest = false,
-  appointmentDate: string | null = null,
+  metadata: AppointmentReviewVisitMetadata = {},
 ): AppointmentReviewDetail {
   const comments = reviewComments(row);
   return {
     id: row.id,
-    isTest,
+    isTest: metadata.isTest ?? false,
     createdAt: row.created_at,
-    appointmentDate,
+    appointmentDate: metadata.appointmentDate ?? null,
+    appointmentAt: metadata.appointmentAt ?? null,
+    appointmentProviderNames: metadata.providerNames ?? [],
+    appointmentVisitTypes: metadata.visitTypes ?? [],
     email: text(row.email) || "—",
     patientName: text(row.patient_name) || "—",
     appointmentEase: rating(row.appointment_ease),
@@ -186,6 +199,22 @@ export function formatAppointmentDate(date: string | null | undefined): string {
     }).format(new Date(`${date.slice(0, 10)}T12:00:00`));
   } catch {
     return date;
+  }
+}
+
+export function formatAppointmentTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+    return new Intl.DateTimeFormat(undefined, {
+      timeZone: "Atlantic/Bermuda",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(date);
+  } catch {
+    return "—";
   }
 }
 

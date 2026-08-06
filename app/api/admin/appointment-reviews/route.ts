@@ -208,15 +208,18 @@ export async function GET(req: Request) {
   let rows = reviewsResult.rows;
   if (!includeTests) rows = rows.filter((row) => !isTestReview(row));
 
-  const reviews = rows.map((row) =>
-    toAppointmentReviewDetail(
-      row,
-      isTestReview(row),
-      row.survey_token
-        ? reviewMetadataByToken.get(row.survey_token)?.appointmentDate ?? null
-        : null,
-    ),
-  );
+  const reviews = rows.map((row) => {
+    const metadata = row.survey_token
+      ? reviewMetadataByToken.get(row.survey_token)
+      : undefined;
+    return toAppointmentReviewDetail(row, {
+      isTest: isTestReview(row),
+      appointmentDate: metadata?.appointmentDate ?? null,
+      appointmentAt: metadata?.appointmentAt ?? null,
+      providerNames: metadata?.providerNames ?? [],
+      visitTypes: metadata?.visitTypes ?? [],
+    });
+  });
   const responseAtBySurveyToken = new Map(
     rows.flatMap((row) => row.survey_token ? [[row.survey_token, row.created_at] as const] : []),
   );

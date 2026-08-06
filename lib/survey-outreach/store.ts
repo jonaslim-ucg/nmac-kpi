@@ -884,6 +884,9 @@ export async function listDailyCheckoutCountsForReport(filters: {
 export type SurveyOutreachReviewMetadata = {
   surveyToken: string;
   appointmentDate: string | null;
+  appointmentAt: string | null;
+  providerNames: string[];
+  visitTypes: string[];
   isTest: boolean;
 };
 
@@ -891,7 +894,17 @@ type SurveyOutreachReviewMetadataResult =
   | { ok: true; rows: SurveyOutreachReviewMetadata[] }
   | { ok: false; error: string };
 
-/** Resolve appointment dates and test status for linked survey responses. */
+function metadataStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(
+    value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean),
+  )];
+}
+
+/** Resolve appointment details and test status for linked survey responses. */
 export async function findSurveyOutreachReviewMetadata(
   surveyTokens: readonly string[],
 ): Promise<SurveyOutreachReviewMetadataResult> {
@@ -909,21 +922,25 @@ export async function findSurveyOutreachReviewMetadata(
       const batch = tokens.slice(offset, offset + batchSize);
       const { data, error } = await supabase
         .from("survey_outreach")
-        .select("survey_token,appointment_date,is_test")
+        .select("survey_token,appointment_date,appointment_at,provider_names,visit_types,is_test")
         .in("survey_token", batch);
-      if (error) return { ok: false, error: "Could not load linked survey appointment dates." };
+      if (error) return { ok: false, error: "Could not load linked survey appointment details." };
       rows.push(
         ...(data ?? []).map((row) => ({
           surveyToken: String(row.survey_token),
           appointmentDate:
             typeof row.appointment_date === "string" ? row.appointment_date : null,
+          appointmentAt:
+            typeof row.appointment_at === "string" ? row.appointment_at : null,
+          providerNames: metadataStringList(row.provider_names),
+          visitTypes: metadataStringList(row.visit_types),
           isTest: Boolean(row.is_test),
         })),
       );
     }
     return { ok: true, rows };
   } catch {
-    return { ok: false, error: "Could not load linked survey appointment dates." };
+    return { ok: false, error: "Could not load linked survey appointment details." };
   }
 }
 

@@ -9,6 +9,7 @@ import {
   MessageSquareText,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import type { SheetData } from "write-excel-file/browser";
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
 import {
   formatAppointmentDate,
@@ -76,13 +77,14 @@ const EXPORT_HEADERS = [
   "Exceptional staff answer",
 ] as const;
 
+const EXPORT_COLUMN_WIDTHS = [
+  14, 22, 18, 18, 24, 30, 32, 30, 20, 18, 34, 34, 24, 42, 24, 42, 26, 42, 18, 28, 42,
+  22, 22, 30, 42,
+] as const;
+
 function protectSpreadsheetValue(value: string): string {
   const normalized = value.replace(/\r\n?/g, "\n");
   return /^[=+\-@]/.test(normalized.trimStart()) ? `'${normalized}` : normalized;
-}
-
-function csvCell(value: string): string {
-  return `"${protectSpreadsheetValue(value).replace(/"/g, '""')}"`;
 }
 
 function exportFileName(periodLabel: string): string {
@@ -90,10 +92,13 @@ function exportFileName(periodLabel: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "") || "selected-period";
-  return `nmac-survey-answers-${period}.csv`;
+  return `nmac-survey-answers-${period}.xlsx`;
 }
 
-function downloadSurveyAnswers(reviews: AppointmentReviewDetail[], periodLabel: string): void {
+async function downloadSurveyAnswers(
+  reviews: AppointmentReviewDetail[],
+  periodLabel: string,
+): Promise<void> {
   const rows = reviews.map((review) => [
     review.isTest ? "Test" : "Live",
     formatReviewWhen(review.createdAt),
@@ -123,18 +128,42 @@ function downloadSurveyAnswers(reviews: AppointmentReviewDetail[], periodLabel: 
     review.referralSourcesLabel ?? "—",
     review.exceptionalStaffComment,
   ]);
-  const csv = [EXPORT_HEADERS, ...rows]
-    .map((row) => row.map((value) => csvCell(String(value ?? ""))).join(","))
-    .join("\r\n");
-  const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = exportFileName(periodLabel);
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+
+  const { default: writeXlsxFile } = await import("write-excel-file/browser");
+  const headerRow: SheetData[number] = EXPORT_HEADERS.map((value) => ({
+    value,
+    type: String,
+    height: 32,
+    fontWeight: "bold" as const,
+    textColor: "#FFFFFF",
+    backgroundColor: "#1E5BA8",
+    alignVertical: "center" as const,
+    wrap: true,
+    bottomBorderColor: "#163F73",
+    bottomBorderStyle: "thin" as const,
+  }));
+  const answerRows: SheetData = rows.map((row, rowIndex) => row.map((value) => ({
+    value: protectSpreadsheetValue(String(value ?? "")),
+    type: String,
+    height: 36,
+    alignVertical: "top" as const,
+    wrap: true,
+    backgroundColor: rowIndex % 2 === 1 ? "#F2F6FC" : undefined,
+    bottomBorderColor: "#D8E2F0",
+    bottomBorderStyle: "thin" as const,
+  })));
+  const sheetData: SheetData = [headerRow, ...answerRows];
+
+  await writeXlsxFile(sheetData, {
+    sheet: "Survey answers",
+    columns: EXPORT_COLUMN_WIDTHS.map((width) => ({ width })),
+    stickyRowsCount: 1,
+    showGridLines: false,
+    zoomScale: 0.9,
+  }, {
+    fontFamily: "Aptos",
+    fontSize: 11,
+  }).toFile(exportFileName(periodLabel));
 }
 
 function compareReviews(
@@ -176,6 +205,7 @@ export function AppointmentReviewList({
   const [commentFilter, setCommentFilter] = useState<CommentFilter>("all");
   const [sortOption, setSortOption] = useState<SortOption>("submitted-desc");
   const [page, setPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
 
   const filtered = useMemo(() => {
     const included = commentFilter === "with-comments"
@@ -207,13 +237,20 @@ export function AppointmentReviewList({
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            disabled={filtered.length === 0}
-            onClick={() => downloadSurveyAnswers(filtered, periodLabel)}
+            disabled={filtered.length === 0 || exporting}
+            onClick={() => {
+              setExporting(true);
+              void downloadSurveyAnswers(filtered, periodLabel).finally(() => setExporting(false));
+            }}
             className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition hover:bg-surface-muted/80 disabled:cursor-not-allowed disabled:opacity-40"
-            title="Download all matching survey answers as a CSV spreadsheet"
+            title="Download all matching survey answers as an Excel workbook"
           >
-            <Download className="h-4 w-4" aria-hidden />
-            Export CSV
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            ) : (
+              <Download className="h-4 w-4" aria-hidden />
+            )}
+            {exporting ? "Preparing Excel" : "Export Excel"}
           </button>
           <label className="flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm text-muted-foreground">
             <ArrowUpDown className="h-4 w-4 shrink-0" aria-hidden />

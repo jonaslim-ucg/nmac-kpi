@@ -10,6 +10,7 @@ import {
   formatRatingOrDash,
   formatReviewWhen,
   formatYesNoOrDash,
+  getAppointmentReviewWrittenResponses,
 } from "@/lib/appointment-review/display";
 
 type Props = {
@@ -56,6 +57,7 @@ export function AppointmentReviewDetailModal({
   hasPrev,
   hasNext,
 }: Props) {
+  const writtenResponses = getAppointmentReviewWrittenResponses(review);
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -198,16 +200,14 @@ export function AppointmentReviewDetailModal({
               className="flex items-center gap-2 text-sm font-semibold text-foreground"
             >
               <MessageSquareText className="h-4 w-4 text-accent" aria-hidden />
-              Optional written responses
+              Customer written answers
             </div>
             <div className="mt-4 space-y-4">
-              <CommentBlock label="7. Testimonial" text={review.testimonialText} />
-              <CommentBlock
-                label={review.referralSourcesLabel ? "13. Exceptional staff" : "12. Exceptional staff"}
-                text={review.exceptionalStaffComment}
-              />
-              {!review.hasComments ? (
-                <p className="text-sm text-muted-foreground">No optional written responses.</p>
+              {writtenResponses.map((answer) => (
+                <CommentBlock key={answer.id} label={answer.label} text={answer.text} />
+              ))}
+              {writtenResponses.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No written answers were provided.</p>
               ) : null}
             </div>
           </section>

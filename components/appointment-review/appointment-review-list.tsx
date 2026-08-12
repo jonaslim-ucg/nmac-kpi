@@ -1,12 +1,22 @@
 "use client";
 
-import { ArrowUpDown, ChevronLeft, ChevronRight, Loader2, MessageSquareText } from "lucide-react";
+import {
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Loader2,
+  MessageSquareText,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
 import {
   formatAppointmentDate,
+  formatAppointmentTime,
   formatRating,
   formatReviewWhen,
+  formatYesNoOrDash,
+  getAppointmentReviewWrittenResponses,
 } from "@/lib/appointment-review/display";
 
 type Props = {
@@ -37,6 +47,95 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "submitted-desc", label: "Submitted: newest" },
   { value: "submitted-asc", label: "Submitted: oldest" },
 ];
+
+const EXPORT_HEADERS = [
+  "Response type",
+  "Submitted",
+  "Appointment date",
+  "Appointment time",
+  "Patient name",
+  "Email",
+  "Appointment provider(s)",
+  "Visit type(s)",
+  "1. Ease of scheduling",
+  "2. Overall visit",
+  "3. Provider(s) selected by customer",
+  "4. Provider rating(s)",
+  "5. Health improvement rating",
+  "Health improvement answer",
+  "6. Likelihood to recommend",
+  "Recommendation answer",
+  "7. Testimonial permission",
+  "Testimonial answer",
+  "8. Wait time",
+  "9. Provider spent enough time",
+  "Provider time answer",
+  "10. Front desk rating",
+  "11. Patient duration",
+  "12. Referral source(s)",
+  "Exceptional staff answer",
+] as const;
+
+function protectSpreadsheetValue(value: string): string {
+  const normalized = value.replace(/\r\n?/g, "\n");
+  return /^[=+\-@]/.test(normalized.trimStart()) ? `'${normalized}` : normalized;
+}
+
+function csvCell(value: string): string {
+  return `"${protectSpreadsheetValue(value).replace(/"/g, '""')}"`;
+}
+
+function exportFileName(periodLabel: string): string {
+  const period = periodLabel
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "") || "selected-period";
+  return `nmac-survey-answers-${period}.csv`;
+}
+
+function downloadSurveyAnswers(reviews: AppointmentReviewDetail[], periodLabel: string): void {
+  const rows = reviews.map((review) => [
+    review.isTest ? "Test" : "Live",
+    formatReviewWhen(review.createdAt),
+    formatAppointmentDate(review.appointmentDate),
+    formatAppointmentTime(review.appointmentAt),
+    review.patientName,
+    review.email,
+    review.appointmentProviderNames.join("; ") || "—",
+    review.appointmentVisitTypes.join("; ") || "—",
+    formatRating(review.appointmentEase),
+    formatRating(review.visitRating),
+    review.serviceTypeLabel,
+    review.providerRatings
+      .map(({ providerLabel, rating }) => `${providerLabel}: ${formatRating(rating)}`)
+      .join("; ") || formatRating(review.providerRating),
+    formatRating(review.healthRating),
+    review.healthImprovementComment,
+    formatRating(review.recommendationRating),
+    review.recommendationMessage,
+    review.testimonialPermissionLabel,
+    review.testimonialText,
+    review.waitTimeLabel,
+    formatYesNoOrDash(review.providerTimeAdequate),
+    review.providerTimeComment,
+    formatRating(review.frontDeskRating),
+    review.patientDurationLabel,
+    review.referralSourcesLabel ?? "—",
+    review.exceptionalStaffComment,
+  ]);
+  const csv = [EXPORT_HEADERS, ...rows]
+    .map((row) => row.map((value) => csvCell(String(value ?? ""))).join(","))
+    .join("\r\n");
+  const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = exportFileName(periodLabel);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
 
 function compareReviews(
   first: AppointmentReviewDetail,
@@ -106,6 +205,16 @@ export function AppointmentReviewList({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={filtered.length === 0}
+            onClick={() => downloadSurveyAnswers(filtered, periodLabel)}
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition hover:bg-surface-muted/80 disabled:cursor-not-allowed disabled:opacity-40"
+            title="Download all matching survey answers as a CSV spreadsheet"
+          >
+            <Download className="h-4 w-4" aria-hidden />
+            Export CSV
+          </button>
           <label className="flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm text-muted-foreground">
             <ArrowUpDown className="h-4 w-4 shrink-0" aria-hidden />
             <span className="text-xs font-medium">Sort by</span>
@@ -205,65 +314,87 @@ export function AppointmentReviewList({
                   <th className="px-3 py-3 font-semibold">Wait time</th>
                   <th className="px-3 py-3 font-semibold">Provider(s)</th>
                   <th className="px-3 py-3 font-semibold">Recommend</th>
-                  <th className="px-3 py-3 font-semibold">Comments</th>
+                  <th className="px-3 py-3 font-semibold">Customer answers</th>
                   <th className="px-5 py-3 font-semibold" />
                 </tr>
               </thead>
               <tbody>
-                {pageReviews.map((review) => (
-                  <tr
-                    key={review.id}
-                    className="cursor-pointer border-b border-border/70 transition hover:bg-surface-muted/30"
-                    onClick={() => onViewReview(review.id)}
-                  >
-                    <td className="px-5 py-3 text-foreground">{formatReviewWhen(review.createdAt)}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-foreground">
-                      {formatAppointmentDate(review.appointmentDate)}
-                    </td>
-                    <td className="max-w-[160px] px-3 py-3">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <p className="font-medium text-foreground">{review.patientName}</p>
-                        {review.isTest ? (
-                          <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-700 dark:text-amber-300">
-                            Test
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{review.email}</p>
-                    </td>
-                    <td className="px-3 py-3 font-mono text-foreground">{formatRating(review.appointmentEase)}</td>
-                    <td className="px-3 py-3 font-mono text-foreground">{formatRating(review.visitRating)}</td>
-                    <td className="px-3 py-3 text-muted-foreground">{review.waitTimeLabel}</td>
-                    <td className="max-w-[220px] px-3 py-3">
-                      <p className="line-clamp-2 text-foreground">{review.serviceTypeLabel || "—"}</p>
-                    </td>
-                    <td className="px-3 py-3 font-mono text-foreground">
-                      {formatRating(review.recommendationRating)}
-                    </td>
-                    <td className="max-w-[220px] px-3 py-3">
-                      {review.commentPreview ? (
-                        <div className="flex items-start gap-2">
-                          <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
-                          <p className="line-clamp-2 text-foreground">{review.commentPreview}</p>
+                {pageReviews.map((review) => {
+                  const writtenResponses = getAppointmentReviewWrittenResponses(review);
+                  return (
+                    <tr
+                      key={review.id}
+                      className="cursor-pointer border-b border-border/70 transition hover:bg-surface-muted/30"
+                      onClick={() => onViewReview(review.id)}
+                    >
+                      <td className="px-5 py-3 text-foreground">{formatReviewWhen(review.createdAt)}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-foreground">
+                        {formatAppointmentDate(review.appointmentDate)}
+                      </td>
+                      <td className="max-w-[160px] px-3 py-3">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <p className="font-medium text-foreground">{review.patientName}</p>
+                          {review.isTest ? (
+                            <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-700 dark:text-amber-300">
+                              Test
+                            </span>
+                          ) : null}
                         </div>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onViewReview(review.id);
-                        }}
-                        className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-surface-muted/80"
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">{review.email}</p>
+                      </td>
+                      <td className="px-3 py-3 font-mono text-foreground">
+                        {formatRating(review.appointmentEase)}
+                      </td>
+                      <td className="px-3 py-3 font-mono text-foreground">
+                        {formatRating(review.visitRating)}
+                      </td>
+                      <td className="px-3 py-3 text-muted-foreground">{review.waitTimeLabel}</td>
+                      <td className="max-w-[220px] px-3 py-3">
+                        <p className="line-clamp-2 text-foreground">{review.serviceTypeLabel || "—"}</p>
+                      </td>
+                      <td className="px-3 py-3 font-mono text-foreground">
+                        {formatRating(review.recommendationRating)}
+                      </td>
+                      <td className="max-w-[280px] px-3 py-3">
+                        {writtenResponses.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {writtenResponses.slice(0, 2).map((answer) => (
+                              <div key={answer.id} className="flex items-start gap-2">
+                                <MessageSquareText
+                                  className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent"
+                                  aria-hidden
+                                />
+                                <p className="line-clamp-1 text-xs text-foreground" title={answer.text}>
+                                  <span className="font-semibold">{answer.label}:</span> {answer.text}
+                                </p>
+                              </div>
+                            ))}
+                            {writtenResponses.length > 2 ? (
+                              <p className="pl-5 text-[11px] text-muted-foreground">
+                                +{writtenResponses.length - 2} more written answer
+                                {writtenResponses.length === 3 ? "" : "s"}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onViewReview(review.id);
+                          }}
+                          className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-surface-muted/80"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -52,6 +52,12 @@ export type AppointmentReviewDetail = {
   commentPreview: string | null;
 };
 
+export type AppointmentReviewWrittenResponse = {
+  id: string;
+  label: string;
+  text: string;
+};
+
 type AppointmentReviewVisitMetadata = {
   isTest?: boolean;
   appointmentDate?: string | null;
@@ -124,9 +130,27 @@ function resolveProviderRatings(
 }
 
 function reviewComments(row: AppointmentReviewRow): string[] {
-  return [row.testimonial_text, row.exceptional_staff_comment]
+  return [
+    row.health_improvement,
+    row.recommendation_message,
+    row.testimonial_text,
+    row.provider_time_comment,
+    row.exceptional_staff_comment,
+  ]
     .map(text)
     .filter(Boolean);
+}
+
+export function getAppointmentReviewWrittenResponses(
+  review: AppointmentReviewDetail,
+): AppointmentReviewWrittenResponse[] {
+  return [
+    { id: "health-improvement", label: "Health improvement", text: review.healthImprovementComment },
+    { id: "recommendation", label: "Recommendation", text: review.recommendationMessage },
+    { id: "testimonial", label: "Testimonial", text: review.testimonialText },
+    { id: "provider-time", label: "Provider time", text: review.providerTimeComment },
+    { id: "exceptional-staff", label: "Exceptional staff", text: review.exceptionalStaffComment },
+  ].filter((answer) => answer.text.length > 0);
 }
 
 export function toAppointmentReviewDetail(

@@ -617,7 +617,7 @@ export function KpiNmac2026Client({ view }: Props) {
                 <div className="nk26-card">
                   <div className="nk26-chd">
                     <div>
-                      <div className="nk26-ctitle">% Patients Completing Feedback</div>
+                      <div className="nk26-ctitle">Patients Completing Feedback</div>
                       <div className="nk26-csub">Target: ≥ 15%</div>
                     </div>
                     {badge("feedback")}

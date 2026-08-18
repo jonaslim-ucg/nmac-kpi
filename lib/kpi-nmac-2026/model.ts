@@ -66,7 +66,7 @@ export const KPIs: KpiRow[] = [
   { id: "fp", label: "Facial Plastics Bookings", unit: "", target: 20, gate: false, domain: "Specialty", higher: true },
   { id: "shop", label: "ShopNMAC Sales ($)", unit: "$", target: 3750, gate: false, domain: "Finance", higher: true },
   { id: "satisfaction", label: "Ave Patient Satisfaction Score", unit: "", target: 85, gate: false, domain: "Compliance", higher: true },
-  { id: "feedback", label: "% Patients Completing Feedback", unit: "%", target: 15, gate: false, domain: "Compliance", higher: true },
+  { id: "feedback", label: "Patients Completing Feedback", unit: "%", target: 15, gate: false, domain: "Compliance", higher: true },
   { id: "survey", label: "Patient Survey Score", unit: "", target: 4.7, gate: false, domain: "Compliance", higher: true },
   { id: "sop", label: "SOP Compliance", unit: "%", target: 100, gate: false, domain: "Compliance", higher: true },
   { id: "engage", label: "Staff Engagement", unit: "%", target: 80, gate: false, domain: "Compliance", higher: true },

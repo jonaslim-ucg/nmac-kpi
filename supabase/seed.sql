@@ -9,7 +9,7 @@ insert into public.kpi_definitions (slug, label, unit, suffix, target, sort_orde
   ('copay', '% Copay Collection Rate', 'percent', '%', 95, 5),
   ('utilization', '% Doctor Utilisation', 'percent', '%', 90, 6),
   ('satisfaction', 'Avg Patient Satisfaction', 'score', '', 85, 7),
-  ('feedback', '% Patients Completing Feedback', 'percent', '%', 15, 8),
+  ('feedback', 'Patients Completing Feedback', 'percent', '%', 15, 8),
   ('call-answer', '% Call Answer Rate', 'percent', '%', 90, 9),
   ('call-wait', 'Avg Call Wait Time', 'minutes', ' sec', 30, 10),
   ('checkin-checkout', 'Avg Check-in to Check-out', 'minutes', ' min', 30, 11)

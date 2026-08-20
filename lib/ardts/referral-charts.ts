@@ -1,4 +1,4 @@
-import type { ChartConfiguration } from "chart.js";
+import type { ChartConfiguration, TooltipItem } from "chart.js";
 import {
   barBase,
   emphasizeSelectedMonthBarColors,
@@ -8,11 +8,13 @@ import {
 import { MONTHS } from "@/lib/kpi-nmac-2026/model";
 import { REFERRAL_STATUS_CARDS } from "@/lib/ardts/referral-display";
 import type { ReferralMonthlyPoint } from "@/lib/ardts/referral-metrics";
+import { buildTrackedItemsChartData } from "@/lib/ardts/referral-workstreams";
 import type {
   ArdtsMonthlyOutcomePoint,
   ArdtsMonthlySentPoint,
   ArdtsStatusCard,
   ArdtsStatusCountsResponse,
+  ArdtsWorkstreamTrends,
 } from "@/lib/ardts/types";
 
 const STATUS_COLORS = [
@@ -48,6 +50,61 @@ export function referralSentMonthlyChart(
 
 function chartMonthIndex(month: number): number {
   return Math.max(0, Math.min(11, month - 1));
+}
+
+export function referralTrackedItemsByWorkstreamChart(
+  trends: ArdtsWorkstreamTrends,
+  highlightMonth?: number,
+): ChartConfiguration {
+  const theme = resolveNk26ChartTheme();
+  const chartData = buildTrackedItemsChartData(trends);
+  const config = barBase(
+    chartData.labels,
+    chartData.datasets.map((dataset) => ({
+      label: dataset.label,
+      data: dataset.data,
+      backgroundColor: dataset.color,
+      hoverBackgroundColor: dataset.color,
+      borderSkipped: false,
+      stack: "workstreams",
+    })),
+    undefined,
+    theme,
+    highlightMonth,
+  );
+
+  return {
+    ...config,
+    options: {
+      ...config.options,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        ...config.options?.plugins,
+        legend: { display: false },
+        tooltip: {
+          mode: "index",
+          intersect: false,
+          callbacks: {
+            footer(items: TooltipItem<"bar">[]) {
+              const dataIndex = items[0]?.dataIndex;
+              return dataIndex === undefined ? "" : `Total: ${chartData.totals[dataIndex] ?? 0}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          ...(config.options?.scales?.x as Record<string, unknown>),
+          stacked: true,
+        },
+        y: {
+          ...(config.options?.scales?.y as Record<string, unknown>),
+          beginAtZero: true,
+          stacked: true,
+        },
+      },
+    },
+  };
 }
 
 function expandedMonthTotals<T extends { month: number }>(months: T[], pick: (m: T) => number): number[] {

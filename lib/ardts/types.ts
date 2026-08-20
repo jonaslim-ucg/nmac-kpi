@@ -77,6 +77,72 @@ export type ArdtsMonthlyOutcomePoint = {
   needs_action: number;
 };
 
+export type ArdtsWorkstreamMetric = {
+  count: number | null;
+  percent: number | null;
+  applicable: boolean;
+};
+
+export type ArdtsWorkstreamComparisonColumn = {
+  key: string;
+  label: string;
+};
+
+export type ArdtsWorkstreamComparisonRow = {
+  key: string;
+  label: string;
+  is_total: boolean;
+  total: number;
+  metrics: Record<string, ArdtsWorkstreamMetric>;
+};
+
+export type ArdtsWorkstreamComparison = {
+  columns: ArdtsWorkstreamComparisonColumn[];
+  rows: ArdtsWorkstreamComparisonRow[];
+};
+
+export type ArdtsWorkstreamSeries = {
+  key: string;
+  label: string;
+};
+
+export type ArdtsTrackedItemsMonth = {
+  month: number;
+  month_label: string;
+  period_from: string;
+  period_to: string;
+  total: number;
+  workstreams: Record<string, number>;
+};
+
+export type ArdtsNeedsBookingRate = {
+  workstream: string;
+  label: string;
+  count: number;
+  total: number;
+  percent: number;
+};
+
+export type ArdtsWorkstreamTrends = {
+  series: ArdtsWorkstreamSeries[];
+  tracked_items_by_month: ArdtsTrackedItemsMonth[];
+  needs_booking_rate: ArdtsNeedsBookingRate[];
+};
+
+export type ArdtsYearToDateCard = ArdtsWorkstreamMetric & {
+  key: string;
+  label: string;
+  description?: string;
+};
+
+export type ArdtsYearToDate = {
+  year: number;
+  from: string;
+  to: string;
+  total: number;
+  cards: ArdtsYearToDateCard[];
+};
+
 export type ArdtsStatusCountsResponse = {
   metadata?: {
     as_of: string;
@@ -110,6 +176,9 @@ export type ArdtsStatusCountsResponse = {
     booked_vs_needs_action?: ArdtsMonthlyOutcomePoint[];
     status_breakdown_selected_period?: ArdtsStatusCard[];
   };
+  workstream_comparison?: ArdtsWorkstreamComparison;
+  workstream_trends?: ArdtsWorkstreamTrends;
+  year_to_date?: ArdtsYearToDate;
   range: {
     preset: ArdtsResolvedRangePreset;
     from: string;

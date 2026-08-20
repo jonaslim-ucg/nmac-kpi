@@ -1,30 +1,12 @@
 "use client";
 
-import { useAppTheme, type AppThemeName } from "@/components/app-theme-provider";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Chart, ChartConfiguration } from "chart.js";
-import {
-  referralOutcomeExpandedChart,
-  referralSentExpandedChart,
-  referralStatusBreakdownExpandedChart,
-} from "@/lib/ardts/referral-charts";
 import { orderReferralStatusCards } from "@/lib/ardts/referral-display";
 import type { ArdtsStatusCountsResponse } from "@/lib/ardts/types";
 import { MONTHS } from "@/lib/kpi-nmac-2026/model";
 import { MonthTabs } from "./nmac-master-entry-panel";
+import { ReferralWorkstreamSections } from "./referral-workstream-sections";
 import "./nk26.css";
-
-let chartJsModule: Promise<typeof import("chart.js/auto")> | null = null;
-function loadChartJs() {
-  chartJsModule ??= import("chart.js/auto");
-  return chartJsModule;
-}
-
-function readDocThemeClass(): AppThemeName {
-  if (typeof document === "undefined") return "dark";
-  if (document.documentElement.classList.contains("light")) return "light";
-  return "dark";
-}
 
 type Props = {
   selectedYear: number;
@@ -42,24 +24,12 @@ function buildMonthQuery(year: number, monthIndex: number): string {
   }).toString();
 }
 
-function formatPercent(value: number | null | undefined): string {
-  return typeof value === "number" && Number.isFinite(value) ? `${value}%` : "—";
-}
-
 export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }: Props) {
-  const { resolvedTheme } = useAppTheme();
-  const chartThemeKey = useMemo<AppThemeName>(() => {
-    if (resolvedTheme === "light" || resolvedTheme === "dark") return resolvedTheme;
-    return readDocThemeClass();
-  }, [resolvedTheme]);
-
   const [data, setData] = useState<ArdtsStatusCountsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
-
-  const chartsRef = useRef<Chart[]>([]);
-  const chartFxGen = useRef(0);
+  const requestControllerRef = useRef<AbortController | null>(null);
 
   const query = useMemo(
     () => buildMonthQuery(selectedYear, selectedMonth),
@@ -67,10 +37,16 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
   );
 
   const loadPeriod = useCallback(async () => {
+    requestControllerRef.current?.abort();
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/referrals/status-counts?${query}`, { cache: "no-store" });
+      const res = await fetch(`/api/referrals/status-counts?${query}`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
       const body = (await res.json()) as ArdtsStatusCountsResponse | { error?: string };
       if (!res.ok) {
         throw new Error(
@@ -82,10 +58,14 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
       setData(body as ArdtsStatusCountsResponse);
       setFetchedAt(new Date());
     } catch (e) {
+      if (controller.signal.aborted) return;
       setData(null);
       setError(e instanceof Error ? e.message : "Could not load referral counts.");
     } finally {
-      setLoading(false);
+      if (requestControllerRef.current === controller) {
+        requestControllerRef.current = null;
+        setLoading(false);
+      }
     }
   }, [query]);
 
@@ -95,6 +75,11 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
 
   useEffect(() => {
     void loadPeriod();
+    return () => {
+      const controller = requestControllerRef.current;
+      requestControllerRef.current = null;
+      controller?.abort();
+    };
   }, [loadPeriod]);
 
   const periodLabel = useMemo(() => {
@@ -107,49 +92,10 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
     return `Period: ${data.range.from} to ${data.range.to} (${tz})`;
   }, [data]);
 
-  useEffect(() => {
-    if (!data || loading) return;
-
-    const gen = ++chartFxGen.current;
-    const charts = data.charts;
-    const sentByMonth = charts?.referrals_sent_by_month ?? [];
-    const outcomesByMonth = charts?.booked_vs_needs_action ?? [];
-    const statusBreakdown = orderReferralStatusCards(
-      charts?.status_breakdown_selected_period ?? data.all_statuses_in_period?.cards ?? [],
-    );
-
-    void loadChartJs().then((mod) => {
-      if (gen !== chartFxGen.current) return;
-      const ChartCtor = mod.default;
-      chartsRef.current.forEach((c) => c.destroy());
-      chartsRef.current = [];
-
-      const mount = (id: string, config: ChartConfiguration) => {
-        const canvas = document.getElementById(id) as HTMLCanvasElement | null;
-        if (!canvas) return;
-        chartsRef.current.push(new ChartCtor(canvas, config));
-      };
-
-      mount("nk26-c-ref-sent", referralSentExpandedChart(sentByMonth, selectedMonth));
-      mount("nk26-c-ref-outcomes", referralOutcomeExpandedChart(outcomesByMonth, selectedMonth));
-      mount("nk26-c-ref-status", referralStatusBreakdownExpandedChart(statusBreakdown));
-    });
-
-    return () => {
-      chartFxGen.current += 1;
-      chartsRef.current.forEach((c) => c.destroy());
-      chartsRef.current = [];
-    };
-  }, [data, loading, selectedMonth, chartThemeKey]);
-
   const statusCards = useMemo(
     () => orderReferralStatusCards(data?.all_statuses_in_period?.cards ?? []),
     [data],
   );
-  const summary = data?.period_summary ?? null;
-  const pipelineStages = data?.pipeline_stages ?? [];
-  const selectedOutcome = data?.charts?.booked_vs_needs_action?.find((row) => row.month === selectedMonth + 1);
-  const hasCharts = Boolean(data?.charts);
 
   return (
     <div key="referrals-content" className="nk26-route-enter">
@@ -169,7 +115,7 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
       <div className="nk26-referral-meta">
         <p className="nk26-referral-note">
           All referral and diagnostic workstreams sent in {MONTHS[selectedMonth]} {selectedYear} by{" "}
-          <strong>date sent</strong>. Status cards, KPI rates, and pipeline stages are calculated by ARDTS.
+          <strong>date sent</strong>. Counts, rates, and comparisons are calculated by ARDTS.
         </p>
         {periodLabel ? <p className="nk26-referral-period">{periodLabel}</p> : null}
       </div>
@@ -181,7 +127,7 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
         </div>
       ) : null}
 
-      {!loading && !error && data && summary ? (
+      {!loading && !error && data ? (
         <>
           <div className="nk26-section-sub nk26-overview-more-intro">All statuses in period</div>
           <div className="nk26-stats nk26-referral-cards">
@@ -202,102 +148,12 @@ export function ReferralKpiPanel({ selectedYear, selectedMonth, onSelectMonth }:
             })}
           </div>
 
-          <div className="nk26-section-sub nk26-overview-more-intro">Period summary</div>
-          <div className="nk26-stats nk26-referral-kpi-row">
-            <div className="nk26-stat nk26-referral-total">
-              <div className="nk26-slab">Sent in period</div>
-              <div className="nk26-sval">{summary.sent_in_period}</div>
-              <div className="nk26-ssub">Total tracked referrals in selected month</div>
-            </div>
-            <div className="nk26-stat">
-              <div className="nk26-slab">Booking rate</div>
-              <div className="nk26-sval">{formatPercent(summary.booking_rate)}</div>
-              <div className="nk26-ssub">Booked-or-beyond ÷ sent in period</div>
-            </div>
-            <div className="nk26-stat">
-              <div className="nk26-slab">Booked-or-beyond</div>
-              <div className="nk26-sval">{selectedOutcome?.booked_or_beyond ?? "—"}</div>
-              <div className="nk26-ssub">Server-calculated booked pipeline count</div>
-            </div>
-            <div className="nk26-stat">
-              <div className="nk26-slab">Completion rate</div>
-              <div className="nk26-sval">{formatPercent(summary.completion_rate)}</div>
-              <div className="nk26-ssub">Completed + results FU attended</div>
-            </div>
-            <div className="nk26-stat">
-              <div className="nk26-slab">Finish rate</div>
-              <div className="nk26-sval">{formatPercent(summary.finish_rate)}</div>
-              <div className="nk26-ssub">Completed, results FU attended, or closed</div>
-            </div>
-            <div className="nk26-stat">
-              <div className="nk26-slab">Needs action</div>
-              <div className="nk26-sval">{summary.needs_action.count}</div>
-              <div className="nk26-ssub">{summary.needs_action.percent}% of period total</div>
-            </div>
-            <div className="nk26-stat">
-              <div className="nk26-slab">YTD sent</div>
-              <div className="nk26-sval">{summary.ytd_sent}</div>
-              <div className="nk26-ssub">January 1 through selected period end</div>
-            </div>
-            <div className="nk26-stat">
-              <div className="nk26-slab">YTD booked</div>
-              <div className="nk26-sval">{summary.ytd_booked}</div>
-              <div className="nk26-ssub">Booked-or-beyond year to date</div>
-            </div>
-          </div>
-
-          <div className="nk26-section-sub nk26-overview-more-intro">Pipeline stages in period</div>
-          <div className="nk26-referral-funnel">
-            {pipelineStages.map((stage) => {
-              return (
-                <div key={stage.key} className="nk26-stat">
-                  <div className="nk26-slab">{stage.label}</div>
-                  <div className="nk26-sval">{stage.count}</div>
-                  <div className="nk26-ssub">{stage.percent}% of period total</div>
-                </div>
-              );
-            })}
-          </div>
-
-          {hasCharts ? (
-            <div className="nk26-charts">
-              <div className="nk26-card">
-                <div className="nk26-chd">
-                  <div>
-                    <div className="nk26-ctitle">Referrals sent by month</div>
-                    <div className="nk26-csub">{selectedYear} — items sent per calendar month</div>
-                  </div>
-                </div>
-                <div className="nk26-canvas">
-                  <canvas id="nk26-c-ref-sent" />
-                </div>
-              </div>
-              <div className="nk26-card">
-                <div className="nk26-chd">
-                  <div>
-                    <div className="nk26-ctitle">Booked vs needs action</div>
-                    <div className="nk26-csub">Monthly booked-or-beyond vs items needing action</div>
-                  </div>
-                </div>
-                <div className="nk26-canvas">
-                  <canvas id="nk26-c-ref-outcomes" />
-                </div>
-              </div>
-              <div className="nk26-card nk26-card-full">
-                <div className="nk26-chd">
-                  <div>
-                    <div className="nk26-ctitle">Status breakdown — selected month</div>
-                    <div className="nk26-csub">
-                      {data?.range.from} to {data?.range.to}
-                    </div>
-                  </div>
-                </div>
-                <div className="nk26-canvas nk26-canvas-trend">
-                  <canvas id="nk26-c-ref-status" />
-                </div>
-              </div>
-            </div>
-          ) : null}
+          <ReferralWorkstreamSections
+            comparison={data.workstream_comparison}
+            trends={data.workstream_trends}
+            yearToDate={data.year_to_date}
+            selectedMonth={selectedMonth}
+          />
         </>
       ) : null}
     </div>

@@ -468,67 +468,305 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.nk26-referral-kpi-row {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.nk26-referral-cards .nk26-stat,
-.nk26-referral-kpi-row .nk26-stat,
-.nk26-referral-funnel .nk26-stat {
+.nk26-referral-cards .nk26-stat {
   min-height: 7.5rem;
   display: flex;
   flex-direction: column;
 }
 
-.nk26-referral-cards .nk26-ssub,
-.nk26-referral-kpi-row .nk26-ssub,
-.nk26-referral-funnel .nk26-ssub {
+.nk26-referral-cards .nk26-ssub {
   margin-top: auto;
 }
 
-.nk26-referral-kpi-row .nk26-sval,
-.nk26-referral-funnel .nk26-sval,
 .nk26-referral-cards .nk26-sval {
   font-size: 1.75rem;
   font-weight: 700;
   line-height: 1.1;
 }
 
-.nk26-referral-funnel {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  margin-bottom: 28px;
+.nk26-referral-section {
+  margin-bottom: 32px;
 }
 
-@media (max-width: 1100px) {
-  .nk26-referral-kpi-row {
+.nk26-referral-section > .nk26-section-sub {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nk26-referral-section-note {
+  margin: 0 0 16px;
+  color: var(--nk26-subtitle);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.nk26-workstream-table-card {
+  overflow: hidden;
+  border: 1px solid var(--nk26-border);
+  border-radius: 12px;
+  background: var(--nk26-surface);
+  box-shadow: var(--nk26-card-shadow);
+}
+
+.nk26-workstream-table-scroll {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.nk26-workstream-table {
+  width: 100%;
+  min-width: 1050px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.nk26-workstream-table th,
+.nk26-workstream-table td {
+  padding: 16px 12px;
+  border-bottom: 1px solid var(--nk26-border);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.nk26-workstream-table thead th {
+  color: var(--nk26-muted);
+  background: color-mix(in srgb, var(--nk26-surface2) 72%, var(--nk26-surface));
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.nk26-workstream-table th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 190px;
+  text-align: left;
+  background: var(--nk26-surface);
+}
+
+.nk26-workstream-table thead th:first-child {
+  z-index: 2;
+  background: color-mix(in srgb, var(--nk26-surface2) 72%, var(--nk26-surface));
+}
+
+.nk26-workstream-table tbody th,
+.nk26-workstream-table tbody td {
+  color: var(--nk26-text);
+  font-weight: 600;
+}
+
+.nk26-workstream-table tbody tr:last-child th,
+.nk26-workstream-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.nk26-workstream-total-row th,
+.nk26-workstream-total-row td {
+  background: color-mix(in srgb, var(--nk26-accent) 5%, var(--nk26-surface));
+  font-weight: 700;
+}
+
+.nk26-workstream-total-row th:first-child {
+  background: color-mix(in srgb, var(--nk26-accent) 5%, var(--nk26-surface));
+}
+
+.nk26-workstream-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.nk26-workstream-dot,
+.nk26-workstream-legend-swatch {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--nk26-workstream-color);
+}
+
+.nk26-referral-trends-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.95fr);
+  gap: 16px;
+}
+
+.nk26-referral-trend-card {
+  min-width: 0;
+  margin: 0;
+}
+
+.nk26-referral-chart-head {
+  flex-wrap: wrap;
+}
+
+.nk26-workstream-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 14px;
+  color: var(--nk26-muted);
+  font-size: 10px;
+}
+
+.nk26-workstream-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.nk26-workstream-legend-swatch {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+}
+
+.nk26-referral-chart-scroll {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.nk26-referral-chart-surface {
+  min-width: 0;
+}
+
+.nk26-referral-workstream-canvas {
+  height: 220px;
+}
+
+.nk26-referral-hover-note {
+  margin: 10px 0 0;
+  color: var(--nk26-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.nk26-booking-rates {
+  display: grid;
+  gap: 24px;
+  padding: 12px 0 20px;
+}
+
+.nk26-booking-rate-row {
+  display: grid;
+  grid-template-columns: minmax(125px, 0.95fr) minmax(140px, 1.6fr) 44px;
+  align-items: center;
+  gap: 12px;
+}
+
+.nk26-booking-rate-label {
+  color: var(--nk26-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.nk26-booking-rate-track {
+  display: block;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--nk26-border) 82%, transparent);
+}
+
+.nk26-booking-rate-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--nk26-workstream-color);
+  transition: width 0.28s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.nk26-booking-rate-value {
+  color: var(--nk26-yellow);
+  font-family: var(--font-dm-mono, ui-monospace, monospace);
+  font-size: 12px;
+  text-align: right;
+}
+
+.nk26-booking-rate-note {
+  margin: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--nk26-border);
+  color: var(--nk26-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.nk26-referral-ytd {
+  margin-bottom: 0;
+}
+
+.nk26-referral-ytd-cards {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 0;
+}
+
+.nk26-referral-ytd-card {
+  min-height: 7.25rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.nk26-referral-ytd-card::before {
+  background: #8b5cf6;
+}
+
+.nk26-referral-ytd-card .nk26-sval {
+  color: color-mix(in srgb, #8b5cf6 25%, var(--nk26-text));
+}
+
+.nk26-referral-ytd-card .nk26-ssub {
+  margin-top: auto;
+}
+
+@container nk26-dashboard (max-width: 960px) {
+  .nk26-referral-trends-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nk26-referral-ytd-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 720px) {
+@container nk26-dashboard (max-width: 720px) {
   .nk26-referral-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .nk26-referral-kpi-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .nk26-referral-chart-surface {
+    min-width: 620px;
   }
 
-  .nk26-referral-kpi-row > .nk26-stat {
-    grid-column: auto;
-  }
-
-  .nk26-referral-funnel {
-    grid-template-columns: 1fr;
+  .nk26-booking-rate-row {
+    grid-template-columns: minmax(110px, 0.85fr) minmax(120px, 1.5fr) 40px;
   }
 }
 
-@media (max-width: 480px) {
+@container nk26-dashboard (max-width: 480px) {
   .nk26-referral-cards,
-  .nk26-referral-kpi-row {
+  .nk26-referral-ytd-cards {
     grid-template-columns: 1fr;
+  }
+
+  .nk26-booking-rate-row {
+    grid-template-columns: 1fr 44px;
+    gap: 7px 10px;
+  }
+
+  .nk26-booking-rate-track {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .nk26-booking-rate-value {
+    grid-column: 2;
+    grid-row: 1 / span 2;
   }
 }
 

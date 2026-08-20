@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { buildAppointmentReviewStats } from "@/lib/appointment-review/analytics";
 import { authorizeAppointmentReviewReportRequest } from "@/lib/appointment-review/authorize";
 import { toAppointmentReviewDetail } from "@/lib/appointment-review/display";
-import { APPOINTMENT_REVIEWS_SETUP_SQL, listAppointmentReviews } from "@/lib/appointment-review/store";
+import { parseAppointmentReviewManagementInput } from "@/lib/appointment-review/management";
+import {
+  APPOINTMENT_REVIEWS_SETUP_SQL,
+  listAppointmentReviews,
+  updateAppointmentReviewManagement,
+} from "@/lib/appointment-review/store";
 import {
   buildResponseOnlyAppointmentReport,
   buildProviderAppointmentReport,
@@ -218,6 +223,7 @@ export async function GET(req: Request) {
       appointmentAt: metadata?.appointmentAt ?? null,
       providerNames: metadata?.providerNames ?? [],
       visitTypes: metadata?.visitTypes ?? [],
+      includeFeedbackManagement: Boolean(session),
     });
   });
   const responseAtBySurveyToken = new Map(
@@ -348,6 +354,58 @@ export async function GET(req: Request) {
       reviews,
       ready: true,
     },
+    { headers: { "Cache-Control": "private, no-store, max-age=0" } },
+  );
+}
+
+export async function PATCH(req: Request) {
+  const session = await getSessionFromCookies();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const settings = await getAppDashboardSettings();
+  if (!isNmacNavViewAllowed(session.role, SURVEY_RESULTS_NAV_VIEW_ID, settings?.roleNmacNav ?? {})) {
+    return unauthorized();
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const record = body as Record<string, unknown>;
+  const id = typeof record.id === "string"
+    ? record.id.trim()
+    : "";
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    return NextResponse.json({ error: "Invalid review id." }, { status: 400 });
+  }
+
+  const parsed = parseAppointmentReviewManagementInput(body);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
+  }
+
+  const result = await updateAppointmentReviewManagement(id, parsed.input, session.email);
+  if (!result.ok) {
+    return NextResponse.json(
+      {
+        error: result.error,
+        setupRequired: result.setupRequired ?? false,
+        setupSql: result.setupRequired ? APPOINTMENT_REVIEWS_SETUP_SQL : undefined,
+      },
+      { status: result.notFound ? 404 : result.setupRequired ? 503 : 500 },
+    );
+  }
+
+  return NextResponse.json(
+    { management: result.management },
     { headers: { "Cache-Control": "private, no-store, max-age=0" } },
   );
 }

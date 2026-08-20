@@ -592,6 +592,13 @@ export default function AdminAppointmentReviewsPage() {
         <AppointmentReviewDetailModal
           review={selectedReview}
           onClose={() => setSelectedId(null)}
+          onManagementSaved={(management) => {
+            setReviews((current) => current.map((review) => (
+              review.id === selectedReview.id
+                ? { ...review, feedbackManagement: management }
+                : review
+            )));
+          }}
           hasPrev={selectedIndex > 0}
           hasNext={selectedIndex < reviews.length - 1}
           onPrev={() => {

@@ -11,6 +11,7 @@ import {
 import { useMemo, useState } from "react";
 import type { SheetData } from "write-excel-file/browser";
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
+import { appointmentReviewActionStatusLabel } from "@/lib/appointment-review/management";
 import {
   formatAppointmentDate,
   formatAppointmentTime,
@@ -58,6 +59,9 @@ const EXPORT_HEADERS = [
   "Email",
   "Appointment provider(s)",
   "Visit type(s)",
+  "Action status",
+  "Responsible person",
+  "Internal notes/comments",
   "1. Ease of scheduling",
   "2. Overall visit",
   "3. Provider(s) selected by customer",
@@ -78,8 +82,8 @@ const EXPORT_HEADERS = [
 ] as const;
 
 const EXPORT_COLUMN_WIDTHS = [
-  14, 22, 18, 18, 24, 30, 32, 30, 20, 18, 34, 34, 24, 42, 24, 42, 26, 42, 18, 28, 42,
-  22, 22, 30, 42,
+  14, 22, 18, 18, 24, 30, 32, 30, 18, 24, 42, 20, 18, 34, 34, 24, 42, 24, 42, 26,
+  42, 18, 28, 42, 22, 22, 30, 42,
 ] as const;
 
 function protectSpreadsheetValue(value: string): string {
@@ -108,6 +112,11 @@ async function downloadSurveyAnswers(
     review.email,
     review.appointmentProviderNames.join("; ") || "—",
     review.appointmentVisitTypes.join("; ") || "—",
+    review.feedbackManagement
+      ? appointmentReviewActionStatusLabel(review.feedbackManagement.status)
+      : "Needs review",
+    review.feedbackManagement?.responsiblePerson || "—",
+    review.feedbackManagement?.notes || "—",
     formatRating(review.appointmentEase),
     formatRating(review.visitRating),
     review.serviceTypeLabel,
@@ -340,14 +349,16 @@ export function AppointmentReviewList({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
+            <table className="w-full min-w-[1180px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border bg-surface-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   <th className="px-5 py-3 font-semibold">Submitted</th>
                   <th className="px-3 py-3 font-semibold">Appointment</th>
+                  <th className="px-3 py-3 font-semibold">Visit type</th>
                   <th className="px-3 py-3 font-semibold">Patient</th>
+                  <th className="px-3 py-3 font-semibold">Handling</th>
                   <th className="px-3 py-3 font-semibold">Scheduling</th>
-                  <th className="px-3 py-3 font-semibold">Visit</th>
+                  <th className="px-3 py-3 font-semibold">Visit rating</th>
                   <th className="px-3 py-3 font-semibold">Wait time</th>
                   <th className="px-3 py-3 font-semibold">Provider(s)</th>
                   <th className="px-3 py-3 font-semibold">Recommend</th>
@@ -358,6 +369,8 @@ export function AppointmentReviewList({
               <tbody>
                 {pageReviews.map((review) => {
                   const writtenResponses = getAppointmentReviewWrittenResponses(review);
+                  const management = review.feedbackManagement;
+                  const managementStatus = management?.status ?? "needs_review";
                   return (
                     <tr
                       key={review.id}
@@ -367,6 +380,11 @@ export function AppointmentReviewList({
                       <td className="px-5 py-3 text-foreground">{formatReviewWhen(review.createdAt)}</td>
                       <td className="whitespace-nowrap px-3 py-3 text-foreground">
                         {formatAppointmentDate(review.appointmentDate)}
+                      </td>
+                      <td className="max-w-[180px] px-3 py-3 text-foreground">
+                        <p className="line-clamp-2">
+                          {review.appointmentVisitTypes.join(", ") || "—"}
+                        </p>
                       </td>
                       <td className="max-w-[160px] px-3 py-3">
                         <div className="flex flex-wrap items-center gap-1.5">
@@ -378,6 +396,25 @@ export function AppointmentReviewList({
                           ) : null}
                         </div>
                         <p className="mt-0.5 truncate text-xs text-muted-foreground">{review.email}</p>
+                      </td>
+                      <td className="max-w-[180px] px-3 py-3">
+                        <span
+                          className={
+                            "inline-flex rounded-full px-2 py-1 text-[11px] font-semibold " +
+                            (managementStatus === "actioned"
+                              ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300"
+                              : managementStatus === "in_progress"
+                                ? "bg-amber-500/12 text-amber-700 dark:text-amber-300"
+                                : managementStatus === "no_action_needed"
+                                  ? "bg-muted text-muted-foreground"
+                                  : "bg-accent/10 text-accent")
+                          }
+                        >
+                          {appointmentReviewActionStatusLabel(managementStatus)}
+                        </span>
+                        <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                          {management?.responsiblePerson || "Unassigned"}
+                        </p>
                       </td>
                       <td className="px-3 py-3 font-mono text-foreground">
                         {formatRating(review.appointmentEase)}

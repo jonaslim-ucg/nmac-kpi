@@ -1,5 +1,9 @@
 import type { AppointmentReviewRow } from "@/lib/appointment-review/analytics";
 import {
+  normalizeAppointmentReviewActionStatus,
+  type AppointmentReviewManagement,
+} from "@/lib/appointment-review/management";
+import {
   APPOINTMENT_REVIEW_MAX_SCORE,
   PATIENT_DURATION_OPTIONS,
   REFERRAL_SOURCE_OPTIONS,
@@ -50,6 +54,7 @@ export type AppointmentReviewDetail = {
   exceptionalStaffComment: string;
   hasComments: boolean;
   commentPreview: string | null;
+  feedbackManagement?: AppointmentReviewManagement;
 };
 
 export type AppointmentReviewWrittenResponse = {
@@ -64,6 +69,7 @@ type AppointmentReviewVisitMetadata = {
   appointmentAt?: string | null;
   providerNames?: string[];
   visitTypes?: string[];
+  includeFeedbackManagement?: boolean;
 };
 
 function optionLabel(
@@ -195,6 +201,17 @@ export function toAppointmentReviewDetail(
     exceptionalStaffComment: text(row.exceptional_staff_comment),
     hasComments: comments.length > 0,
     commentPreview: comments[0] ?? null,
+    ...(metadata.includeFeedbackManagement
+      ? {
+          feedbackManagement: {
+            responsiblePerson: text(row.feedback_responsible_person),
+            status: normalizeAppointmentReviewActionStatus(row.feedback_status),
+            notes: text(row.feedback_notes),
+            updatedAt: text(row.feedback_updated_at) || null,
+            updatedBy: text(row.feedback_updated_by) || null,
+          },
+        }
+      : {}),
   };
 }
 

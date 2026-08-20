@@ -1,8 +1,23 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, MessageSquareText, X } from "lucide-react";
-import { useCallback, useEffect } from "react";
+import {
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  MessageSquareText,
+  Save,
+  ShieldCheck,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
+import {
+  APPOINTMENT_REVIEW_ACTION_STATUS_OPTIONS,
+  EMPTY_APPOINTMENT_REVIEW_MANAGEMENT,
+  type AppointmentReviewActionStatus,
+  type AppointmentReviewManagement,
+} from "@/lib/appointment-review/management";
 import {
   formatAppointmentDate,
   formatAppointmentTime,
@@ -20,6 +35,7 @@ type Props = {
   onNext?: () => void;
   hasPrev?: boolean;
   hasNext?: boolean;
+  onManagementSaved: (management: AppointmentReviewManagement) => void;
 };
 
 function Answer({
@@ -56,11 +72,36 @@ export function AppointmentReviewDetailModal({
   onNext,
   hasPrev,
   hasNext,
+  onManagementSaved,
 }: Props) {
   const writtenResponses = getAppointmentReviewWrittenResponses(review);
+  const management = review.feedbackManagement ?? EMPTY_APPOINTMENT_REVIEW_MANAGEMENT;
+  const [responsiblePerson, setResponsiblePerson] = useState(management.responsiblePerson);
+  const [status, setStatus] = useState<AppointmentReviewActionStatus>(management.status);
+  const [notes, setNotes] = useState(management.notes);
+  const [savingManagement, setSavingManagement] = useState(false);
+  const [managementError, setManagementError] = useState<string | null>(null);
+  const [managementSaved, setManagementSaved] = useState(false);
+  const managementDirty = responsiblePerson.trim() !== management.responsiblePerson
+    || status !== management.status
+    || notes.trim() !== management.notes;
+
+  useEffect(() => {
+    setResponsiblePerson(management.responsiblePerson);
+    setStatus(management.status);
+    setNotes(management.notes);
+    setManagementError(null);
+    setManagementSaved(false);
+  }, [management.notes, management.responsiblePerson, management.status, review.id]);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
+      const target = e.target;
+      const editing = target instanceof HTMLInputElement
+        || target instanceof HTMLTextAreaElement
+        || target instanceof HTMLSelectElement;
+      if (editing) return;
       if (e.key === "ArrowLeft" && hasPrev && onPrev) onPrev();
       if (e.key === "ArrowRight" && hasNext && onNext) onNext();
     },
@@ -71,6 +112,42 @@ export function AppointmentReviewDetailModal({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
+
+  async function saveManagement() {
+    if (savingManagement || !managementDirty) return;
+    setSavingManagement(true);
+    setManagementError(null);
+    setManagementSaved(false);
+    try {
+      const response = await fetch("/api/admin/appointment-reviews", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: review.id,
+          responsiblePerson,
+          status,
+          notes,
+        }),
+      });
+      const data = (await response.json()) as {
+        management?: AppointmentReviewManagement;
+        error?: string;
+      };
+      if (!response.ok || !data.management) {
+        throw new Error(data.error ?? "Could not save feedback management.");
+      }
+      onManagementSaved(data.management);
+      setResponsiblePerson(data.management.responsiblePerson);
+      setStatus(data.management.status);
+      setNotes(data.management.notes);
+      setManagementSaved(true);
+    } catch (error) {
+      setManagementError(error instanceof Error ? error.message : "Could not save feedback management.");
+    } finally {
+      setSavingManagement(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
@@ -128,6 +205,108 @@ export function AppointmentReviewDetailModal({
                   ? review.appointmentVisitTypes.join(", ")
                   : "—"}
               />
+            </div>
+          </section>
+
+          <section
+            className="mt-6 rounded-xl border border-accent/25 bg-accent/5 p-4"
+            aria-labelledby="review-management-heading"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-accent" aria-hidden />
+                  <h3 id="review-management-heading" className="text-sm font-semibold text-foreground">
+                    Feedback management
+                  </h3>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Internal handling details · visible to signed-in staff only
+                </p>
+              </div>
+              {managementSaved ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="h-4 w-4" aria-hidden />
+                  Saved
+                </span>
+              ) : null}
+            </div>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label className="min-w-0 text-xs font-medium text-muted-foreground">
+                Responsible person
+                <input
+                  type="text"
+                  value={responsiblePerson}
+                  maxLength={120}
+                  onChange={(event) => {
+                    setResponsiblePerson(event.target.value);
+                    setManagementSaved(false);
+                  }}
+                  placeholder="Staff member or team"
+                  className="mt-1.5 h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-accent focus:ring-2 focus:ring-accent/20"
+                />
+              </label>
+              <label className="min-w-0 text-xs font-medium text-muted-foreground">
+                Status
+                <select
+                  value={status}
+                  onChange={(event) => {
+                    setStatus(event.target.value as AppointmentReviewActionStatus);
+                    setManagementSaved(false);
+                  }}
+                  className="mt-1.5 h-10 w-full rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                >
+                  {APPOINTMENT_REVIEW_ACTION_STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="min-w-0 text-xs font-medium text-muted-foreground sm:col-span-2">
+                Internal notes/comments
+                <textarea
+                  value={notes}
+                  maxLength={5_000}
+                  rows={4}
+                  onChange={(event) => {
+                    setNotes(event.target.value);
+                    setManagementSaved(false);
+                  }}
+                  placeholder="Record the response, follow-up, or action taken…"
+                  className="mt-1.5 w-full resize-y rounded-lg border border-border bg-card px-3 py-2.5 text-sm leading-relaxed text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-accent focus:ring-2 focus:ring-accent/20"
+                />
+              </label>
+            </div>
+
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 text-xs text-muted-foreground">
+                {management.updatedAt ? (
+                  <span>
+                    Last updated {formatReviewWhen(management.updatedAt)}
+                    {management.updatedBy ? ` by ${management.updatedBy}` : ""}
+                  </span>
+                ) : (
+                  <span>No handling activity recorded yet.</span>
+                )}
+                {managementError ? (
+                  <p className="mt-1 font-medium text-red-600 dark:text-red-400" role="alert">
+                    {managementError}
+                  </p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                disabled={savingManagement || !managementDirty}
+                onClick={() => void saveManagement()}
+                className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {savingManagement ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                ) : (
+                  <Save className="h-4 w-4" aria-hidden />
+                )}
+                {savingManagement ? "Saving" : "Save handling"}
+              </button>
             </div>
           </section>
 

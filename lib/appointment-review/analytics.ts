@@ -44,6 +44,11 @@ export type AppointmentReviewRow = {
   referral_other: string;
   exceptional_staff_comment: string;
   survey_token: string | null;
+  feedback_responsible_person?: string | null;
+  feedback_status?: string | null;
+  feedback_notes?: string | null;
+  feedback_updated_at?: string | null;
+  feedback_updated_by?: string | null;
 };
 
 export type LabelCount = { label: string; count: number; pct: number };

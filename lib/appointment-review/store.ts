@@ -5,6 +5,10 @@ import {
   type AppointmentReviewPayload,
 } from "@/lib/appointment-review/types";
 import type { AppointmentReviewRow } from "@/lib/appointment-review/analytics";
+import type {
+  AppointmentReviewManagement,
+  AppointmentReviewManagementInput,
+} from "@/lib/appointment-review/management";
 
 export const APPOINTMENT_REVIEWS_SETUP_SQL = `-- Run in Supabase SQL Editor
 create table if not exists public.appointment_reviews (
@@ -38,8 +42,20 @@ create table if not exists public.appointment_reviews (
   referral_sources text[] not null default '{}',
   referral_other text not null default '',
   exceptional_staff_comment text not null default '',
-  survey_token uuid unique
+  survey_token uuid unique,
+  feedback_responsible_person text not null default '',
+  feedback_status text not null default 'needs_review' check (feedback_status in ('needs_review', 'in_progress', 'actioned', 'no_action_needed')),
+  feedback_notes text not null default '',
+  feedback_updated_at timestamptz,
+  feedback_updated_by text
 );
+
+alter table public.appointment_reviews
+  add column if not exists feedback_responsible_person text not null default '',
+  add column if not exists feedback_status text not null default 'needs_review',
+  add column if not exists feedback_notes text not null default '',
+  add column if not exists feedback_updated_at timestamptz,
+  add column if not exists feedback_updated_by text;
 
 alter table public.appointment_reviews enable row level security;
 `;
@@ -173,5 +189,76 @@ export async function listAppointmentReviews(options: ListAppointmentReviewsOpti
     return { ok: true, rows };
   } catch {
     return { ok: false, error: "Could not load reviews." };
+  }
+}
+
+type UpdateManagementResult =
+  | { ok: true; management: AppointmentReviewManagement }
+  | { ok: false; error: string; setupRequired?: boolean; notFound?: boolean };
+
+type FeedbackManagementRow = {
+  feedback_responsible_person: string | null;
+  feedback_status: AppointmentReviewManagement["status"] | null;
+  feedback_notes: string | null;
+  feedback_updated_at: string | null;
+  feedback_updated_by: string | null;
+};
+
+export async function updateAppointmentReviewManagement(
+  id: string,
+  input: AppointmentReviewManagementInput,
+  updatedBy: string,
+): Promise<UpdateManagementResult> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return { ok: false, error: "Review storage is not available." };
+  }
+
+  try {
+    const supabase = createServiceRoleClient();
+    const updatedAt = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("appointment_reviews")
+      .update({
+        feedback_responsible_person: input.responsiblePerson,
+        feedback_status: input.status,
+        feedback_notes: input.notes,
+        feedback_updated_at: updatedAt,
+        feedback_updated_by: updatedBy,
+      })
+      .eq("id", id)
+      .select("feedback_responsible_person,feedback_status,feedback_notes,feedback_updated_at,feedback_updated_by")
+      .maybeSingle();
+
+    if (error) {
+      if (
+        /feedback_responsible_person|feedback_status|feedback_notes|feedback_updated_at|feedback_updated_by/i.test(
+          error.message,
+        ) && /does not exist|schema cache|could not find/i.test(error.message)
+      ) {
+        return {
+          ok: false,
+          error: "Feedback management is not configured.",
+          setupRequired: true,
+        };
+      }
+      return { ok: false, error: "Could not save feedback management." };
+    }
+    if (!data) {
+      return { ok: false, error: "Review not found.", notFound: true };
+    }
+
+    const row = data as FeedbackManagementRow;
+    return {
+      ok: true,
+      management: {
+        responsiblePerson: row.feedback_responsible_person?.trim() ?? "",
+        status: row.feedback_status ?? "needs_review",
+        notes: row.feedback_notes?.trim() ?? "",
+        updatedAt: row.feedback_updated_at,
+        updatedBy: row.feedback_updated_by?.trim() || null,
+      },
+    };
+  } catch {
+    return { ok: false, error: "Could not save feedback management." };
   }
 }

@@ -559,6 +559,7 @@ export default function AdminAppointmentReviewsPage() {
         <AppointmentReviewDashboard
           key={appliedPeriodLabel}
           stats={stats}
+          reviews={reviews}
           numberCheckouts={numberCheckouts}
           numberMultipleSameDayAppointments={numberMultipleSameDayAppointments}
           numberSent={numberSent}

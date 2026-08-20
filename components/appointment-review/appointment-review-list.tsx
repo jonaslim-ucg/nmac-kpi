@@ -67,6 +67,26 @@ function formatTableSubmittedAt(value: string): { date: string; time: string } {
   }
 }
 
+function formatAverageReviewRating(review: AppointmentReviewDetail): string {
+  const providerRating =
+    review.providerRating ??
+    (review.providerRatings.length > 0
+      ? review.providerRatings.reduce((sum, item) => sum + item.rating, 0) /
+        review.providerRatings.length
+      : null);
+  const ratings = [
+    review.appointmentEase,
+    review.visitRating,
+    providerRating,
+    review.healthRating,
+    review.recommendationRating,
+    review.frontDeskRating,
+  ].filter((value): value is number => value !== null);
+
+  if (ratings.length === 0) return "—";
+  return `${(ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length).toFixed(1)}/5`;
+}
+
 const EXPORT_HEADERS = [
   "Response type",
   "Submitted",
@@ -366,14 +386,16 @@ export function AppointmentReviewList({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] table-fixed text-left text-sm">
+            <table className="w-full min-w-[900px] table-fixed text-left text-sm">
               <colgroup>
-                <col className="w-[14%]" />
+                <col className="w-[12%]" />
+                <col className="w-[13%]" />
+                <col className="w-[16%]" />
                 <col className="w-[15%]" />
-                <col className="w-[20%]" />
-                <col className="w-[18%]" />
+                <col className="w-[12%]" />
                 <col className="w-[14%]" />
-                <col className="w-[19%]" />
+                <col className="w-[8%]" />
+                <col className="w-[10%]" />
               </colgroup>
               <thead>
                 <tr className="border-b border-border bg-surface-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -383,6 +405,8 @@ export function AppointmentReviewList({
                   <th className="px-4 py-3 font-semibold">Visit type</th>
                   <th className="px-4 py-3 font-semibold">Handler</th>
                   <th className="px-4 py-3 font-semibold">Provider</th>
+                  <th className="px-3 py-3 font-semibold">Average rating</th>
+                  <th className="px-3 py-3 font-semibold">Handling resolution</th>
                 </tr>
               </thead>
               <tbody>
@@ -391,6 +415,10 @@ export function AppointmentReviewList({
                   const submittedAt = formatTableSubmittedAt(review.createdAt);
                   const providerNames =
                     review.appointmentProviderNames.join(", ") || review.serviceTypeLabel || "—";
+                  const averageRating = formatAverageReviewRating(review);
+                  const resolution = appointmentReviewActionStatusLabel(
+                    management?.status ?? "needs_review",
+                  );
                   return (
                     <tr
                       key={review.id}
@@ -439,6 +467,25 @@ export function AppointmentReviewList({
                         <p className="line-clamp-2 leading-snug" title={providerNames}>
                           {providerNames}
                         </p>
+                      </td>
+                      <td className="px-3 py-3.5 text-foreground">
+                        <p className="font-mono font-semibold tabular-nums">{averageRating}</p>
+                      </td>
+                      <td className="px-3 py-3.5">
+                        <span
+                          className={
+                            "inline-flex whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-semibold leading-tight " +
+                            (management?.status === "actioned"
+                              ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300"
+                              : management?.status === "in_progress"
+                                ? "bg-amber-500/12 text-amber-700 dark:text-amber-300"
+                                : management?.status === "no_action_needed"
+                                  ? "bg-muted text-muted-foreground"
+                                  : "bg-accent/10 text-accent")
+                          }
+                        >
+                          {resolution}
+                        </span>
                       </td>
                     </tr>
                   );

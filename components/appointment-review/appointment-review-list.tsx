@@ -50,6 +50,25 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "submitted-asc", label: "Submitted: oldest" },
 ];
 
+function formatTableSubmittedAt(value: string): { date: string; time: string } {
+  try {
+    const date = new Date(value);
+    return {
+      date: new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }).format(date),
+      time: new Intl.DateTimeFormat(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(date),
+    };
+  } catch {
+    return { date: value, time: "" };
+  }
+}
+
 const EXPORT_HEADERS = [
   "Response type",
   "Submitted",
@@ -349,21 +368,27 @@ export function AppointmentReviewList({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1180px] text-left text-sm">
+            <table className="w-full min-w-[960px] table-fixed text-left text-sm">
+              <colgroup>
+                <col className="w-[11%]" />
+                <col className="w-[12%]" />
+                <col className="w-[14%]" />
+                <col className="w-[12%]" />
+                <col className="w-[17%]" />
+                <col className="w-[13%]" />
+                <col className="w-[16%]" />
+                <col className="w-[5%]" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-border bg-surface-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <th className="px-5 py-3 font-semibold">Submitted</th>
-                  <th className="px-3 py-3 font-semibold">Appointment</th>
+                  <th className="px-4 py-3 font-semibold">Timeline</th>
                   <th className="px-3 py-3 font-semibold">Visit type</th>
                   <th className="px-3 py-3 font-semibold">Patient</th>
                   <th className="px-3 py-3 font-semibold">Handling</th>
-                  <th className="px-3 py-3 font-semibold">Scheduling</th>
-                  <th className="px-3 py-3 font-semibold">Visit rating</th>
-                  <th className="px-3 py-3 font-semibold">Wait time</th>
+                  <th className="px-3 py-3 font-semibold">Experience</th>
                   <th className="px-3 py-3 font-semibold">Provider(s)</th>
-                  <th className="px-3 py-3 font-semibold">Recommend</th>
                   <th className="px-3 py-3 font-semibold">Customer answers</th>
-                  <th className="px-5 py-3 font-semibold" />
+                  <th className="sticky right-0 z-[1] border-l border-border bg-surface-muted px-2 py-3 font-semibold" />
                 </tr>
               </thead>
               <tbody>
@@ -371,36 +396,50 @@ export function AppointmentReviewList({
                   const writtenResponses = getAppointmentReviewWrittenResponses(review);
                   const management = review.feedbackManagement;
                   const managementStatus = management?.status ?? "needs_review";
+                  const submittedAt = formatTableSubmittedAt(review.createdAt);
                   return (
                     <tr
                       key={review.id}
-                      className="cursor-pointer border-b border-border/70 transition hover:bg-surface-muted/30"
+                      className="group cursor-pointer border-b border-border/70 align-top transition hover:bg-surface-muted/30"
                       onClick={() => onViewReview(review.id)}
                     >
-                      <td className="px-5 py-3 text-foreground">{formatReviewWhen(review.createdAt)}</td>
-                      <td className="whitespace-nowrap px-3 py-3 text-foreground">
-                        {formatAppointmentDate(review.appointmentDate)}
+                      <td className="px-4 py-3.5 text-foreground">
+                        <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Submitted
+                        </p>
+                        <p className="mt-0.5 text-xs font-medium leading-snug">{submittedAt.date}</p>
+                        <p className="text-[11px] text-muted-foreground">{submittedAt.time}</p>
+                        <p className="mt-2 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Appointment
+                        </p>
+                        <p className="mt-0.5 text-xs leading-snug">
+                          {formatAppointmentDate(review.appointmentDate)}
+                        </p>
                       </td>
-                      <td className="max-w-[180px] px-3 py-3 text-foreground">
-                        <p className="line-clamp-2">
+                      <td className="px-3 py-3.5 text-foreground">
+                        <p className="line-clamp-3 text-xs leading-snug" title={review.appointmentVisitTypes.join(", ")}>
                           {review.appointmentVisitTypes.join(", ") || "—"}
                         </p>
                       </td>
-                      <td className="max-w-[160px] px-3 py-3">
+                      <td className="px-3 py-3.5">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <p className="font-medium text-foreground">{review.patientName}</p>
+                          <p className="line-clamp-2 text-xs font-semibold leading-snug text-foreground">
+                            {review.patientName}
+                          </p>
                           {review.isTest ? (
                             <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-700 dark:text-amber-300">
                               Test
                             </span>
                           ) : null}
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">{review.email}</p>
+                        <p className="mt-1 truncate text-[11px] text-muted-foreground" title={review.email}>
+                          {review.email}
+                        </p>
                       </td>
-                      <td className="max-w-[180px] px-3 py-3">
+                      <td className="px-3 py-3.5">
                         <span
                           className={
-                            "inline-flex rounded-full px-2 py-1 text-[11px] font-semibold " +
+                            "inline-flex whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-semibold leading-none " +
                             (managementStatus === "actioned"
                               ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300"
                               : managementStatus === "in_progress"
@@ -416,37 +455,57 @@ export function AppointmentReviewList({
                           {management?.responsiblePerson || "Unassigned"}
                         </p>
                       </td>
-                      <td className="px-3 py-3 font-mono text-foreground">
-                        {formatRating(review.appointmentEase)}
+                      <td className="px-3 py-3.5">
+                        <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
+                          <div>
+                            <dt className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Schedule</dt>
+                            <dd className="mt-0.5 font-mono text-xs font-medium text-foreground">
+                              {formatRating(review.appointmentEase)}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Visit</dt>
+                            <dd className="mt-0.5 font-mono text-xs font-medium text-foreground">
+                              {formatRating(review.visitRating)}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Recommend</dt>
+                            <dd className="mt-0.5 font-mono text-xs font-medium text-foreground">
+                              {formatRating(review.recommendationRating)}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Wait</dt>
+                            <dd className="mt-0.5 text-xs font-medium text-foreground">{review.waitTimeLabel}</dd>
+                          </div>
+                        </dl>
                       </td>
-                      <td className="px-3 py-3 font-mono text-foreground">
-                        {formatRating(review.visitRating)}
+                      <td className="px-3 py-3.5">
+                        <p className="line-clamp-3 text-xs leading-relaxed text-foreground" title={review.serviceTypeLabel}>
+                          {review.serviceTypeLabel || "—"}
+                        </p>
                       </td>
-                      <td className="px-3 py-3 text-muted-foreground">{review.waitTimeLabel}</td>
-                      <td className="max-w-[220px] px-3 py-3">
-                        <p className="line-clamp-2 text-foreground">{review.serviceTypeLabel || "—"}</p>
-                      </td>
-                      <td className="px-3 py-3 font-mono text-foreground">
-                        {formatRating(review.recommendationRating)}
-                      </td>
-                      <td className="max-w-[280px] px-3 py-3">
+                      <td className="px-3 py-3.5">
                         {writtenResponses.length > 0 ? (
-                          <div className="space-y-1.5">
-                            {writtenResponses.slice(0, 2).map((answer) => (
-                              <div key={answer.id} className="flex items-start gap-2">
-                                <MessageSquareText
-                                  className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent"
-                                  aria-hidden
-                                />
-                                <p className="line-clamp-1 text-xs text-foreground" title={answer.text}>
-                                  <span className="font-semibold">{answer.label}:</span> {answer.text}
-                                </p>
-                              </div>
-                            ))}
-                            {writtenResponses.length > 2 ? (
-                              <p className="pl-5 text-[11px] text-muted-foreground">
-                                +{writtenResponses.length - 2} more written answer
-                                {writtenResponses.length === 3 ? "" : "s"}
+                          <div>
+                            <div className="flex items-start gap-2">
+                              <MessageSquareText
+                                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent"
+                                aria-hidden
+                              />
+                              <p
+                                className="line-clamp-3 text-xs leading-relaxed text-foreground"
+                                title={`${writtenResponses[0]!.label}: ${writtenResponses[0]!.text}`}
+                              >
+                                <span className="font-semibold">{writtenResponses[0]!.label}:</span>{" "}
+                                {writtenResponses[0]!.text}
+                              </p>
+                            </div>
+                            {writtenResponses.length > 1 ? (
+                              <p className="mt-1 pl-5 text-[10px] font-medium text-muted-foreground">
+                                +{writtenResponses.length - 1} more answer
+                                {writtenResponses.length === 2 ? "" : "s"}
                               </p>
                             ) : null}
                           </div>
@@ -454,16 +513,17 @@ export function AppointmentReviewList({
                           <span className="text-muted-foreground">—</span>
                         )}
                       </td>
-                      <td className="px-5 py-3 text-right">
+                      <td className="sticky right-0 border-l border-border/70 bg-card px-2 py-3.5 text-center transition group-hover:bg-surface-muted/30">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             onViewReview(review.id);
                           }}
-                          className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-surface-muted/80"
+                          className="inline-flex h-8 items-center justify-center rounded-lg border border-border bg-card px-2 text-[11px] font-semibold text-foreground shadow-sm transition hover:border-accent hover:text-accent"
+                          aria-label={`Open review for ${review.patientName}`}
                         >
-                          View
+                          Open
                         </button>
                       </td>
                     </tr>

@@ -16,6 +16,7 @@ import {
 import type { SurveyOutreachStage } from "@/lib/survey-outreach/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "@/components/auth/session-provider";
+import { SurveyMonthlyReportPanel } from "@/components/dev/survey-monthly-report-panel";
 import { canAccessDev } from "@/lib/auth/types";
 
 type ScheduleConfig = {
@@ -885,6 +886,8 @@ export function SurveyOutreachDevPanel() {
           </div>
         )}
       </section>
+
+      <SurveyMonthlyReportPanel />
 
       <section className="overflow-hidden rounded-xl border border-amber-400/50 bg-amber-50/80 shadow-sm ring-1 ring-amber-500/10 dark:border-amber-400/30 dark:bg-amber-400/10">
         <div className="border-b border-amber-400/30 px-4 py-3 sm:px-5">

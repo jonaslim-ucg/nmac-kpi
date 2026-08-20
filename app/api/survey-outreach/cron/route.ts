@@ -6,6 +6,7 @@ import {
 } from "@/lib/survey-outreach/config";
 import { isAuthorizedSurveyOutreachRequest } from "@/lib/survey-outreach/auth";
 import { runSurveyOutreachScheduler } from "@/lib/survey-outreach/run-scheduler";
+import { runSurveyMonthlyReportScheduler } from "@/lib/survey-outreach/monthly-report-runner";
 import { formatScheduleSummary } from "@/lib/survey-outreach/schedule";
 import {
   getSurveyOutreachSchedule,
@@ -26,9 +27,22 @@ async function handleCron(req: Request) {
 
   try {
     const result = await runSurveyOutreachScheduler();
+    const monthlyReport = await runSurveyMonthlyReportScheduler().catch((error) => ({
+      enabled: true,
+      due: true,
+      scheduledAt: new Date().toISOString(),
+      periodKey: "unknown",
+      periodLabel: "Unknown",
+      sent: 0,
+      skipped: 0,
+      errors: 1,
+      recipients: 0,
+      error: error instanceof Error ? error.message : "Monthly survey report failed.",
+    }));
     const schedule = await getSurveyOutreachSchedule();
     return NextResponse.json({
       ...result,
+      monthlyReport,
       schedule: formatScheduleSummary(schedule),
       message:
         result.configurationErrors[0] ??

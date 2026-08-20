@@ -85,21 +85,36 @@ export async function updateSurveyOutreachSchedule(
 ): Promise<SurveyOutreachScheduleConfig> {
   const schedule = normalizeSurveyOutreachSchedule(input);
   const supabase = createServiceRoleClient();
-  const { data, error } = await supabase
-    .from("app_settings")
-    .update({
-      survey_outreach_schedule: schedule,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", APP_SETTINGS_ID)
-    .select("survey_outreach_schedule")
-    .single();
-
-  if (error || !data?.survey_outreach_schedule) {
-    throw new Error(error?.message ?? "Could not save survey outreach schedule.");
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const { data: current, error: currentError } = await supabase
+      .from("app_settings")
+      .select("survey_outreach_schedule,updated_at")
+      .eq("id", APP_SETTINGS_ID)
+      .single();
+    if (currentError || !current) {
+      throw new Error(currentError?.message ?? "Could not load survey outreach schedule.");
+    }
+    const currentSchedule = current.survey_outreach_schedule &&
+      typeof current.survey_outreach_schedule === "object" &&
+      !Array.isArray(current.survey_outreach_schedule)
+      ? current.survey_outreach_schedule
+      : {};
+    const { data, error } = await supabase
+      .from("app_settings")
+      .update({
+        survey_outreach_schedule: { ...currentSchedule, ...schedule },
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", APP_SETTINGS_ID)
+      .eq("updated_at", current.updated_at)
+      .select("survey_outreach_schedule")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (data?.survey_outreach_schedule) {
+      return normalizeSurveyOutreachSchedule(data.survey_outreach_schedule);
+    }
   }
-
-  return normalizeSurveyOutreachSchedule(data.survey_outreach_schedule);
+  throw new Error("Survey schedule changed at the same time. Please try again.");
 }
 
 export async function getSurveyOutreachSendingState(): Promise<SurveyOutreachSendingState> {

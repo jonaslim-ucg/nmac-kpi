@@ -1,4 +1,11 @@
-import type { ChartConfiguration, TooltipItem } from "chart.js";
+import type {
+  ActiveDataPoint,
+  Chart,
+  ChartConfiguration,
+  Plugin,
+  TooltipItem,
+  TooltipPositionerFunction,
+} from "chart.js";
 import {
   barBase,
   emphasizeSelectedMonthBarColors,
@@ -8,7 +15,10 @@ import {
 import { MONTHS } from "@/lib/kpi-nmac-2026/model";
 import { REFERRAL_STATUS_CARDS } from "@/lib/ardts/referral-display";
 import type { ReferralMonthlyPoint } from "@/lib/ardts/referral-metrics";
-import { buildTrackedItemsChartData } from "@/lib/ardts/referral-workstreams";
+import {
+  buildTrackedItemsChartData,
+  nearestTrackedMonthIndex,
+} from "@/lib/ardts/referral-workstreams";
 import type {
   ArdtsMonthlyOutcomePoint,
   ArdtsMonthlySentPoint,
@@ -52,6 +62,259 @@ function chartMonthIndex(month: number): number {
   return Math.max(0, Math.min(11, month - 1));
 }
 
+type ReferralHoverTarget =
+  | { mode: "whole"; dataIndex: number }
+  | { mode: "segment"; dataIndex: number; datasetIndex: number }
+  | null;
+
+type DrawableBar = {
+  x: number;
+  y: number;
+  base: number;
+  width: number;
+  draw: (context: CanvasRenderingContext2D) => void;
+  inRange: (x: number, y: number, useFinalPosition?: boolean) => boolean;
+};
+
+type ReferralHoverMotion = {
+  target: ReferralHoverTarget;
+  wholeProgress: number;
+  segmentProgress: number;
+  fromWhole: number;
+  fromSegment: number;
+  toWhole: number;
+  toSegment: number;
+  startedAt: number;
+  frame: number | null;
+};
+
+const REFERRAL_HOVER_DURATION_MS = 155;
+const referralHoverMotion = new WeakMap<Chart, ReferralHoverMotion>();
+
+function drawableBar(chart: Chart, datasetIndex: number, dataIndex: number): DrawableBar | null {
+  return (chart.getDatasetMeta(datasetIndex).data[dataIndex] as unknown as DrawableBar | undefined) ?? null;
+}
+
+function visibleBarDatasetIndexes(chart: Chart): number[] {
+  return chart.data.datasets.flatMap((_, datasetIndex) => {
+    const meta = chart.getDatasetMeta(datasetIndex);
+    return meta.visible && meta.type === "bar" ? [datasetIndex] : [];
+  });
+}
+
+function ensureReferralHoverMotion(chart: Chart): ReferralHoverMotion {
+  const existing = referralHoverMotion.get(chart);
+  if (existing) return existing;
+  const state: ReferralHoverMotion = {
+    target: null,
+    wholeProgress: 0,
+    segmentProgress: 0,
+    fromWhole: 0,
+    fromSegment: 0,
+    toWhole: 0,
+    toSegment: 0,
+    startedAt: 0,
+    frame: null,
+  };
+  referralHoverMotion.set(chart, state);
+  return state;
+}
+
+function sameReferralHoverTarget(a: ReferralHoverTarget, b: ReferralHoverTarget): boolean {
+  if (!a || !b) return a === b;
+  return a.mode === b.mode &&
+    a.dataIndex === b.dataIndex &&
+    (a.mode !== "segment" || b.mode !== "segment" || a.datasetIndex === b.datasetIndex);
+}
+
+function animateReferralHover(chart: Chart, state: ReferralHoverMotion): void {
+  if (state.frame !== null && typeof cancelAnimationFrame === "function") {
+    cancelAnimationFrame(state.frame);
+  }
+  state.fromWhole = state.wholeProgress;
+  state.fromSegment = state.segmentProgress;
+  state.toWhole = state.target?.mode === "whole" ? 1 : 0;
+  state.toSegment = state.target?.mode === "segment" ? 1 : 0;
+  state.startedAt = typeof performance === "undefined" ? 0 : performance.now();
+
+  if (typeof requestAnimationFrame !== "function") {
+    state.wholeProgress = state.toWhole;
+    state.segmentProgress = state.toSegment;
+    chart.draw();
+    return;
+  }
+
+  const tick = (now: number) => {
+    const elapsed = Math.max(0, now - state.startedAt);
+    const progress = Math.min(1, elapsed / REFERRAL_HOVER_DURATION_MS);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    state.wholeProgress = state.fromWhole + (state.toWhole - state.fromWhole) * eased;
+    state.segmentProgress = state.fromSegment + (state.toSegment - state.fromSegment) * eased;
+    chart.draw();
+    if (progress < 1) {
+      state.frame = requestAnimationFrame(tick);
+    } else {
+      state.frame = null;
+    }
+  };
+  state.frame = requestAnimationFrame(tick);
+}
+
+function targetActivePoints(chart: Chart, target: ReferralHoverTarget): ActiveDataPoint[] {
+  if (!target) return [];
+  if (target.mode === "segment") {
+    return drawableBar(chart, target.datasetIndex, target.dataIndex)
+      ? [{ datasetIndex: target.datasetIndex, index: target.dataIndex }]
+      : [];
+  }
+  const datasetIndex = visibleBarDatasetIndexes(chart).find((candidate) =>
+    drawableBar(chart, candidate, target.dataIndex),
+  );
+  return datasetIndex === undefined
+    ? []
+    : [{ datasetIndex, index: target.dataIndex }];
+}
+
+function stackGeometry(chart: Chart, dataIndex: number): { x: number; top: number; base: number } | null {
+  const bars = visibleBarDatasetIndexes(chart)
+    .map((datasetIndex) => drawableBar(chart, datasetIndex, dataIndex))
+    .filter((bar): bar is DrawableBar => Boolean(bar));
+  if (bars.length === 0) return null;
+  return {
+    x: bars[0]!.x,
+    top: Math.min(...bars.flatMap((bar) => [bar.y, bar.base])),
+    base: Math.max(...bars.flatMap((bar) => [bar.y, bar.base])),
+  };
+}
+
+function setReferralHoverTarget(chart: Chart, target: ReferralHoverTarget): void {
+  const state = ensureReferralHoverMotion(chart);
+  const changed = !sameReferralHoverTarget(state.target, target);
+  state.target = target;
+  const active = targetActivePoints(chart, target);
+  chart.setActiveElements(active);
+  const geometry = target ? stackGeometry(chart, target.dataIndex) : null;
+  chart.tooltip?.setActiveElements(active, {
+    x: geometry?.x ?? chart.chartArea.left,
+    y: geometry?.top ?? chart.chartArea.bottom,
+  });
+  if (changed) animateReferralHover(chart, state);
+  else chart.draw();
+}
+
+function directReferralSegment(
+  chart: Chart,
+  dataIndex: number,
+  x: number,
+  y: number,
+): { datasetIndex: number; dataIndex: number } | null {
+  for (const datasetIndex of visibleBarDatasetIndexes(chart).reverse()) {
+    const bar = drawableBar(chart, datasetIndex, dataIndex);
+    if (bar?.inRange(x, y, true)) return { datasetIndex, dataIndex };
+  }
+  return null;
+}
+
+function referralTargetAtPoint(chart: Chart, x: number, y: number): ReferralHoverTarget {
+  if (y < chart.chartArea.top - 10 || y > chart.chartArea.bottom + 8) return null;
+  const firstDataset = visibleBarDatasetIndexes(chart)[0];
+  if (firstDataset === undefined) return null;
+  const centers = chart.getDatasetMeta(firstDataset).data.map((element) => element.x);
+  const dataIndex = nearestTrackedMonthIndex(centers, x);
+  if (dataIndex === null) return null;
+  const segment = directReferralSegment(chart, dataIndex, x, y);
+  return segment ? { mode: "segment", ...segment } : { mode: "whole", dataIndex };
+}
+
+function drawScaledBarOverlay(chart: Chart, state: ReferralHoverMotion): void {
+  const target = state.target;
+  if (!target) return;
+  const geometry = stackGeometry(chart, target.dataIndex);
+  if (!geometry) return;
+  const context = chart.ctx;
+
+  if (state.wholeProgress > 0.001) {
+    const scaleX = 1 + state.wholeProgress * 0.07;
+    const scaleY = 1 + state.wholeProgress * 0.055;
+    context.save();
+    context.translate(geometry.x, geometry.base);
+    context.scale(scaleX, scaleY);
+    context.translate(-geometry.x, -geometry.base);
+    for (const datasetIndex of visibleBarDatasetIndexes(chart)) {
+      drawableBar(chart, datasetIndex, target.dataIndex)?.draw(context);
+    }
+    context.restore();
+  }
+
+  if (target.mode === "segment" && state.segmentProgress > 0.001) {
+    const bar = drawableBar(chart, target.datasetIndex, target.dataIndex);
+    if (!bar) return;
+    context.save();
+    context.translate(bar.x, 0);
+    context.scale(1 + state.segmentProgress * 0.1, 1);
+    context.translate(-bar.x, 0);
+    bar.draw(context);
+    context.restore();
+  }
+}
+
+const referralTrackedItemsHoverPlugin: Plugin = {
+  id: "referralTrackedItemsHover",
+  afterEvent(chart, args) {
+    const event = args.event;
+    if (event.type === "mouseout" || event.x === null || event.y === null) {
+      setReferralHoverTarget(chart, null);
+      args.changed = true;
+      return;
+    }
+    if (event.type !== "mousemove" && event.type !== "click") return;
+    setReferralHoverTarget(chart, referralTargetAtPoint(chart, event.x, event.y));
+    args.changed = true;
+  },
+  afterDatasetsDraw(chart) {
+    const state = referralHoverMotion.get(chart);
+    if (state) drawScaledBarOverlay(chart, state);
+  },
+  beforeDestroy(chart) {
+    const state = referralHoverMotion.get(chart);
+    if (state && state.frame !== null && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(state.frame);
+    }
+    referralHoverMotion.delete(chart);
+  },
+};
+
+export function installReferralTrackedItemsTooltipPositioner(
+  positioners: Record<string, TooltipPositionerFunction<"bar">>,
+): void {
+  if (positioners.referralStackTop) return;
+  positioners.referralStackTop = function referralStackTop(items) {
+    const state = referralHoverMotion.get(this.chart);
+    const dataIndex = state?.target?.dataIndex ?? items[0]?.index;
+    if (dataIndex === undefined) return false;
+    const geometry = stackGeometry(this.chart, dataIndex);
+    if (!geometry) return false;
+    return {
+      x: geometry.x,
+      y: Math.max(this.chart.chartArea.top + 6, geometry.top - 10),
+      xAlign: "center",
+      yAlign: "bottom",
+    };
+  };
+}
+
+export function focusReferralTrackedItemsMonth(chart: Chart, dataIndex: number): void {
+  const maxIndex = Math.max(0, chart.data.labels?.length ? chart.data.labels.length - 1 : 0);
+  setReferralHoverTarget(chart, {
+    mode: "whole",
+    dataIndex: Math.max(0, Math.min(maxIndex, dataIndex)),
+  });
+}
+
+export function clearReferralTrackedItemsHover(chart: Chart): void {
+  setReferralHoverTarget(chart, null);
+}
+
 export function referralTrackedItemsByWorkstreamChart(
   trends: ArdtsWorkstreamTrends,
   highlightMonth?: number,
@@ -75,19 +338,25 @@ export function referralTrackedItemsByWorkstreamChart(
 
   return {
     ...config,
+    plugins: [...(config.plugins ?? []), referralTrackedItemsHoverPlugin],
     options: {
       ...config.options,
-      interaction: { mode: "index", intersect: false },
+      interaction: { mode: "nearest", intersect: true },
       plugins: {
         ...config.options?.plugins,
         legend: { display: false },
         tooltip: {
-          mode: "index",
-          intersect: false,
+          mode: "nearest",
+          intersect: true,
+          position: "referralStackTop" as "nearest",
           callbacks: {
-            footer(items: TooltipItem<"bar">[]) {
-              const dataIndex = items[0]?.dataIndex;
-              return dataIndex === undefined ? "" : `Total: ${chartData.totals[dataIndex] ?? 0}`;
+            label(item: TooltipItem<"bar">) {
+              const state = referralHoverMotion.get(item.chart);
+              if (state?.target?.mode === "whole") {
+                return `All workstreams: ${chartData.totals[item.dataIndex] ?? 0}`;
+              }
+              const dataset = chartData.datasets[item.datasetIndex];
+              return `${dataset?.label ?? item.dataset.label}: ${dataset?.data[item.dataIndex] ?? 0}`;
             },
           },
         },

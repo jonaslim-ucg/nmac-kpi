@@ -50,3 +50,26 @@ export function boundedPercent(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, value));
 }
+
+export function nearestTrackedMonthIndex(
+  centers: readonly number[],
+  pointerX: number,
+): number | null {
+  if (centers.length === 0 || !Number.isFinite(pointerX)) return null;
+  let nearestIndex = 0;
+  let nearestDistance = Math.abs(pointerX - centers[0]!);
+  for (let index = 1; index < centers.length; index += 1) {
+    const distance = Math.abs(pointerX - centers[index]!);
+    if (distance < nearestDistance) {
+      nearestIndex = index;
+      nearestDistance = distance;
+    }
+  }
+
+  const gaps = centers
+    .slice(1)
+    .map((center, index) => Math.abs(center - centers[index]!))
+    .filter((gap) => gap > 0);
+  const monthSpacing = gaps.length > 0 ? Math.min(...gaps) : 48;
+  return nearestDistance <= monthSpacing * 0.62 ? nearestIndex : null;
+}

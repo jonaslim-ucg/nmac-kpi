@@ -639,6 +639,12 @@
   height: 220px;
 }
 
+.nk26-referral-workstream-canvas canvas:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--nk26-accent) 78%, white);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
 .nk26-referral-hover-note {
   margin: 10px 0 0;
   color: var(--nk26-muted);

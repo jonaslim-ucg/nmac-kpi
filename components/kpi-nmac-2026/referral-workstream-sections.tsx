@@ -1,9 +1,20 @@
 "use client";
 
 import { useAppTheme, type AppThemeName } from "@/components/app-theme-provider";
-import { useEffect, useMemo, useRef, type CSSProperties } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import type { Chart } from "chart.js";
-import { referralTrackedItemsByWorkstreamChart } from "@/lib/ardts/referral-charts";
+import {
+  clearReferralTrackedItemsHover,
+  focusReferralTrackedItemsMonth,
+  installReferralTrackedItemsTooltipPositioner,
+  referralTrackedItemsByWorkstreamChart,
+} from "@/lib/ardts/referral-charts";
 import {
   boundedPercent,
   comparisonMetric,
@@ -19,7 +30,14 @@ import type {
 let chartJsModule: Promise<typeof import("chart.js/auto")> | null = null;
 
 function loadChartJs() {
-  chartJsModule ??= import("chart.js/auto");
+  chartJsModule ??= import("chart.js/auto").then((mod) => {
+    installReferralTrackedItemsTooltipPositioner(
+      mod.Tooltip.positioners as unknown as Parameters<
+        typeof installReferralTrackedItemsTooltipPositioner
+      >[0],
+    );
+    return mod;
+  });
   return chartJsModule;
 }
 
@@ -72,6 +90,11 @@ function TrackedItemsByMonthChart({
   }, [resolvedTheme]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<Chart | null>(null);
+  const keyboardMonthRef = useRef(selectedMonth);
+
+  useEffect(() => {
+    keyboardMonthRef.current = selectedMonth;
+  }, [selectedMonth]);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,6 +106,9 @@ function TrackedItemsByMonthChart({
         canvasRef.current,
         referralTrackedItemsByWorkstreamChart(trends, selectedMonth),
       );
+      if (document.activeElement === canvasRef.current) {
+        focusReferralTrackedItemsMonth(chartRef.current, keyboardMonthRef.current);
+      }
     });
 
     return () => {
@@ -92,11 +118,35 @@ function TrackedItemsByMonthChart({
     };
   }, [chartThemeKey, selectedMonth, trends]);
 
+  function handleChartKeyDown(event: ReactKeyboardEvent<HTMLCanvasElement>) {
+    if (!chartRef.current) return;
+    const lastMonthIndex = Math.max(0, trends.tracked_items_by_month.length - 1);
+    let nextMonth = keyboardMonthRef.current;
+    if (event.key === "ArrowLeft") nextMonth = Math.max(0, nextMonth - 1);
+    else if (event.key === "ArrowRight") nextMonth = Math.min(lastMonthIndex, nextMonth + 1);
+    else if (event.key === "Home") nextMonth = 0;
+    else if (event.key === "End") nextMonth = lastMonthIndex;
+    else return;
+    event.preventDefault();
+    keyboardMonthRef.current = nextMonth;
+    focusReferralTrackedItemsMonth(chartRef.current, nextMonth);
+  }
+
   return (
     <canvas
       ref={canvasRef}
+      tabIndex={0}
       role="img"
-      aria-label="Tracked items by month, stacked by referrals, external diagnostics, and in-house ultrasounds. Hover any monthly column for its full workstream breakdown and total."
+      aria-describedby="nk26-tracked-items-hover-help"
+      aria-label="Tracked items by month, stacked by referrals, external diagnostics, and in-house ultrasounds. Hover a colored segment for its count or the open area around a month for its all-workstreams total."
+      onFocus={() => {
+        keyboardMonthRef.current = selectedMonth;
+        if (chartRef.current) focusReferralTrackedItemsMonth(chartRef.current, selectedMonth);
+      }}
+      onBlur={() => {
+        if (chartRef.current) clearReferralTrackedItemsHover(chartRef.current);
+      }}
+      onKeyDown={handleChartKeyDown}
     />
   );
 }
@@ -225,7 +275,10 @@ function WorkstreamTrends({
               ))}
             </tbody>
           </table>
-          <p className="nk26-referral-hover-note">Hover any color in a month to see every workstream and the monthly total.</p>
+          <p id="nk26-tracked-items-hover-help" className="nk26-referral-hover-note">
+            Hover a colored segment for its count, or the open area around a month for its all-workstreams total.
+            Keyboard: focus the chart and use the left or right arrow keys to move by month.
+          </p>
         </figure>
 
         <article className="nk26-card nk26-referral-trend-card">

@@ -5,6 +5,7 @@ import {
   buildTrackedItemsChartData,
   comparisonMetric,
   comparisonMetricLabel,
+  nearestTrackedMonthIndex,
 } from "../../lib/ardts/referral-workstreams.ts";
 import type {
   ArdtsWorkstreamComparisonRow,
@@ -73,4 +74,12 @@ test("booking-rate bar widths stay within the visual range", () => {
   assert.equal(boundedPercent(77), 77);
   assert.equal(boundedPercent(105), 100);
   assert.equal(boundedPercent(Number.NaN), 0);
+});
+
+test("whole-month hover accepts empty space above and slightly beside a bar", () => {
+  const centers = [40, 80, 120, 160];
+  assert.equal(nearestTrackedMonthIndex(centers, 120), 2);
+  assert.equal(nearestTrackedMonthIndex(centers, 141), 3);
+  assert.equal(nearestTrackedMonthIndex(centers, 185), null);
+  assert.equal(nearestTrackedMonthIndex([], 40), null);
 });

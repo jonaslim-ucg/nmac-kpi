@@ -328,7 +328,6 @@ export function referralTrackedItemsByWorkstreamChart(
       data: dataset.data,
       backgroundColor: dataset.color,
       hoverBackgroundColor: dataset.color,
-      borderSkipped: false,
       stack: "workstreams",
     })),
     undefined,

@@ -250,31 +250,33 @@ function WorkstreamTrends({
               </div>
             </div>
           </div>
-          <table className="sr-only">
-            <caption>Monthly tracked items by workstream</caption>
-            <thead>
-              <tr>
-                <th scope="col">Month</th>
-                {trends.series.map((series) => (
-                  <th key={series.key} scope="col">
-                    {series.label}
-                  </th>
-                ))}
-                <th scope="col">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {trends.tracked_items_by_month.map((point) => (
-                <tr key={point.month}>
-                  <th scope="row">{point.month_label}</th>
+          <div className="sr-only">
+            <table>
+              <caption>Monthly tracked items by workstream</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Month</th>
                   {trends.series.map((series) => (
-                    <td key={series.key}>{point.workstreams[series.key] ?? 0}</td>
+                    <th key={series.key} scope="col">
+                      {series.label}
+                    </th>
                   ))}
-                  <td>{point.total}</td>
+                  <th scope="col">Total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {trends.tracked_items_by_month.map((point) => (
+                  <tr key={point.month}>
+                    <th scope="row">{point.month_label}</th>
+                    {trends.series.map((series) => (
+                      <td key={series.key}>{point.workstreams[series.key] ?? 0}</td>
+                    ))}
+                    <td>{point.total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <p id="nk26-tracked-items-hover-help" className="nk26-referral-hover-note">
             Hover a colored segment for its count, or the open area around a month for its all-workstreams total.
             Keyboard: focus the chart and use the left or right arrow keys to move by month.

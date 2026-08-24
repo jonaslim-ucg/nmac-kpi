@@ -6,6 +6,7 @@ import {
 } from "@/lib/appointment-review/types";
 import type { AppointmentReviewRow } from "@/lib/appointment-review/analytics";
 import type {
+  AppointmentReviewAssignee,
   AppointmentReviewManagement,
   AppointmentReviewManagementInput,
 } from "@/lib/appointment-review/management";
@@ -44,6 +45,7 @@ create table if not exists public.appointment_reviews (
   exceptional_staff_comment text not null default '',
   survey_token uuid unique,
   feedback_responsible_person text not null default '',
+  feedback_assigned_to_email text,
   feedback_status text not null default 'needs_review' check (feedback_status in ('needs_review', 'in_progress', 'actioned', 'no_action_needed')),
   feedback_notes text not null default '',
   feedback_updated_at timestamptz,
@@ -52,6 +54,7 @@ create table if not exists public.appointment_reviews (
 
 alter table public.appointment_reviews
   add column if not exists feedback_responsible_person text not null default '',
+  add column if not exists feedback_assigned_to_email text,
   add column if not exists feedback_status text not null default 'needs_review',
   add column if not exists feedback_notes text not null default '',
   add column if not exists feedback_updated_at timestamptz,
@@ -137,6 +140,7 @@ type ListAppointmentReviewsOptions = {
   limit?: number;
   createdFrom?: string;
   createdBefore?: string;
+  assignedToEmail?: string;
 };
 
 export async function listAppointmentReviews(options: ListAppointmentReviewsOptions = {}): Promise<ListResult> {
@@ -168,6 +172,9 @@ export async function listAppointmentReviews(options: ListAppointmentReviewsOpti
       if (options.createdBefore) {
         query = query.lt("created_at", options.createdBefore);
       }
+      if (options.assignedToEmail) {
+        query = query.ilike("feedback_assigned_to_email", options.assignedToEmail.trim());
+      }
 
       const { data, error, count } = await query.range(offset, offset + remaining - 1);
 
@@ -198,11 +205,106 @@ type UpdateManagementResult =
 
 type FeedbackManagementRow = {
   feedback_responsible_person: string | null;
+  feedback_assigned_to_email: string | null;
   feedback_status: AppointmentReviewManagement["status"] | null;
   feedback_notes: string | null;
   feedback_updated_at: string | null;
   feedback_updated_by: string | null;
 };
+
+type AssigneeDirectoryResult =
+  | { ok: true; assignees: AppointmentReviewAssignee[] }
+  | { ok: false; error: string };
+
+function appUserDisplayName(row: {
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+}): string {
+  return [row.first_name, row.last_name]
+    .map((part) => part?.trim() ?? "")
+    .filter(Boolean)
+    .join(" ") || row.email;
+}
+
+export async function listAppointmentReviewAssignees(): Promise<AssigneeDirectoryResult> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return { ok: false, error: "User directory is not available." };
+  }
+
+  try {
+    const supabase = createServiceRoleClient();
+    const { data, error } = await supabase
+      .from("app_users")
+      .select("email,first_name,last_name")
+      .order("first_name", { ascending: true, nullsFirst: false })
+      .order("last_name", { ascending: true, nullsFirst: false })
+      .order("email", { ascending: true });
+
+    if (error) return { ok: false, error: "Could not load review assignees." };
+
+    return {
+      ok: true,
+      assignees: (data ?? []).map((row) => ({
+        email: String(row.email).trim().toLowerCase(),
+        displayName: appUserDisplayName({
+          email: String(row.email),
+          first_name: row.first_name as string | null,
+          last_name: row.last_name as string | null,
+        }),
+      })),
+    };
+  } catch {
+    return { ok: false, error: "Could not load review assignees." };
+  }
+}
+
+export async function getAppointmentReviewManagement(
+  id: string,
+): Promise<UpdateManagementResult> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return { ok: false, error: "Review storage is not available." };
+  }
+
+  try {
+    const supabase = createServiceRoleClient();
+    const { data, error } = await supabase
+      .from("appointment_reviews")
+      .select("feedback_responsible_person,feedback_assigned_to_email,feedback_status,feedback_notes,feedback_updated_at,feedback_updated_by")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      if (
+        /feedback_assigned_to_email/i.test(error.message) &&
+        /does not exist|schema cache|could not find/i.test(error.message)
+      ) {
+        return {
+          ok: false,
+          error: "Feedback assignment is not configured.",
+          setupRequired: true,
+        };
+      }
+      return { ok: false, error: "Could not load feedback management." };
+    }
+    if (!data) return { ok: false, error: "Review not found.", notFound: true };
+
+    const row = data as FeedbackManagementRow;
+    return {
+      ok: true,
+      management: {
+        responsiblePerson: row.feedback_responsible_person?.trim() ?? "",
+        assignedToEmail: row.feedback_assigned_to_email?.trim().toLowerCase() || null,
+        status: row.feedback_status ?? "needs_review",
+        notes: row.feedback_notes?.trim() ?? "",
+        updatedAt: row.feedback_updated_at,
+        updatedBy: row.feedback_updated_by?.trim() || null,
+      },
+    };
+  } catch {
+    return { ok: false, error: "Could not load feedback management." };
+  }
+}
 
 export async function updateAppointmentReviewManagement(
   id: string,
@@ -220,18 +322,19 @@ export async function updateAppointmentReviewManagement(
       .from("appointment_reviews")
       .update({
         feedback_responsible_person: input.responsiblePerson,
+        feedback_assigned_to_email: input.assignedToEmail,
         feedback_status: input.status,
         feedback_notes: input.notes,
         feedback_updated_at: updatedAt,
         feedback_updated_by: updatedBy,
       })
       .eq("id", id)
-      .select("feedback_responsible_person,feedback_status,feedback_notes,feedback_updated_at,feedback_updated_by")
+      .select("feedback_responsible_person,feedback_assigned_to_email,feedback_status,feedback_notes,feedback_updated_at,feedback_updated_by")
       .maybeSingle();
 
     if (error) {
       if (
-        /feedback_responsible_person|feedback_status|feedback_notes|feedback_updated_at|feedback_updated_by/i.test(
+        /feedback_responsible_person|feedback_assigned_to_email|feedback_status|feedback_notes|feedback_updated_at|feedback_updated_by/i.test(
           error.message,
         ) && /does not exist|schema cache|could not find/i.test(error.message)
       ) {
@@ -252,6 +355,7 @@ export async function updateAppointmentReviewManagement(
       ok: true,
       management: {
         responsiblePerson: row.feedback_responsible_person?.trim() ?? "",
+        assignedToEmail: row.feedback_assigned_to_email?.trim().toLowerCase() || null,
         status: row.feedback_status ?? "needs_review",
         notes: row.feedback_notes?.trim() ?? "",
         updatedAt: row.feedback_updated_at,

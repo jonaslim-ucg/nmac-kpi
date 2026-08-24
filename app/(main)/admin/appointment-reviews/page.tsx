@@ -11,6 +11,7 @@ import { useDashboardPreferences } from "@/components/auth/dashboard-preferences
 import { useSession } from "@/components/auth/session-provider";
 import type { AppointmentReviewStats } from "@/lib/appointment-review/analytics";
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
+import type { AppointmentReviewAssignee } from "@/lib/appointment-review/management";
 import type { AppointmentReviewQuarter } from "@/lib/appointment-review/report";
 import type { DailyCheckoutPoint } from "@/lib/survey-outreach/checkout-stats";
 import type { DailyInitialSurveySendPoint } from "@/lib/survey-outreach/sent-stats";
@@ -18,7 +19,7 @@ import { APPOINTMENT_REVIEWS_SETUP_SQL } from "@/lib/appointment-review/store";
 import { isNmacNavHrefAllowed } from "@/lib/auth/role-nmac-nav";
 
 type ReviewPeriod = "all" | "quarter" | "30" | "90" | "custom";
-type Tab = "overview" | "reviews";
+type Tab = "overview" | "reviews" | "assigned";
 
 type CustomDateRange = {
   start: string;
@@ -30,6 +31,7 @@ type ApiResponse = {
   dateEnd?: string | null;
   stats?: AppointmentReviewStats;
   reviews?: AppointmentReviewDetail[];
+  assignees?: AppointmentReviewAssignee[];
   numberCheckouts?: number;
   numberMultipleSameDayAppointments?: number | null;
   numberSent?: number;
@@ -92,6 +94,10 @@ export default function AdminAppointmentReviewsPage() {
   const { ready: prefsReady, roleNmacNav } = useDashboardPreferences();
   const [stats, setStats] = useState<AppointmentReviewStats | null>(null);
   const [reviews, setReviews] = useState<AppointmentReviewDetail[]>([]);
+  const [assignedReviews, setAssignedReviews] = useState<AppointmentReviewDetail[]>([]);
+  const [assignees, setAssignees] = useState<AppointmentReviewAssignee[]>([]);
+  const [assignedLoading, setAssignedLoading] = useState(false);
+  const [assignedError, setAssignedError] = useState<string | null>(null);
   const [numberCheckouts, setNumberCheckouts] = useState(0);
   const [numberMultipleSameDayAppointments, setNumberMultipleSameDayAppointments] = useState<
     number | null
@@ -122,15 +128,17 @@ export default function AdminAppointmentReviewsPage() {
   const [customRangeError, setCustomRangeError] = useState<string | null>(null);
   const hasLoaded = useRef(false);
   const latestLoadRequest = useRef(0);
+  const latestAssignedLoadRequest = useRef(0);
 
   const allowed =
     !prefsReady || isNmacNavHrefAllowed(user?.role, "/admin/appointment-reviews", roleNmacNav);
 
+  const activeReviews = tab === "assigned" ? assignedReviews : reviews;
   const selectedIndex = useMemo(
-    () => (selectedId ? reviews.findIndex((r) => r.id === selectedId) : -1),
-    [reviews, selectedId],
+    () => (selectedId ? activeReviews.findIndex((r) => r.id === selectedId) : -1),
+    [activeReviews, selectedId],
   );
-  const selectedReview = selectedIndex >= 0 ? reviews[selectedIndex] : null;
+  const selectedReview = selectedIndex >= 0 ? activeReviews[selectedIndex] : null;
   const quarterOptions = useMemo(() => availableQuarters(currentQuarter), [currentQuarter]);
   const periodControlValue: ReviewPeriod = customRangeOpen ? "custom" : period;
   const latestClinicDate = useMemo(() => clinicToday(), []);
@@ -241,6 +249,7 @@ export default function AdminAppointmentReviewsPage() {
 
       setStats(liveData.stats ?? null);
       setReviews(displayedReviews);
+      setAssignees(liveData.assignees ?? []);
       setNumberCheckouts(
         typeof liveData.numberCheckouts === "number" ? liveData.numberCheckouts : 0,
       );
@@ -299,10 +308,58 @@ export default function AdminAppointmentReviewsPage() {
     }
   }, []);
 
+  const loadAssigned = useCallback(async (
+    filter: ReviewPeriod,
+    quarterId: string | null,
+    customDateRange: CustomDateRange | null,
+  ) => {
+    const requestId = latestAssignedLoadRequest.current + 1;
+    latestAssignedLoadRequest.current = requestId;
+    setAssignedLoading(true);
+    setAssignedError(null);
+
+    try {
+      const params = new URLSearchParams({ scope: "assigned", includeTests: "false" });
+      if (filter === "quarter") {
+        if (quarterId) params.set("quarter", quarterId);
+        else params.set("range", "quarter");
+      }
+      if (filter === "30" || filter === "90") params.set("days", filter);
+      if (filter === "custom" && customDateRange) {
+        params.set("dateStart", customDateRange.start);
+        params.set("dateEnd", customDateRange.end);
+      }
+
+      const response = await fetch(`/api/admin/appointment-reviews?${params}`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      const data = (await response.json()) as ApiResponse;
+      if (requestId !== latestAssignedLoadRequest.current) return;
+      if (!response.ok) {
+        setAssignedReviews([]);
+        setAssignedError(data.error ?? "Could not load assigned reviews.");
+        return;
+      }
+      setAssignedReviews(data.reviews ?? []);
+    } catch {
+      if (requestId !== latestAssignedLoadRequest.current) return;
+      setAssignedReviews([]);
+      setAssignedError("Could not load assigned reviews.");
+    } finally {
+      if (requestId === latestAssignedLoadRequest.current) setAssignedLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (loading || !allowed) return;
     void load(period, selectedQuarter, customRange, showTestResponses, hasLoaded.current);
   }, [allowed, customRange, load, loading, period, selectedQuarter, showTestResponses]);
+
+  useEffect(() => {
+    if (loading || !allowed || tab !== "assigned") return;
+    void loadAssigned(period, selectedQuarter, customRange);
+  }, [allowed, customRange, loadAssigned, loading, period, selectedQuarter, tab]);
 
   const applyCustomRange = useCallback(() => {
     if (!customDateStart || !customDateEnd) {
@@ -367,6 +424,7 @@ export default function AdminAppointmentReviewsPage() {
                   [
                     { id: "overview", label: "Overview" },
                     { id: "reviews", label: "Survey results" },
+                    { id: "assigned", label: "My assigned reviews" },
                   ] as const
                 ).map(({ id, label }) => (
                   <button
@@ -449,7 +507,12 @@ export default function AdminAppointmentReviewsPage() {
 
                 <button
                   type="button"
-                  onClick={() => void load(period, selectedQuarter, customRange, showTestResponses, true)}
+                  onClick={() => {
+                    void load(period, selectedQuarter, customRange, showTestResponses, true);
+                    if (tab === "assigned") {
+                      void loadAssigned(period, selectedQuarter, customRange);
+                    }
+                  }}
                   disabled={refreshing}
                   className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition hover:bg-surface-muted/80 disabled:opacity-50 sm:w-auto"
                 >
@@ -589,9 +652,41 @@ export default function AdminAppointmentReviewsPage() {
         />
       ) : null}
 
+      {tab === "assigned" ? (
+        assignedLoading && assignedReviews.length === 0 ? (
+          <div className="dashboard-card flex items-center gap-2 p-5 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            Loading assigned reviews…
+          </div>
+        ) : (
+          <>
+            {assignedError ? (
+              <div className="dashboard-card mb-5 p-5 text-sm font-medium text-red-600 dark:text-red-400">
+                {assignedError}
+              </div>
+            ) : null}
+            <AppointmentReviewList
+              key={`assigned:${period}:${selectedQuarter ?? ""}:${customRange?.start ?? ""}:${customRange?.end ?? ""}`}
+              reviews={assignedReviews}
+              onViewReview={viewReview}
+              periodLabel={periodLabel}
+              title="My assigned reviews"
+              resultLabel="assigned review"
+              emptyMessage="No survey reviews are assigned to you in this period."
+              showTestResponses={false}
+              showTestControl={false}
+              testResponsesLoading={assignedLoading}
+              onShowTestResponsesChange={() => undefined}
+            />
+          </>
+        )
+      ) : null}
+
       {selectedReview ? (
         <AppointmentReviewDetailModal
           review={selectedReview}
+          assignees={assignees}
+          canAssignReview={allowed}
           onClose={() => setSelectedId(null)}
           onManagementSaved={(management) => {
             setReviews((current) => current.map((review) => (
@@ -599,15 +694,21 @@ export default function AdminAppointmentReviewsPage() {
                 ? { ...review, feedbackManagement: management }
                 : review
             )));
+            setAssignedReviews((current) => current.flatMap((review) => {
+              if (review.id !== selectedReview.id) return [review];
+              return management.assignedToEmail === user?.email.toLowerCase()
+                ? [{ ...review, feedbackManagement: management }]
+                : [];
+            }));
           }}
           hasPrev={selectedIndex > 0}
-          hasNext={selectedIndex < reviews.length - 1}
+          hasNext={selectedIndex < activeReviews.length - 1}
           onPrev={() => {
-            const prev = reviews[selectedIndex - 1];
+            const prev = activeReviews[selectedIndex - 1];
             if (prev) setSelectedId(prev.id);
           }}
           onNext={() => {
-            const next = reviews[selectedIndex + 1];
+            const next = activeReviews[selectedIndex + 1];
             if (next) setSelectedId(next.id);
           }}
         />

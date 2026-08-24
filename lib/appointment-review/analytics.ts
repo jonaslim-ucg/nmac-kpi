@@ -45,6 +45,7 @@ export type AppointmentReviewRow = {
   exceptional_staff_comment: string;
   survey_token: string | null;
   feedback_responsible_person?: string | null;
+  feedback_assigned_to_email?: string | null;
   feedback_status?: string | null;
   feedback_notes?: string | null;
   feedback_updated_at?: string | null;

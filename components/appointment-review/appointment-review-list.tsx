@@ -2,15 +2,34 @@
 
 import {
   ArrowUpDown,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
+  ListFilter,
   Loader2,
+  RotateCcw,
+  X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { SheetData } from "write-excel-file/browser";
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
-import { appointmentReviewActionStatusLabel } from "@/lib/appointment-review/management";
+import {
+  APPOINTMENT_REVIEW_ACTION_STATUS_OPTIONS,
+  appointmentReviewActionStatusLabel,
+} from "@/lib/appointment-review/management";
+import {
+  APPOINTMENT_REVIEW_RATING_MAX,
+  APPOINTMENT_REVIEW_RATING_MIN,
+  countActiveAppointmentReviewFilters,
+  DEFAULT_APPOINTMENT_REVIEW_FILTERS,
+  filterAppointmentReviews,
+  getAppointmentReviewAverageRating,
+  getAppointmentReviewFilterOptions,
+  getAppointmentReviewHandler,
+  getAppointmentReviewProviderNames,
+  type AppointmentReviewFilters,
+} from "@/lib/appointment-review/filters";
 import {
   formatAppointmentDate,
   formatAppointmentTime,
@@ -23,7 +42,11 @@ type Props = {
   reviews: AppointmentReviewDetail[];
   onViewReview: (id: string) => void;
   periodLabel?: string;
+  title?: string;
+  resultLabel?: string;
+  emptyMessage?: string;
   showTestResponses: boolean;
+  showTestControl?: boolean;
   testResponsesLoading?: boolean;
   onShowTestResponsesChange: (show: boolean) => void;
 };
@@ -68,23 +91,38 @@ function formatTableSubmittedAt(value: string): { date: string; time: string } {
 }
 
 function formatAverageReviewRating(review: AppointmentReviewDetail): string {
-  const providerRating =
-    review.providerRating ??
-    (review.providerRatings.length > 0
-      ? review.providerRatings.reduce((sum, item) => sum + item.rating, 0) /
-        review.providerRatings.length
-      : null);
-  const ratings = [
-    review.appointmentEase,
-    review.visitRating,
-    providerRating,
-    review.healthRating,
-    review.recommendationRating,
-    review.frontDeskRating,
-  ].filter((value): value is number => value !== null);
+  const averageRating = getAppointmentReviewAverageRating(review);
+  return averageRating === null ? "—" : `${averageRating.toFixed(1)}/5`;
+}
 
-  if (ratings.length === 0) return "—";
-  return `${(ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length).toFixed(1)}/5`;
+function ReviewFilterSelect({
+  label,
+  allLabel,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  allLabel: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="min-w-0 text-xs font-medium text-muted-foreground">
+      {label}
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1.5 h-10 w-full min-w-0 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+      >
+        <option value="">{allLabel}</option>
+        {options.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+    </label>
+  );
 }
 
 const EXPORT_HEADERS = [
@@ -244,21 +282,35 @@ export function AppointmentReviewList({
   reviews,
   onViewReview,
   periodLabel = "All",
+  title = "Survey results",
+  resultLabel,
+  emptyMessage,
   showTestResponses,
+  showTestControl = true,
   testResponsesLoading = false,
   onShowTestResponsesChange,
 }: Props) {
   const [commentFilter, setCommentFilter] = useState<CommentFilter>("all");
   const [sortOption, setSortOption] = useState<SortOption>("submitted-desc");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState<AppointmentReviewFilters>(
+    DEFAULT_APPOINTMENT_REVIEW_FILTERS,
+  );
   const [page, setPage] = useState(1);
   const [exporting, setExporting] = useState(false);
 
+  const filterOptions = useMemo(
+    () => getAppointmentReviewFilterOptions(reviews),
+    [reviews],
+  );
+  const activeFilterCount = countActiveAppointmentReviewFilters(filters);
   const filtered = useMemo(() => {
-    const included = commentFilter === "with-comments"
+    const commentMatches = commentFilter === "with-comments"
       ? reviews.filter((review) => review.hasComments)
       : reviews;
+    const included = filterAppointmentReviews(commentMatches, filters);
     return [...included].sort((first, second) => compareReviews(first, second, sortOption));
-  }, [commentFilter, reviews, sortOption]);
+  }, [commentFilter, filters, reviews, sortOption]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
   const pageStart = (currentPage - 1) * PAGE_SIZE;
@@ -271,13 +323,18 @@ export function AppointmentReviewList({
       <span className="dashboard-card-accent" aria-hidden />
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-5">
         <div>
-          <p className="text-sm font-semibold text-foreground">Survey results</p>
+          <p className="text-sm font-semibold text-foreground">{title}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {periodLabel} · {liveCount} live review{liveCount === 1 ? "" : "s"}
-            {showTestResponses
+            {periodLabel} · {resultLabel
+              ? `${filtered.length} ${resultLabel}${filtered.length === 1 ? "" : "s"}`
+              : `${liveCount} live review${liveCount === 1 ? "" : "s"}`}
+            {!resultLabel && showTestResponses
               ? ` · ${testCount} test response${testCount === 1 ? "" : "s"} shown`
               : ""}
             {commentFilter === "with-comments" ? " with written responses" : ""}
+            {activeFilterCount > 0
+              ? ` · ${activeFilterCount} filter${activeFilterCount === 1 ? "" : "s"} applied`
+              : ""}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -317,40 +374,66 @@ export function AppointmentReviewList({
               ))}
             </select>
           </label>
-          <div className="mr-1 flex items-center gap-2 rounded-lg border border-border bg-surface-muted/30 px-3 py-1.5">
-            <div>
-              <p className="text-xs font-medium text-foreground">Show test responses</p>
-              <p className="hidden text-[11px] text-muted-foreground lg:block">
-                Excluded from live totals and quarterly entries
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={showTestResponses}
-              aria-label="Show test responses"
-              disabled={testResponsesLoading}
-              onClick={() => onShowTestResponsesChange(!showTestResponses)}
-              className={
-                "relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-60 " +
-                (showTestResponses ? "bg-accent" : "bg-muted-foreground/30")
-              }
-            >
-              <span
+          <button
+            type="button"
+            aria-expanded={filtersOpen}
+            aria-controls="appointment-review-filters"
+            onClick={() => setFiltersOpen((open) => !open)}
+            className={
+              "inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition "
+              + (filtersOpen || activeFilterCount > 0
+                ? "border-accent bg-accent/10 text-accent"
+                : "border-border bg-card text-foreground hover:bg-surface-muted/80")
+            }
+          >
+            <ListFilter className="h-4 w-4 shrink-0" aria-hidden />
+            Filter
+            {activeFilterCount > 0 ? (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-semibold text-accent-foreground">
+                {activeFilterCount}
+              </span>
+            ) : null}
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 transition-transform ${filtersOpen ? "rotate-180" : ""}`}
+              aria-hidden
+            />
+          </button>
+          {showTestControl ? (
+            <div className="mr-1 flex items-center gap-2 rounded-lg border border-border bg-surface-muted/30 px-3 py-1.5">
+              <div>
+                <p className="text-xs font-medium text-foreground">Show test responses</p>
+                <p className="hidden text-[11px] text-muted-foreground lg:block">
+                  Excluded from live totals and quarterly entries
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showTestResponses}
+                aria-label="Show test responses"
+                disabled={testResponsesLoading}
+                onClick={() => onShowTestResponsesChange(!showTestResponses)}
                 className={
-                  "pointer-events-none absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-white shadow transition-[left] duration-200 ease-out " +
-                  (showTestResponses ? "left-[calc(100%-1.375rem)]" : "left-0.5")
+                  "relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-60 " +
+                  (showTestResponses ? "bg-accent" : "bg-muted-foreground/30")
                 }
-                aria-hidden
-              />
-              {testResponsesLoading ? (
-                <Loader2
-                  className="absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 animate-spin text-foreground"
+              >
+                <span
+                  className={
+                    "pointer-events-none absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-white shadow transition-[left] duration-200 ease-out " +
+                    (showTestResponses ? "left-[calc(100%-1.375rem)]" : "left-0.5")
+                  }
                   aria-hidden
                 />
-              ) : null}
-            </button>
-          </div>
+                {testResponsesLoading ? (
+                  <Loader2
+                    className="absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 animate-spin text-foreground"
+                    aria-hidden
+                  />
+                ) : null}
+              </button>
+            </div>
+          ) : null}
           {(
             [
               { id: "all", label: "All" },
@@ -377,9 +460,173 @@ export function AppointmentReviewList({
         </div>
       </div>
 
+      {filtersOpen ? (
+        <div
+          id="appointment-review-filters"
+          className="border-b border-border bg-surface-muted/20 px-4 py-4 sm:px-5"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Filter results</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Choose any combination. Results update immediately.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={activeFilterCount === 0}
+                onClick={() => {
+                  setFilters(DEFAULT_APPOINTMENT_REVIEW_FILTERS);
+                  setPage(1);
+                }}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-foreground transition hover:bg-surface-muted/80 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                Clear all
+              </button>
+              <button
+                type="button"
+                onClick={() => setFiltersOpen(false)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition hover:bg-surface-muted/80 hover:text-foreground"
+                aria-label="Close filters"
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <ReviewFilterSelect
+              label="Patient name"
+              allLabel="All patients"
+              value={filters.patientName}
+              options={filterOptions.patientNames}
+              onChange={(patientName) => {
+                setFilters((current) => ({ ...current, patientName }));
+                setPage(1);
+              }}
+            />
+            <ReviewFilterSelect
+              label="Visit type"
+              allLabel="All visit types"
+              value={filters.visitType}
+              options={filterOptions.visitTypes}
+              onChange={(visitType) => {
+                setFilters((current) => ({ ...current, visitType }));
+                setPage(1);
+              }}
+            />
+            <ReviewFilterSelect
+              label="Handler"
+              allLabel="All handlers"
+              value={filters.handler}
+              options={filterOptions.handlers}
+              onChange={(handler) => {
+                setFilters((current) => ({ ...current, handler }));
+                setPage(1);
+              }}
+            />
+            <ReviewFilterSelect
+              label="Provider"
+              allLabel="All providers"
+              value={filters.provider}
+              options={filterOptions.providers}
+              onChange={(provider) => {
+                setFilters((current) => ({ ...current, provider }));
+                setPage(1);
+              }}
+            />
+            <label className="min-w-0 text-xs font-medium text-muted-foreground">
+              Handling resolution
+              <select
+                value={filters.resolution}
+                onChange={(event) => {
+                  setFilters((current) => ({
+                    ...current,
+                    resolution: event.target.value as AppointmentReviewFilters["resolution"],
+                  }));
+                  setPage(1);
+                }}
+                className="mt-1.5 h-10 w-full min-w-0 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+              >
+                <option value="">All resolutions</option>
+                {APPOINTMENT_REVIEW_ACTION_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+
+            <div
+              role="group"
+              aria-labelledby="appointment-review-rating-filter-label"
+              className="min-w-0 rounded-lg border border-border bg-card px-3 py-2.5"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <p
+                  id="appointment-review-rating-filter-label"
+                  className="text-xs font-medium text-muted-foreground"
+                >
+                  Average rating
+                </p>
+                <span className="font-mono text-xs font-semibold tabular-nums text-foreground">
+                  {filters.ratingMin.toFixed(1)}–{filters.ratingMax.toFixed(1)}
+                </span>
+              </div>
+              <div className="relative mt-3 h-5" aria-label="Average rating range">
+                <div className="absolute left-0 right-0 top-2 h-1 rounded-full bg-muted-foreground/20" />
+                <div
+                  className="absolute top-2 h-1 rounded-full bg-accent"
+                  style={{
+                    left: `${((filters.ratingMin - APPOINTMENT_REVIEW_RATING_MIN) / (APPOINTMENT_REVIEW_RATING_MAX - APPOINTMENT_REVIEW_RATING_MIN)) * 100}%`,
+                    right: `${100 - ((filters.ratingMax - APPOINTMENT_REVIEW_RATING_MIN) / (APPOINTMENT_REVIEW_RATING_MAX - APPOINTMENT_REVIEW_RATING_MIN)) * 100}%`,
+                  }}
+                />
+                <input
+                  type="range"
+                  min={APPOINTMENT_REVIEW_RATING_MIN}
+                  max={APPOINTMENT_REVIEW_RATING_MAX}
+                  step="0.1"
+                  value={filters.ratingMin}
+                  aria-label="Minimum average rating"
+                  onChange={(event) => {
+                    const ratingMin = Math.min(Number(event.target.value), filters.ratingMax);
+                    setFilters((current) => ({ ...current, ratingMin }));
+                    setPage(1);
+                  }}
+                  className="appointment-review-rating-range absolute inset-x-0 top-0 z-20 w-full"
+                />
+                <input
+                  type="range"
+                  min={APPOINTMENT_REVIEW_RATING_MIN}
+                  max={APPOINTMENT_REVIEW_RATING_MAX}
+                  step="0.1"
+                  value={filters.ratingMax}
+                  aria-label="Maximum average rating"
+                  onChange={(event) => {
+                    const ratingMax = Math.max(Number(event.target.value), filters.ratingMin);
+                    setFilters((current) => ({ ...current, ratingMax }));
+                    setPage(1);
+                  }}
+                  className="appointment-review-rating-range absolute inset-x-0 top-0 z-30 w-full"
+                />
+              </div>
+              <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
+                <span>1.0</span>
+                <span>5.0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {filtered.length === 0 ? (
         <p className="px-5 py-8 text-sm text-muted-foreground">
-          {commentFilter === "with-comments"
+          {activeFilterCount > 0
+            ? "No reviews match the selected filters."
+            : emptyMessage && commentFilter === "all"
+            ? emptyMessage
+            : commentFilter === "with-comments"
             ? "No reviews with written responses in this period."
             : "No reviews in this period."}
         </p>
@@ -413,8 +660,7 @@ export function AppointmentReviewList({
                 {pageReviews.map((review) => {
                   const management = review.feedbackManagement;
                   const submittedAt = formatTableSubmittedAt(review.createdAt);
-                  const providerNames =
-                    review.appointmentProviderNames.join(", ") || review.serviceTypeLabel || "—";
+                  const providerNames = getAppointmentReviewProviderNames(review).join(", ") || "—";
                   const averageRating = formatAverageReviewRating(review);
                   const resolution = appointmentReviewActionStatusLabel(
                     management?.status ?? "needs_review",
@@ -460,7 +706,7 @@ export function AppointmentReviewList({
                       </td>
                       <td className="px-4 py-3.5 text-foreground">
                         <p className="line-clamp-2 leading-snug">
-                          {management?.responsiblePerson || "Unassigned"}
+                          {getAppointmentReviewHandler(review)}
                         </p>
                       </td>
                       <td className="px-4 py-3.5 text-foreground">

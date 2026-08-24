@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { buildAppointmentReviewStats } from "@/lib/appointment-review/analytics";
+import type { AppointmentReviewRow } from "@/lib/appointment-review/analytics";
 import { authorizeAppointmentReviewReportRequest } from "@/lib/appointment-review/authorize";
 import { toAppointmentReviewDetail } from "@/lib/appointment-review/display";
 import { parseAppointmentReviewManagementInput } from "@/lib/appointment-review/management";
 import {
   APPOINTMENT_REVIEWS_SETUP_SQL,
+  getAppointmentReviewManagement,
   listAppointmentReviews,
+  listAppointmentReviewAssignees,
   updateAppointmentReviewManagement,
 } from "@/lib/appointment-review/store";
 import {
@@ -52,21 +55,71 @@ function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 }
 
+async function prepareReviewDetails(
+  sourceRows: AppointmentReviewRow[],
+  includeTests: boolean,
+  includeFeedbackManagement: boolean,
+) {
+  const reviewMetadataResult = await findSurveyOutreachReviewMetadata(
+    sourceRows
+      .map((row) => row.survey_token)
+      .filter((token): token is string => Boolean(token)),
+  );
+  if (!reviewMetadataResult.ok) {
+    return { ok: false as const, error: reviewMetadataResult.error };
+  }
+
+  const reviewMetadataByToken = new Map(
+    reviewMetadataResult.rows.map((metadata) => [metadata.surveyToken, metadata]),
+  );
+  const isTestReview = (row: AppointmentReviewRow) =>
+    row.survey_token
+      ? reviewMetadataByToken.get(row.survey_token)?.isTest ?? false
+      : isScheduledTestRecipientAllowed(row.email);
+  const rows = includeTests
+    ? sourceRows
+    : sourceRows.filter((row) => !isTestReview(row));
+  const reviews = rows.map((row) => {
+    const metadata = row.survey_token
+      ? reviewMetadataByToken.get(row.survey_token)
+      : undefined;
+    return toAppointmentReviewDetail(row, {
+      isTest: isTestReview(row),
+      appointmentDate: metadata?.appointmentDate ?? null,
+      appointmentAt: metadata?.appointmentAt ?? null,
+      providerNames: metadata?.providerNames ?? [],
+      visitTypes: metadata?.visitTypes ?? [],
+      includeFeedbackManagement,
+    });
+  });
+
+  return { ok: true as const, rows, reviews };
+}
+
 export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const scope = url.searchParams.get("scope") ?? "all";
+  if (scope !== "all" && scope !== "assigned") {
+    return NextResponse.json({ error: "scope must be all or assigned." }, { status: 400 });
+  }
+
   const apiKeyAuthorized = authorizeAppointmentReviewReportRequest(req);
   const session = apiKeyAuthorized ? null : await getSessionFromCookies();
   if (!apiKeyAuthorized && !session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (session) {
+  if (scope === "assigned" && !session) {
+    return NextResponse.json({ error: "A signed-in user is required for assigned reviews." }, { status: 401 });
+  }
+
+  if (session && scope === "all") {
     const settings = await getAppDashboardSettings();
     if (!isNmacNavViewAllowed(session.role, SURVEY_RESULTS_NAV_VIEW_ID, settings?.roleNmacNav ?? {})) {
       return unauthorized();
     }
   }
 
-  const url = new URL(req.url);
   const now = new Date();
   const parsedRange = parseAppointmentReviewReportRange(url.searchParams, now);
   if (!parsedRange.ok) {
@@ -79,6 +132,42 @@ export async function GET(req: Request) {
   }
   const includeTests = includeTestsParam === "true";
 
+  if (scope === "assigned" && session) {
+    const reviewsResult = await listAppointmentReviews({
+      createdFrom: range.startAt,
+      createdBefore: range.endBefore,
+      assignedToEmail: session.email,
+    });
+    if (!reviewsResult.ok) {
+      return NextResponse.json(
+        {
+          setupRequired: reviewsResult.setupRequired ?? false,
+          setupSql: reviewsResult.setupRequired ? APPOINTMENT_REVIEWS_SETUP_SQL : undefined,
+          error: reviewsResult.error,
+        },
+        { status: reviewsResult.setupRequired ? 503 : 500 },
+      );
+    }
+
+    const prepared = await prepareReviewDetails(reviewsResult.rows, includeTests, true);
+    if (!prepared.ok) {
+      return NextResponse.json({ error: prepared.error }, { status: 500 });
+    }
+
+    return NextResponse.json(
+      {
+        dateStart: range.dateStart,
+        dateEnd: range.dateEnd,
+        includeTests,
+        scope,
+        numberResponses: prepared.rows.length,
+        reviews: prepared.reviews,
+        ready: true,
+      },
+      { headers: { "Cache-Control": "private, no-store, max-age=0" } },
+    );
+  }
+
   const [
     reviewsResult,
     outreachResult,
@@ -89,6 +178,7 @@ export async function GET(req: Request) {
     permanentInitialFailureResult,
     dailyCheckoutResult,
     reportingStartResult,
+    assigneeResult,
   ] = await Promise.all([
     listAppointmentReviews({ createdFrom: range.startAt, createdBefore: range.endBefore }),
     listSurveyOutreachForReport({
@@ -123,6 +213,9 @@ export async function GET(req: Request) {
       dateEnd: range.dateEnd,
     }),
     getSurveyOutreachReportingStartDate(),
+    session
+      ? listAppointmentReviewAssignees()
+      : Promise.resolve({ ok: true as const, assignees: [] }),
   ]);
   if (!reviewsResult.ok) {
     if (reviewsResult.setupRequired) {
@@ -194,38 +287,18 @@ export async function GET(req: Request) {
   if (!reportingStartResult.ok) {
     return NextResponse.json({ error: reportingStartResult.error }, { status: 500 });
   }
-  const reviewMetadataResult = await findSurveyOutreachReviewMetadata(
-    reviewsResult.rows
-      .map((row) => row.survey_token)
-      .filter((token): token is string => Boolean(token)),
-  );
-  if (!reviewMetadataResult.ok) {
-    return NextResponse.json({ error: reviewMetadataResult.error }, { status: 500 });
+  if (!assigneeResult.ok) {
+    return NextResponse.json({ error: assigneeResult.error }, { status: 500 });
   }
-  const reviewMetadataByToken = new Map(
-    reviewMetadataResult.rows.map((metadata) => [metadata.surveyToken, metadata]),
+  const prepared = await prepareReviewDetails(
+    reviewsResult.rows,
+    includeTests,
+    Boolean(session),
   );
-  const isTestReview = (row: (typeof reviewsResult.rows)[number]) =>
-    row.survey_token
-      ? reviewMetadataByToken.get(row.survey_token)?.isTest ?? false
-      : isScheduledTestRecipientAllowed(row.email);
-
-  let rows = reviewsResult.rows;
-  if (!includeTests) rows = rows.filter((row) => !isTestReview(row));
-
-  const reviews = rows.map((row) => {
-    const metadata = row.survey_token
-      ? reviewMetadataByToken.get(row.survey_token)
-      : undefined;
-    return toAppointmentReviewDetail(row, {
-      isTest: isTestReview(row),
-      appointmentDate: metadata?.appointmentDate ?? null,
-      appointmentAt: metadata?.appointmentAt ?? null,
-      providerNames: metadata?.providerNames ?? [],
-      visitTypes: metadata?.visitTypes ?? [],
-      includeFeedbackManagement: Boolean(session),
-    });
-  });
+  if (!prepared.ok) {
+    return NextResponse.json({ error: prepared.error }, { status: 500 });
+  }
+  const { rows, reviews } = prepared;
   const responseAtBySurveyToken = new Map(
     rows.flatMap((row) => row.survey_token ? [[row.survey_token, row.created_at] as const] : []),
   );
@@ -352,6 +425,7 @@ export async function GET(req: Request) {
       providers: providerReport.providers,
       appointments: providerReport.appointments,
       reviews,
+      assignees: assigneeResult.assignees,
       ready: true,
     },
     { headers: { "Cache-Control": "private, no-store, max-age=0" } },
@@ -365,9 +439,11 @@ export async function PATCH(req: Request) {
   }
 
   const settings = await getAppDashboardSettings();
-  if (!isNmacNavViewAllowed(session.role, SURVEY_RESULTS_NAV_VIEW_ID, settings?.roleNmacNav ?? {})) {
-    return unauthorized();
-  }
+  const hasFullSurveyAccess = isNmacNavViewAllowed(
+    session.role,
+    SURVEY_RESULTS_NAV_VIEW_ID,
+    settings?.roleNmacNav ?? {},
+  );
 
   let body: unknown;
   try {
@@ -392,7 +468,51 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
-  const result = await updateAppointmentReviewManagement(id, parsed.input, session.email);
+  const currentResult = await getAppointmentReviewManagement(id);
+  if (!currentResult.ok) {
+    return NextResponse.json(
+      {
+        error: currentResult.error,
+        setupRequired: currentResult.setupRequired ?? false,
+        setupSql: currentResult.setupRequired ? APPOINTMENT_REVIEWS_SETUP_SQL : undefined,
+      },
+      { status: currentResult.notFound ? 404 : currentResult.setupRequired ? 503 : 500 },
+    );
+  }
+
+  let input = parsed.input;
+  if (!hasFullSurveyAccess) {
+    if (currentResult.management.assignedToEmail !== session.email.trim().toLowerCase()) {
+      return unauthorized();
+    }
+    if (input.assignedToEmail !== currentResult.management.assignedToEmail) {
+      return NextResponse.json(
+        { error: "You cannot reassign this review." },
+        { status: 403 },
+      );
+    }
+    input = {
+      ...input,
+      responsiblePerson: currentResult.management.responsiblePerson,
+      assignedToEmail: currentResult.management.assignedToEmail,
+    };
+  } else if (input.assignedToEmail) {
+    const assigneeResult = await listAppointmentReviewAssignees();
+    if (!assigneeResult.ok) {
+      return NextResponse.json({ error: assigneeResult.error }, { status: 500 });
+    }
+    const assignee = assigneeResult.assignees.find(
+      (candidate) => candidate.email === input.assignedToEmail,
+    );
+    if (!assignee) {
+      return NextResponse.json({ error: "Choose a user from the app directory." }, { status: 400 });
+    }
+    input = { ...input, responsiblePerson: assignee.displayName };
+  } else {
+    input = { ...input, responsiblePerson: "" };
+  }
+
+  const result = await updateAppointmentReviewManagement(id, input, session.email);
   if (!result.ok) {
     return NextResponse.json(
       {

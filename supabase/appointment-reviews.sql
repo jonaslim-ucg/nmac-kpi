@@ -33,6 +33,7 @@ create table if not exists public.appointment_reviews (
   exceptional_staff_comment text not null default '',
   survey_token uuid unique,
   feedback_responsible_person text not null default '',
+  feedback_assigned_to_email text,
   feedback_status text not null default 'needs_review' check (feedback_status in ('needs_review', 'in_progress', 'actioned', 'no_action_needed')),
   feedback_notes text not null default '',
   feedback_updated_at timestamptz,

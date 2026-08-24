@@ -16,6 +16,7 @@ import {
   APPOINTMENT_REVIEW_ACTION_STATUS_OPTIONS,
   EMPTY_APPOINTMENT_REVIEW_MANAGEMENT,
   type AppointmentReviewActionStatus,
+  type AppointmentReviewAssignee,
   type AppointmentReviewManagement,
 } from "@/lib/appointment-review/management";
 import {
@@ -35,6 +36,8 @@ type Props = {
   onNext?: () => void;
   hasPrev?: boolean;
   hasNext?: boolean;
+  assignees?: AppointmentReviewAssignee[];
+  canAssignReview?: boolean;
   onManagementSaved: (management: AppointmentReviewManagement) => void;
 };
 
@@ -72,27 +75,29 @@ export function AppointmentReviewDetailModal({
   onNext,
   hasPrev,
   hasNext,
+  assignees = [],
+  canAssignReview = true,
   onManagementSaved,
 }: Props) {
   const writtenResponses = getAppointmentReviewWrittenResponses(review);
   const management = review.feedbackManagement ?? EMPTY_APPOINTMENT_REVIEW_MANAGEMENT;
-  const [responsiblePerson, setResponsiblePerson] = useState(management.responsiblePerson);
+  const [assignedToEmail, setAssignedToEmail] = useState(management.assignedToEmail ?? "");
   const [status, setStatus] = useState<AppointmentReviewActionStatus>(management.status);
   const [notes, setNotes] = useState(management.notes);
   const [savingManagement, setSavingManagement] = useState(false);
   const [managementError, setManagementError] = useState<string | null>(null);
   const [managementSaved, setManagementSaved] = useState(false);
-  const managementDirty = responsiblePerson.trim() !== management.responsiblePerson
+  const managementDirty = assignedToEmail !== (management.assignedToEmail ?? "")
     || status !== management.status
     || notes.trim() !== management.notes;
 
   useEffect(() => {
-    setResponsiblePerson(management.responsiblePerson);
+    setAssignedToEmail(management.assignedToEmail ?? "");
     setStatus(management.status);
     setNotes(management.notes);
     setManagementError(null);
     setManagementSaved(false);
-  }, [management.notes, management.responsiblePerson, management.status, review.id]);
+  }, [management.assignedToEmail, management.notes, management.status, review.id]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -125,7 +130,8 @@ export function AppointmentReviewDetailModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: review.id,
-          responsiblePerson,
+          responsiblePerson: management.responsiblePerson,
+          assignedToEmail: assignedToEmail || null,
           status,
           notes,
         }),
@@ -138,7 +144,7 @@ export function AppointmentReviewDetailModal({
         throw new Error(data.error ?? "Could not save feedback management.");
       }
       onManagementSaved(data.management);
-      setResponsiblePerson(data.management.responsiblePerson);
+      setAssignedToEmail(data.management.assignedToEmail ?? "");
       setStatus(data.management.status);
       setNotes(data.management.notes);
       setManagementSaved(true);
@@ -234,18 +240,28 @@ export function AppointmentReviewDetailModal({
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <label className="min-w-0 text-xs font-medium text-muted-foreground">
-                Responsible person
-                <input
-                  type="text"
-                  value={responsiblePerson}
-                  maxLength={120}
-                  onChange={(event) => {
-                    setResponsiblePerson(event.target.value);
-                    setManagementSaved(false);
-                  }}
-                  placeholder="Staff member or team"
-                  className="mt-1.5 h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-accent focus:ring-2 focus:ring-accent/20"
-                />
+                Assigned reviewer
+                {canAssignReview ? (
+                  <select
+                    value={assignedToEmail}
+                    onChange={(event) => {
+                      setAssignedToEmail(event.target.value);
+                      setManagementSaved(false);
+                    }}
+                    className="mt-1.5 h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  >
+                    <option value="">Unassigned</option>
+                    {assignees.map((assignee) => (
+                      <option key={assignee.email} value={assignee.email}>
+                        {assignee.displayName} — {assignee.email}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="mt-1.5 flex min-h-10 items-center rounded-lg border border-border bg-surface-muted/30 px-3 text-sm text-foreground">
+                    {management.responsiblePerson || management.assignedToEmail || "Unassigned"}
+                  </div>
+                )}
               </label>
               <label className="min-w-0 text-xs font-medium text-muted-foreground">
                 Status

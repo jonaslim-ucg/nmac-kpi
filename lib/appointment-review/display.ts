@@ -205,6 +205,7 @@ export function toAppointmentReviewDetail(
       ? {
           feedbackManagement: {
             responsiblePerson: text(row.feedback_responsible_person),
+            assignedToEmail: text(row.feedback_assigned_to_email).toLowerCase() || null,
             status: normalizeAppointmentReviewActionStatus(row.feedback_status),
             notes: text(row.feedback_notes),
             updatedAt: text(row.feedback_updated_at) || null,

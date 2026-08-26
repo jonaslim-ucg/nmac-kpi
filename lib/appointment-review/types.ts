@@ -23,6 +23,8 @@ export const SERVICE_TYPE_OPTIONS = [
   { value: "dr-gonzalez-fermin", label: "Dr. Fermin Gonzalez" },
   { value: "dr-flood-amani", label: "Dr. Amani Flood" },
   { value: "dr-dzepina-davor", label: "Dr. Davor Dzepina" },
+  { value: "phlebotomist-lab-appointment", label: "Phlebotomist Lab Appointment" },
+  { value: "ultrasound-technician", label: "Ultrasound Technician" },
   { value: "other", label: "Other Providers" },
 ] as const;
 

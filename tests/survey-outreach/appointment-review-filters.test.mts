@@ -12,8 +12,9 @@ import {
 function review(
   overrides: Partial<AppointmentReviewDetail> & Pick<AppointmentReviewDetail, "id">,
 ): AppointmentReviewDetail {
+  const { id, ...rest } = overrides;
   return {
-    id: overrides.id,
+    id,
     isTest: false,
     createdAt: "2026-08-25T12:00:00.000Z",
     appointmentDate: "2026-08-24",
@@ -57,7 +58,7 @@ function review(
       updatedAt: null,
       updatedBy: null,
     },
-    ...overrides,
+    ...rest,
   };
 }
 

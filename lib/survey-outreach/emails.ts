@@ -5,6 +5,7 @@ type EmailContent = { subject: string; textBody: string; htmlBody: string };
 
 const EMAIL_ASSET_BASE =
   "https://olonjbczxsytseikrajo.supabase.co/storage/v1/object/public/email-assets";
+const EMAIL_LOGO_URL = "https://kpi.nmac.bm/nmac-email-logo.png";
 const PRACTICE_NAME = "Northshore Medical & Aesthetics Center";
 const RAFFLE_COPY =
   "Complete this testimonial survey and you will automatically be entered into our quarterly draw for a chance to win one of two $100 gift vouchers.";
@@ -83,8 +84,8 @@ function buildHtmlBody(input: {
     '<td align="center" style="padding:24px 12px;">',
     '<table role="presentation" class="email-shell" width="640" cellspacing="0" cellpadding="0" border="0" style="width:640px;max-width:640px;background-color:#ffffff;border:1px solid #d7e3e6;border-radius:8px;overflow:hidden;">',
     "<tr>",
-    '<td align="center" style="padding:0;line-height:0;font-size:0;text-align:center;">',
-    `<img class="full-img" src="${EMAIL_ASSET_BASE}/header-full.png" width="640" height="79" alt="${safePracticeName}" style="display:block;width:640px;max-width:100%;height:auto;margin:0 auto;border:0;outline:none;text-decoration:none;">`,
+    '<td align="center" style="padding:20px 26px 16px;line-height:0;font-size:0;text-align:center;background-color:#ffffff;">',
+    `<img src="${EMAIL_LOGO_URL}" width="460" height="166" alt="${safePracticeName}" style="display:block;width:460px;max-width:100%;height:auto;margin:0 auto;border:0;outline:none;text-decoration:none;">`,
     "</td>",
     "</tr>",
     '<tr><td style="padding:0;height:1px;line-height:1px;font-size:1px;background-color:#d9e5e8;">&nbsp;</td></tr>',

@@ -20,7 +20,8 @@ test("builds an initial survey email from a CRM-formatted name", () => {
   assert.match(email.htmlBody, /\(441\) 293-5476/);
   assert.doesNotMatch(email.htmlBody, /293-0751/);
   assert.match(email.textBody, /Call \(441\) 293-5476/);
-  assert.match(email.htmlBody, /header-full\.png/);
+  assert.match(email.htmlBody, /https:\/\/kpi\.nmac\.bm\/nmac-email-logo\.png/);
+  assert.doesNotMatch(email.htmlBody, /header-full\.png/);
   assert.match(
     email.htmlBody,
     /https:\/\/kpi\.nmac\.bm\/appointment-review\?t=survey-token/,

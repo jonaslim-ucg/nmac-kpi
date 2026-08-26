@@ -5,7 +5,8 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Download,
+  FileSpreadsheet,
+  FileText,
   ListFilter,
   Loader2,
   RotateCcw,
@@ -59,6 +60,7 @@ type SortOption =
   | "name-desc"
   | "submitted-desc"
   | "submitted-asc";
+type ExportFormat = "excel" | "pdf";
 
 const PAGE_SIZE = 10;
 
@@ -172,6 +174,28 @@ function exportFileName(periodLabel: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "") || "selected-period";
   return `nmac-survey-answers-${period}.xlsx`;
+}
+
+function describeExportFilters(
+  filters: AppointmentReviewFilters,
+  commentFilter: CommentFilter,
+): string[] {
+  const descriptions: string[] = [];
+  if (filters.patientName) descriptions.push(`Patient: ${filters.patientName}`);
+  if (filters.visitType) descriptions.push(`Visit type: ${filters.visitType}`);
+  if (filters.handler) descriptions.push(`Handler: ${filters.handler}`);
+  if (filters.provider) descriptions.push(`Provider: ${filters.provider}`);
+  if (
+    filters.ratingMin !== APPOINTMENT_REVIEW_RATING_MIN ||
+    filters.ratingMax !== APPOINTMENT_REVIEW_RATING_MAX
+  ) {
+    descriptions.push(`Average rating: ${filters.ratingMin.toFixed(1)}-${filters.ratingMax.toFixed(1)}`);
+  }
+  if (filters.resolution) {
+    descriptions.push(`Handling resolution: ${appointmentReviewActionStatusLabel(filters.resolution)}`);
+  }
+  if (commentFilter === "with-comments") descriptions.push("Written responses only");
+  return descriptions;
 }
 
 async function downloadSurveyAnswers(
@@ -297,7 +321,8 @@ export function AppointmentReviewList({
     DEFAULT_APPOINTMENT_REVIEW_FILTERS,
   );
   const [page, setPage] = useState(1);
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState<ExportFormat | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const filterOptions = useMemo(
     () => getAppointmentReviewFilterOptions(reviews),
@@ -317,6 +342,40 @@ export function AppointmentReviewList({
   const pageReviews = filtered.slice(pageStart, pageStart + PAGE_SIZE);
   const liveCount = filtered.filter((review) => !review.isTest).length;
   const testCount = filtered.length - liveCount;
+  const exportFilters = describeExportFilters(filters, commentFilter);
+  const selectedSortLabel = SORT_OPTIONS.find((option) => option.value === sortOption)?.label
+    ?? "Submitted: newest";
+
+  const runExport = async (format: ExportFormat) => {
+    setExporting(format);
+    setExportError(null);
+    try {
+      if (format === "excel") {
+        await downloadSurveyAnswers(filtered, periodLabel);
+        return;
+      }
+      const { downloadAppointmentReviewPdf } = await import(
+        "@/lib/appointment-review/pdf-report"
+      );
+      await downloadAppointmentReviewPdf({
+        reviews: filtered,
+        periodLabel,
+        reportTitle: title === "My assigned reviews"
+          ? "My Assigned Survey Reviews"
+          : "Provider Experience Survey Report",
+        filterSummary: exportFilters,
+        sortLabel: selectedSortLabel,
+      });
+    } catch {
+      setExportError(
+        format === "pdf"
+          ? "The PDF report could not be created. Please try again."
+          : "The Excel workbook could not be created. Please try again.",
+      );
+    } finally {
+      setExporting(null);
+    }
+  };
 
   return (
     <div className="dashboard-card overflow-hidden">
@@ -340,20 +399,31 @@ export function AppointmentReviewList({
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            disabled={filtered.length === 0 || exporting}
-            onClick={() => {
-              setExporting(true);
-              void downloadSurveyAnswers(filtered, periodLabel).finally(() => setExporting(false));
-            }}
+            disabled={filtered.length === 0 || exporting !== null}
+            onClick={() => void runExport("excel")}
             className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition hover:bg-surface-muted/80 disabled:cursor-not-allowed disabled:opacity-40"
             title="Download all matching survey answers as an Excel workbook"
           >
-            {exporting ? (
+            {exporting === "excel" ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
             ) : (
-              <Download className="h-4 w-4" aria-hidden />
+              <FileSpreadsheet className="h-4 w-4" aria-hidden />
             )}
-            {exporting ? "Preparing Excel" : "Export Excel"}
+            {exporting === "excel" ? "Preparing Excel" : "Export Excel"}
+          </button>
+          <button
+            type="button"
+            disabled={filtered.length === 0 || exporting !== null}
+            onClick={() => void runExport("pdf")}
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition hover:bg-surface-muted/80 disabled:cursor-not-allowed disabled:opacity-40"
+            title="Download all matching survey answers as a formatted PDF report"
+          >
+            {exporting === "pdf" ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            ) : (
+              <FileText className="h-4 w-4" aria-hidden />
+            )}
+            {exporting === "pdf" ? "Preparing PDF" : "Export PDF"}
           </button>
           <label className="flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm text-muted-foreground">
             <ArrowUpDown className="h-4 w-4 shrink-0" aria-hidden />
@@ -459,6 +529,23 @@ export function AppointmentReviewList({
           ))}
         </div>
       </div>
+
+      {exportError ? (
+        <div
+          className="flex items-center justify-between gap-3 border-b border-red-500/25 bg-red-500/8 px-4 py-2.5 text-sm text-red-700 dark:text-red-300 sm:px-5"
+          role="alert"
+        >
+          <span>{exportError}</span>
+          <button
+            type="button"
+            onClick={() => setExportError(null)}
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-current transition hover:bg-red-500/10"
+            aria-label="Dismiss export error"
+          >
+            <X className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
+      ) : null}
 
       {filtersOpen ? (
         <div

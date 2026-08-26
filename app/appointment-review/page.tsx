@@ -22,12 +22,12 @@ export default async function AppointmentReviewPage({ searchParams }: Props) {
           <div className="mb-6 border-b border-border pb-6">
             <div className="flex justify-center">
               <Image
-                src="/nmac-logo.svg"
+                src="/nmac-email-logo.png"
                 alt="Northshore Medical & Aesthetics Center"
-                width={500}
-                height={164}
+                width={2000}
+                height={721}
                 priority
-                className="h-auto w-full max-w-60 sm:max-w-68"
+                className="h-auto w-full max-w-md"
               />
             </div>
             <h1 className="mt-5 text-xl font-semibold tracking-tight text-foreground">Provider experience survey</h1>

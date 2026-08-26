@@ -117,10 +117,7 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
     TESTIMONIAL_VALUES.has(b.testimonialPermission as TestimonialPermissionValue)
       ? (b.testimonialPermission as TestimonialPermissionValue)
       : null;
-  const testimonialText =
-    testimonialPermission === "yes-named" || testimonialPermission === "yes-anonymous"
-      ? str(b.testimonialText, 2000)
-      : "";
+  const testimonialText = str(b.testimonialText, 2000);
   const waitTime =
     typeof b.waitTime === "string" && WAIT_VALUES.has(b.waitTime as never) ? b.waitTime : null;
   const patientDuration =
@@ -151,7 +148,7 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
   }
 
   if (!isTestimonialComplete(testimonialPermission, testimonialText)) {
-    return { error: "Please enter the testimonial you would like us to use." };
+    return { error: "Please write your testimonial before continuing." };
   }
 
   const referralSources =

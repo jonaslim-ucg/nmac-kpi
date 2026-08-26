@@ -11,7 +11,6 @@ import {
   WAIT_TIME_OPTIONS,
   areProviderRatingsComplete,
   isTestimonialComplete,
-  isTestimonialPermissionGranted,
   isNewPatientDuration,
   isReferralSourceComplete,
   areServiceTypesComplete,
@@ -272,11 +271,12 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
         setError("Please rate each provider you selected.");
         return;
       }
-      if (
-        isTestimonialPermissionGranted(form.testimonialPermission) &&
-        !form.testimonialText.trim()
-      ) {
-        setError("Please enter the testimonial you would like us to use.");
+      if (!form.testimonialText.trim()) {
+        setError("Please write your testimonial before continuing.");
+        return;
+      }
+      if (!form.testimonialPermission) {
+        setError("Please choose whether NMAC may use your comments in marketing materials.");
         return;
       }
       if (
@@ -321,7 +321,6 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
   }, [form]);
 
   const showReferralQuestion = isNewPatientDuration(form.patientDuration);
-  const showTestimonialText = isTestimonialPermissionGranted(form.testimonialPermission);
 
   if (linkLoading) {
     return (
@@ -552,9 +551,36 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
 
       <QuestionBlock
         number={7}
-        title="May we use your comments as a testimonial in our marketing materials (website, social media, advertisements, and other promotional materials)?"
+        title="We would love for you to write us a customer/patient testimonial! Write your response below and indicate if we can use your comments as a testimonial in our marketing materials."
         required
       >
+        <label className="block rounded-lg border border-accent/30 bg-accent-muted/30 p-4">
+          <span className="text-sm font-semibold text-foreground">
+            Your testimonial
+            <span className="ml-0.5 text-red-600 dark:text-red-400">*</span>
+          </span>
+          <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+            Tell us what you would like others to know about your experience. You can choose how NMAC may use your
+            comments below.
+          </span>
+          <textarea
+            value={form.testimonialText}
+            onChange={(e) => patch({ testimonialText: e.target.value })}
+            disabled={busy}
+            required
+            maxLength={2000}
+            rows={4}
+            placeholder="Tell us what you would like others to know about your experience..."
+            className="mt-3 w-full resize-y rounded-lg border border-border bg-background px-3 py-2.5 text-sm leading-relaxed text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
+          />
+          <span className="mt-1 block text-right text-xs tabular-nums text-muted-foreground">
+            {form.testimonialText.length}/2000
+          </span>
+        </label>
+        <p className="mb-2 mt-4 text-sm font-semibold text-foreground">
+          May NMAC use your comments in marketing materials?
+          <span className="ml-0.5 text-red-600 dark:text-red-400">*</span>
+        </p>
         <div className="space-y-2" role="radiogroup" aria-label="Testimonial permission">
           {TESTIMONIAL_PERMISSION_OPTIONS.map(({ value, label }) => (
             <label
@@ -570,12 +596,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
                 name="testimonial-permission"
                 value={value}
                 checked={form.testimonialPermission === value}
-                onChange={() =>
-                  patch({
-                    testimonialPermission: value,
-                    ...(value === "confidential" ? { testimonialText: "" } : {}),
-                  })
-                }
+                onChange={() => patch({ testimonialPermission: value })}
                 disabled={busy}
                 className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
               />
@@ -583,33 +604,6 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
             </label>
           ))}
         </div>
-        {showTestimonialText ? (
-          <label className="mt-4 block rounded-lg border border-accent/30 bg-accent-muted/30 p-4">
-            <span className="text-sm font-semibold text-foreground">
-              Your testimonial
-              <span className="ml-0.5 text-red-600 dark:text-red-400">*</span>
-            </span>
-            <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
-              Share the comment you would like Northshore Medical &amp; Aesthetics Center to use.
-              {form.testimonialPermission === "yes-anonymous"
-                ? " Your name will not be included in marketing materials."
-                : ""}
-            </span>
-            <textarea
-              value={form.testimonialText}
-              onChange={(e) => patch({ testimonialText: e.target.value })}
-              disabled={busy}
-              required
-              maxLength={2000}
-              rows={4}
-              placeholder="Tell us what you would like others to know about your experience..."
-              className="mt-3 w-full resize-y rounded-lg border border-border bg-background px-3 py-2.5 text-sm leading-relaxed text-foreground outline-none ring-accent placeholder:text-muted-foreground/70 focus:ring-2"
-            />
-            <span className="mt-1 block text-right text-xs tabular-nums text-muted-foreground">
-              {form.testimonialText.length}/2000
-            </span>
-          </label>
-        ) : null}
       </QuestionBlock>
 
       <p className="border-t border-border pt-8 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

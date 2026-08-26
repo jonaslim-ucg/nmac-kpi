@@ -21,7 +21,10 @@ import {
 import type { AppointmentReviewStats } from "@/lib/appointment-review/analytics";
 import type { AppointmentReviewDetail } from "@/lib/appointment-review/display";
 import { appointmentReviewActionStatusLabel } from "@/lib/appointment-review/management";
-import { APPOINTMENT_REVIEW_MAX_SCORE } from "@/lib/appointment-review/types";
+import {
+  APPOINTMENT_REVIEW_MAX_SCORE,
+  isTestimonialPermissionGranted,
+} from "@/lib/appointment-review/types";
 import type { DailyCheckoutPoint } from "@/lib/survey-outreach/checkout-stats";
 import type { DailyInitialSurveySendPoint } from "@/lib/survey-outreach/sent-stats";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
@@ -191,7 +194,12 @@ export function AppointmentReviewDashboard({
   }));
   const dailyPatientVolume = mergeDailyPatientVolume(dailyCheckouts, dailySurveySends);
   const testimonialResponses = reviews
-    .filter((review) => !review.isTest && review.testimonialText.trim().length > 0)
+    .filter(
+      (review) =>
+        !review.isTest &&
+        isTestimonialPermissionGranted(review.testimonialPermission) &&
+        review.testimonialText.trim().length > 0,
+    )
     .map((review) => ({ review, text: review.testimonialText.trim() }))
     .sort((a, b) => b.review.createdAt.localeCompare(a.review.createdAt));
   const exceptionalStaffResponses = reviews

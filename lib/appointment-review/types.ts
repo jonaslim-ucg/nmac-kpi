@@ -39,7 +39,7 @@ export function isNewPatientDuration(duration: PatientDurationValue | null): boo
 export const TESTIMONIAL_PERMISSION_OPTIONS = [
   {
     value: "yes-named",
-    label: "Yes, I give Northshore Medical & Aesthetics Center permission to use my comments.",
+    label: "Yes, I give Northshore Medical & Aesthetics Center permission to use my comments with my name.",
   },
   {
     value: "yes-anonymous",
@@ -158,9 +158,7 @@ export function isTestimonialComplete(
   permission: TestimonialPermissionValue | null,
   testimonialText: string,
 ): boolean {
-  if (!permission) return false;
-  if (!isTestimonialPermissionGranted(permission)) return true;
-  return testimonialText.trim().length > 0;
+  return permission !== null && testimonialText.trim().length > 0;
 }
 
 export function areProviderRatingsComplete(

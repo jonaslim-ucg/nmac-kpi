@@ -2,6 +2,7 @@ import { buildAppointmentReviewStats, type AppointmentReviewRow } from "@/lib/ap
 import { normalizeAppointmentReviewActionStatus } from "@/lib/appointment-review/management";
 import { parseAppointmentReviewReportRange } from "@/lib/appointment-review/report";
 import { listAppointmentReviews } from "@/lib/appointment-review/store";
+import { isTestimonialPermissionGranted } from "@/lib/appointment-review/types";
 import { sendMailViaGraph } from "@/lib/graph/send-mail";
 import { listInitialSurveyBouncesForReport } from "@/lib/survey-outreach/bounce-store";
 import { isScheduledTestRecipientAllowed } from "@/lib/survey-outreach/config";
@@ -119,7 +120,11 @@ export async function buildSurveyMonthlyReportSummary(
       recommend: averageOrNull(stats.averages.recommendationRating, hasResponses),
       frontDesk: averageOrNull(stats.averages.frontDeskRating, hasResponses),
     },
-    testimonials: reviews.filter((row) => row.testimonial_text.trim().length > 0).length,
+    testimonials: reviews.filter(
+      (row) =>
+        isTestimonialPermissionGranted(row.testimonial_permission) &&
+        row.testimonial_text.trim().length > 0,
+    ).length,
     exceptionalStaffResponses: reviews.filter(
       (row) => row.exceptional_staff_comment.trim().length > 0,
     ).length,

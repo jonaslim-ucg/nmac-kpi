@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  FileDown,
   Loader2,
   MessageSquareText,
   Save,
@@ -87,6 +88,8 @@ export function AppointmentReviewDetailModal({
   const [savingManagement, setSavingManagement] = useState(false);
   const [managementError, setManagementError] = useState<string | null>(null);
   const [managementSaved, setManagementSaved] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const managementDirty = assignedToEmail !== (management.assignedToEmail ?? "")
     || status !== management.status
     || notes.trim() !== management.notes;
@@ -97,6 +100,7 @@ export function AppointmentReviewDetailModal({
     setNotes(management.notes);
     setManagementError(null);
     setManagementSaved(false);
+    setExportError(null);
   }, [management.assignedToEmail, management.notes, management.status, review.id]);
 
   const handleKeyDown = useCallback(
@@ -155,6 +159,22 @@ export function AppointmentReviewDetailModal({
     }
   }
 
+  async function exportReviewPdf() {
+    if (exportingPdf) return;
+    setExportingPdf(true);
+    setExportError(null);
+    try {
+      const { downloadSingleAppointmentReviewPdf } = await import(
+        "@/lib/appointment-review/pdf-report"
+      );
+      await downloadSingleAppointmentReviewPdf(review);
+    } catch {
+      setExportError("This patient review could not be exported. Please try again.");
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
       <button type="button" className="absolute inset-0 bg-black/50" aria-label="Close review" onClick={onClose} />
@@ -179,15 +199,39 @@ export function AppointmentReviewDetailModal({
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">{formatReviewWhen(review.createdAt)}</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-border p-1.5 text-muted-foreground transition hover:bg-surface-muted/80 hover:text-foreground"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" aria-hidden />
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              disabled={exportingPdf}
+              onClick={() => void exportReviewPdf()}
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition hover:bg-surface-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
+              title="Download this patient review as a print-ready PDF"
+            >
+              {exportingPdf ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <FileDown className="h-4 w-4" aria-hidden />
+              )}
+              <span className="hidden sm:inline">
+                {exportingPdf ? "Preparing PDF" : "Export PDF"}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-border p-1.5 text-muted-foreground transition hover:bg-surface-muted/80 hover:text-foreground"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
         </div>
+
+        {exportError ? (
+          <div className="border-b border-border bg-red-500/10 px-5 py-2 text-xs font-medium text-red-600 dark:text-red-400" role="alert">
+            {exportError}
+          </div>
+        ) : null}
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
           <section aria-labelledby="review-visit-heading">

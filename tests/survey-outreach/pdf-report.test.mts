@@ -4,7 +4,9 @@ import type { AppointmentReviewDetail } from "../../lib/appointment-review/displ
 import {
   appointmentReviewPdfFileName,
   buildAppointmentReviewPdf,
+  buildSingleAppointmentReviewPdf,
   normalizePdfText,
+  singleAppointmentReviewPdfFileName,
 } from "../../lib/appointment-review/pdf-report.ts";
 
 function review(id: string, overrides: Partial<AppointmentReviewDetail> = {}): AppointmentReviewDetail {
@@ -67,9 +69,16 @@ test("creates a stable PDF filename for the selected report period", () => {
     appointmentReviewPdfFileName("Jul 22, 2026 - Aug 26, 2026"),
     "nmac-survey-report-jul-22-2026-aug-26-2026.pdf",
   );
+  assert.equal(
+    singleAppointmentReviewPdfFileName(review("filename", {
+      patientName: "Patient, Sample / Jr.",
+      appointmentDate: "2026-08-25",
+    })),
+    "nmac-survey-review-patient-sample-jr-2026-08-25.pdf",
+  );
 });
 
-test("builds a multi-page survey report with one section per response", () => {
+test("builds a compact patient report with a clickable contents page", () => {
   const doc = buildAppointmentReviewPdf({
     reviews: [review("one"), review("two", { patientName: "Patient, Second", isTest: true })],
     periodLabel: "Aug 1, 2026 - Aug 26, 2026",
@@ -80,10 +89,38 @@ test("builds a multi-page survey report with one section per response", () => {
     logoData: null,
   });
 
-  assert.ok(doc.getNumberOfPages() >= 3);
+  assert.equal(doc.getNumberOfPages(), 4);
   const bytes = new Uint8Array(doc.output("arraybuffer"));
   assert.equal(new TextDecoder().decode(bytes.slice(0, 5)), "%PDF-");
   assert.ok(bytes.byteLength > 5_000);
+  assert.match(new TextDecoder().decode(bytes), /\/Dest\s*\[/);
+});
+
+test("keeps a typical individual patient review on one page", () => {
+  const doc = buildSingleAppointmentReviewPdf(review("single"), {
+    generatedAt: new Date("2026-08-27T01:00:00.000Z"),
+    logoData: null,
+  });
+
+  assert.equal(doc.getNumberOfPages(), 1);
+  assert.doesNotThrow(() => doc.output("arraybuffer"));
+});
+
+test("keeps every patient link when the contents directory spans pages", () => {
+  const reviews = Array.from({ length: 35 }, (_, index) => review(`patient-${index}`, {
+    patientName: `Patient, ${String(index + 1).padStart(2, "0")}`,
+    feedbackManagement: undefined,
+  }));
+  const doc = buildAppointmentReviewPdf({
+    reviews,
+    periodLabel: "Current quarter",
+    generatedAt: new Date("2026-08-27T01:00:00.000Z"),
+    logoData: null,
+  });
+
+  assert.equal(doc.getNumberOfPages(), 38);
+  const pdfSource = new TextDecoder().decode(new Uint8Array(doc.output("arraybuffer")));
+  assert.ok((pdfSource.match(/\/Dest\s*\[/g) ?? []).length >= 70);
 });
 
 test("continues a long testimonial onto additional pages without throwing", () => {
@@ -98,6 +135,6 @@ test("continues a long testimonial onto additional pages without throwing", () =
     logoData: null,
   });
 
-  assert.ok(doc.getNumberOfPages() >= 3);
+  assert.ok(doc.getNumberOfPages() >= 4);
   assert.doesNotThrow(() => doc.output("arraybuffer"));
 });

@@ -139,7 +139,6 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
     frontDeskRating === null ||
     !serviceTypes ||
     !areServiceTypesComplete(serviceTypes, serviceTypeOther) ||
-    !testimonialPermission ||
     !waitTime ||
     !patientDuration ||
     providerTimeAdequate === null
@@ -148,7 +147,7 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
   }
 
   if (!isTestimonialComplete(testimonialPermission, testimonialText)) {
-    return { error: "Please write your testimonial before continuing." };
+    return { error: "Please choose whether NMAC may use your comments in marketing materials." };
   }
 
   const referralSources =
@@ -179,7 +178,7 @@ function parsePayload(body: unknown): AppointmentReviewPayload | { error: string
     recommendationRating,
     wouldEncouragePatient,
     recommendationMessage: "",
-    testimonialPermission,
+    testimonialPermission: testimonialText ? (testimonialPermission ?? "confidential") : "confidential",
     testimonialText,
     waitTime: waitTime as AppointmentReviewPayload["waitTime"],
     providerTimeAdequate,

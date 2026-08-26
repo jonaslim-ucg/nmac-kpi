@@ -47,7 +47,7 @@ export const TESTIMONIAL_PERMISSION_OPTIONS = [
   },
   {
     value: "confidential",
-    label: "No, I prefer my feedback remain confidential.",
+    label: "No, I prefer my feedback to remain confidential.",
   },
 ] as const;
 
@@ -154,11 +154,15 @@ export function isTestimonialPermissionGranted(
   return permission === "yes-named" || permission === "yes-anonymous";
 }
 
+export function shouldRequestTestimonialPermission(testimonialText: string): boolean {
+  return testimonialText.trim().length > 0;
+}
+
 export function isTestimonialComplete(
   permission: TestimonialPermissionValue | null,
   testimonialText: string,
 ): boolean {
-  return permission !== null && testimonialText.trim().length > 0;
+  return !shouldRequestTestimonialPermission(testimonialText) || permission !== null;
 }
 
 export function areProviderRatingsComplete(

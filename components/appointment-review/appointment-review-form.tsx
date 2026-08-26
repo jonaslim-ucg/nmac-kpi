@@ -11,12 +11,12 @@ import {
   WAIT_TIME_OPTIONS,
   areProviderRatingsComplete,
   isTestimonialComplete,
+  shouldRequestTestimonialPermission,
   isNewPatientDuration,
   isReferralSourceComplete,
   areServiceTypesComplete,
   serviceTypeLabel,
   type AppointmentReviewFormState,
-  type AppointmentReviewPayload,
 } from "@/lib/appointment-review/types";
 import { isValidEmailFormat } from "@/lib/auth/email-policy";
 
@@ -159,7 +159,7 @@ function QuestionBlock({
   );
 }
 
-function isFormComplete(form: AppointmentReviewFormState): form is AppointmentReviewPayload {
+function isFormComplete(form: AppointmentReviewFormState): boolean {
   return (
     isValidEmailFormat(form.email.trim()) &&
     form.patientName.trim().length > 0 &&
@@ -169,7 +169,6 @@ function isFormComplete(form: AppointmentReviewFormState): form is AppointmentRe
     areProviderRatingsComplete(form.serviceTypes, form.providerRatings) &&
     form.healthRating !== null &&
     form.recommendationRating !== null &&
-    form.testimonialPermission !== null &&
     isTestimonialComplete(form.testimonialPermission, form.testimonialText) &&
     form.waitTime !== null &&
     form.providerTimeAdequate !== null &&
@@ -271,11 +270,7 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
         setError("Please rate each provider you selected.");
         return;
       }
-      if (!form.testimonialText.trim()) {
-        setError("Please write your testimonial before continuing.");
-        return;
-      }
-      if (!form.testimonialPermission) {
+      if (shouldRequestTestimonialPermission(form.testimonialText) && !form.testimonialPermission) {
         setError("Please choose whether NMAC may use your comments in marketing materials.");
         return;
       }
@@ -552,12 +547,11 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
       <QuestionBlock
         number={7}
         title="We would love for you to write us a customer/patient testimonial! Write your response below and indicate if we can use your comments as a testimonial in our marketing materials."
-        required
       >
         <label className="block rounded-lg border border-accent/30 bg-accent-muted/30 p-4">
           <span className="text-sm font-semibold text-foreground">
             Your testimonial
-            <span className="ml-0.5 text-red-600 dark:text-red-400">*</span>
+            <span className="ml-1 font-normal text-muted-foreground">(optional)</span>
           </span>
           <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
             Tell us what you would like others to know about your experience. You can choose how NMAC may use your
@@ -565,9 +559,14 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
           </span>
           <textarea
             value={form.testimonialText}
-            onChange={(e) => patch({ testimonialText: e.target.value })}
+            onChange={(e) => {
+              const testimonialText = e.target.value;
+              patch({
+                testimonialText,
+                testimonialPermission: testimonialText.trim() ? form.testimonialPermission : null,
+              });
+            }}
             disabled={busy}
-            required
             maxLength={2000}
             rows={4}
             placeholder="Tell us what you would like others to know about your experience..."
@@ -577,33 +576,37 @@ export function AppointmentReviewForm({ surveyToken = null }: { surveyToken?: st
             {form.testimonialText.length}/2000
           </span>
         </label>
-        <p className="mb-2 mt-4 text-sm font-semibold text-foreground">
-          May NMAC use your comments in marketing materials?
-          <span className="ml-0.5 text-red-600 dark:text-red-400">*</span>
-        </p>
-        <div className="space-y-2" role="radiogroup" aria-label="Testimonial permission">
-          {TESTIMONIAL_PERMISSION_OPTIONS.map(({ value, label }) => (
-            <label
-              key={value}
-              className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 text-sm transition ${
-                form.testimonialPermission === value
-                  ? "border-accent bg-accent-muted/60"
-                  : "border-border bg-background hover:border-accent/40"
-              } ${busy ? "cursor-not-allowed opacity-50" : ""}`}
-            >
-              <input
-                type="radio"
-                name="testimonial-permission"
-                value={value}
-                checked={form.testimonialPermission === value}
-                onChange={() => patch({ testimonialPermission: value })}
-                disabled={busy}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
-              />
-              <span className="leading-snug">{label}</span>
-            </label>
-          ))}
-        </div>
+        {shouldRequestTestimonialPermission(form.testimonialText) ? (
+          <div className="mt-4">
+            <p className="mb-2 text-sm font-semibold text-foreground">
+              May NMAC use your comments in marketing materials?
+              <span className="ml-0.5 text-red-600 dark:text-red-400">*</span>
+            </p>
+            <div className="space-y-2" role="radiogroup" aria-label="Testimonial permission">
+              {TESTIMONIAL_PERMISSION_OPTIONS.map(({ value, label }) => (
+                <label
+                  key={value}
+                  className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 text-sm transition ${
+                    form.testimonialPermission === value
+                      ? "border-accent bg-accent-muted/60"
+                      : "border-border bg-background hover:border-accent/40"
+                  } ${busy ? "cursor-not-allowed opacity-50" : ""}`}
+                >
+                  <input
+                    type="radio"
+                    name="testimonial-permission"
+                    value={value}
+                    checked={form.testimonialPermission === value}
+                    onChange={() => patch({ testimonialPermission: value })}
+                    disabled={busy}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
+                  />
+                  <span className="leading-snug">{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </QuestionBlock>
 
       <p className="border-t border-border pt-8 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

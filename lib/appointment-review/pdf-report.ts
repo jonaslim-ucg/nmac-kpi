@@ -16,6 +16,7 @@ const FOOTER_Y = PAGE_HEIGHT - 30;
 const CONTENT_BOTTOM = PAGE_HEIGHT - 52;
 const TOC_ENTRIES_PER_PAGE = 34;
 const CONTINUATION_ANSWER_START_Y = 131;
+const ANSWER_DIVIDER_AFTER_GAP = 10;
 
 const NAVY: PdfColor = [7, 23, 51];
 const TEAL: PdfColor = [8, 117, 125];
@@ -562,7 +563,10 @@ function prepareAnswerRows(
     const pair = answers.slice(index, index + 2);
     const cellWidth = pair.length === 1 ? CONTENT_WIDTH : columnWidth;
     const items = pair.map((answer) => prepareAnswer(doc, answer, cellWidth - 4, style));
-    rows.push({ items, height: Math.max(...items.map((item) => item.height)) + 4 });
+    rows.push({
+      items,
+      height: Math.max(...items.map((item) => item.height)) + ANSWER_DIVIDER_AFTER_GAP,
+    });
   }
   return rows;
 }
@@ -582,7 +586,7 @@ function chooseAnswerStyle(
         { label: "Staff-only follow-up notes", value: managementNotes },
         CONTENT_WIDTH - 4,
         style,
-      ).height
+      ).height + ANSWER_DIVIDER_AFTER_GAP
       : 0;
     if (rowsHeight + notesHeight <= availableHeight) return style;
   }
@@ -623,7 +627,12 @@ function drawPreparedAnswerRow(
   });
   setDraw(doc, BORDER);
   doc.setLineWidth(0.35);
-  doc.line(MARGIN, y + row.height - 3, PAGE_WIDTH - MARGIN, y + row.height - 3);
+  doc.line(
+    MARGIN,
+    y + row.height - ANSWER_DIVIDER_AFTER_GAP,
+    PAGE_WIDTH - MARGIN,
+    y + row.height - ANSWER_DIVIDER_AFTER_GAP,
+  );
   return y + row.height;
 }
 
@@ -665,7 +674,10 @@ function drawPaginatedAnswer(
 
     const availableLines = Math.max(
       1,
-      Math.floor((CONTENT_BOTTOM - y - style.blockGap) / style.valueLineHeight),
+      Math.floor(
+        (CONTENT_BOTTOM - y - style.blockGap - ANSWER_DIVIDER_AFTER_GAP)
+          / style.valueLineHeight,
+      ),
     );
     const chunk = valueLines.slice(valueIndex, valueIndex + availableLines);
     doc.setFont("helvetica", "normal");
@@ -683,8 +695,8 @@ function drawPaginatedAnswer(
 
   setDraw(doc, BORDER);
   doc.setLineWidth(0.35);
-  doc.line(MARGIN, y + style.blockGap - 3, PAGE_WIDTH - MARGIN, y + style.blockGap - 3);
-  return y + style.blockGap;
+  doc.line(MARGIN, y + style.blockGap, PAGE_WIDTH - MARGIN, y + style.blockGap);
+  return y + style.blockGap + ANSWER_DIVIDER_AFTER_GAP;
 }
 
 type ReviewPageEntry = {
@@ -858,7 +870,8 @@ function drawResponsePages(
       label: "Staff-only follow-up notes",
       value: management.notes,
     };
-    const notesHeight = prepareAnswer(doc, notesAnswer, CONTENT_WIDTH - 4, style).height;
+    const notesHeight = prepareAnswer(doc, notesAnswer, CONTENT_WIDTH - 4, style).height
+      + ANSWER_DIVIDER_AFTER_GAP;
     if (y + 30 + notesHeight > CONTENT_BOTTOM) {
       y = drawSectionHeading(doc, startContinuationPage(), "Internal handling notes");
     } else {

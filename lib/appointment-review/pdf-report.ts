@@ -35,6 +35,7 @@ export type AppointmentReviewPdfReportInput = {
   sortLabel?: string;
   generatedAt?: Date;
   logoData?: Uint8Array | string | null;
+  showPeriodInHeader?: boolean;
 };
 
 function setFill(doc: jsPDF, color: PdfColor): void {
@@ -202,10 +203,12 @@ function drawCompactPageHeader(
   doc.text(normalizePdfText(input.reportTitle ?? "Provider Experience Survey Report"), PAGE_WIDTH - MARGIN, 28, {
     align: "right",
   });
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  setText(doc, MUTED);
-  doc.text(normalizePdfText(input.periodLabel), PAGE_WIDTH - MARGIN, 42, { align: "right" });
+  if (input.showPeriodInHeader !== false) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    setText(doc, MUTED);
+    doc.text(normalizePdfText(input.periodLabel), PAGE_WIDTH - MARGIN, 42, { align: "right" });
+  }
   if (contentsPage) {
     const linkText = "Back to contents";
     doc.setFont("helvetica", "bold");
@@ -391,14 +394,16 @@ function drawResponseTitle(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
   setText(doc, WHITE);
-  doc.text(nameLines, MARGIN + 15, y + 21);
-  doc.setFontSize(9);
-  setText(doc, review.isTest ? GREEN : BLUE);
   doc.text(
-    review.isTest ? "TEST RESPONSE" : "LIVE RESPONSE",
+    nameLines,
     MARGIN + 15,
-    y + (nameLines.length > 1 ? 51 : 39),
+    y + (review.isTest ? 21 : nameLines.length > 1 ? 22 : 29),
   );
+  if (review.isTest) {
+    doc.setFontSize(9);
+    setText(doc, GREEN);
+    doc.text("TEST RESPONSE", MARGIN + 15, y + (nameLines.length > 1 ? 51 : 39));
+  }
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   setText(doc, WHITE);
@@ -426,10 +431,11 @@ function drawMetadataGrid(
   let y = startY;
   for (let index = 0; index < items.length; index += 2) {
     const pair = items.slice(index, index + 2);
+    const itemWidth = pair.length === 1 ? CONTENT_WIDTH : columnWidth;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    const lineSets = pair.map((item) => splitLines(doc, item.value, columnWidth - 4));
-    const rowHeight = Math.max(27, ...lineSets.map((lines) => 13 + lines.length * 9.5));
+    const lineSets = pair.map((item) => splitLines(doc, item.value, itemWidth - 4));
+    const rowHeight = Math.max(31, ...lineSets.map((lines) => 21.5 + lines.length * 9.5));
     if (y + rowHeight > CONTENT_BOTTOM) y = startContinuationPage();
     pair.forEach((item, pairIndex) => {
       const x = MARGIN + pairIndex * (columnWidth + gap);
@@ -441,10 +447,10 @@ function drawMetadataGrid(
       doc.setFontSize(8);
       setText(doc, NAVY);
       doc.text(lineSets[pairIndex], x, y + 11);
+      setDraw(doc, BORDER);
+      doc.setLineWidth(0.35);
+      doc.line(x, y + rowHeight - 10, x + itemWidth, y + rowHeight - 10);
     });
-    setDraw(doc, BORDER);
-    doc.setLineWidth(0.35);
-    doc.line(MARGIN, y + rowHeight - 4, PAGE_WIDTH - MARGIN, y + rowHeight - 4);
     y += rowHeight;
   }
   return y;
@@ -801,10 +807,9 @@ function drawResponsePages(
       value: `${formatPdfAppointmentDate(review.appointmentDate)} | ${formatPdfAppointmentTime(review.appointmentAt)}`,
     },
     { label: "Email", value: review.email },
-    { label: "Response type", value: review.isTest ? "Test response" : "Live response" },
+    { label: "Handler", value: getAppointmentReviewHandler(review) },
     { label: "Appointment provider(s)", value: joined(review.appointmentProviderNames) },
     { label: "Visit type(s)", value: joined(review.appointmentVisitTypes) },
-    { label: "Handler", value: getAppointmentReviewHandler(review) },
     {
       label: "Handling resolution",
       value: management ? appointmentReviewActionStatusLabel(management.status) : "Needs review",
@@ -952,6 +957,7 @@ export function buildSingleAppointmentReviewPdf(
     reportTitle: "Patient Survey Review",
     generatedAt: options.generatedAt,
     logoData: options.logoData,
+    showPeriodInHeader: false,
   };
   const doc = createPdfDocument();
   setDocumentProperties(
